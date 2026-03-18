@@ -1,0 +1,1402 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:McpManager.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
+        x:Class="McpManager.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="MCP Manager"
+        Icon="/Assets/app-icon.png"
+        Width="1200" Height="700"
+        MinWidth="900" MinHeight="600">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel />
+    </Design.DataContext>
+
+    <Window.Styles>
+        <Style Selector="Button">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="CornerRadius" Value="9" />
+        </Style>
+        <Style Selector="Button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemAccentColorLight2}" />
+        </Style>
+        <Style Selector="Button:pressed">
+            <Setter Property="Background" Value="{DynamicResource SystemAccentColorDark1}" />
+        </Style>
+        <Style Selector="Button:focus-visible">
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+        <Style Selector="Button.sidebar-nav">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.sidebar-nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+        </Style>
+        <Style Selector="Button.sidebar-nav.sidebar-active">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListAccentLowBrush}" />
+        </Style>
+        <Style Selector="Button.sidebar-nav.sidebar-active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListAccentLowBrush}" />
+        </Style>
+        <Style Selector="ListBox.sidebar-inactive ListBoxItem:selected">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <Style Selector="ListBox.sidebar-inactive ListBoxItem:selected:pointerover">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <Style Selector="ListBox.sidebar-inactive ListBoxItem:selected:focus">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+
+        <!-- Add Button -->
+        <Style Selector="Button.addButton">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="9" />
+        </Style>
+        <Style Selector="Button.addButton:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+
+        <!-- Empty State Button -->
+        <Style Selector="Button.emptyStateButton">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="CornerRadius" Value="9" />
+        </Style>
+
+        <!-- Sidebar Button -->
+        <Style Selector="Button.sidebarButton">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="CornerRadius" Value="9" />
+        </Style>
+        <Style Selector="Button.sidebarButton:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+        </Style>
+
+        <!-- Toolbar Button -->
+        <Style Selector="Button.toolbarButton">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="16,8" />
+            <Setter Property="CornerRadius" Value="9" />
+        </Style>
+        <Style Selector="Button.toolbarButton:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+        </Style>
+
+        <!-- Action Card -->
+        <Style Selector="Button.actionCard">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="Padding" Value="20" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Width" Value="180" />
+            <Setter Property="Height" Value="104" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+        </Style>
+        <Style Selector="Button.actionCard:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+
+        <Style Selector="Border.summaryCard">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="18" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="Width" Value="220" />
+            <Setter Property="MinHeight" Value="132" />
+        </Style>
+
+        <Style Selector="Border.emptyOverviewCard">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="24" />
+        </Style>
+
+        <Style Selector="TextBlock.summaryValue">
+            <Setter Property="FontSize" Value="30" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+
+        <!-- Server Card -->
+        <Style Selector="Button.serverCard">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+        </Style>
+        <Style Selector="Button.serverCard:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+
+        <!-- Detail Card -->
+        <Style Selector="Border.detailCard">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="20" />
+        </Style>
+
+        <Style Selector="Border.browseSummaryCard">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="18" />
+        </Style>
+
+        <Style Selector="Border.secondaryCard">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="18" />
+        </Style>
+
+        <Style Selector="Border.secondaryPanel">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="14" />
+        </Style>
+
+        <Style Selector="TextBlock.cardEyebrow">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Opacity" Value="0.75" />
+        </Style>
+
+        <Style Selector="TextBlock.metaLabel">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Opacity" Value="0.75" />
+        </Style>
+
+        <Style Selector="TextBlock.metaValue">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+
+        <Style Selector="Border.inlineBadge">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+
+        <Style Selector="TextBlock.inlineBadgeText">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Opacity" Value="0.75" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
+
+        <!-- Form Field -->
+        <Style Selector="TextBox.formField">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+        <Style Selector="ComboBox.formField">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+        <!-- Hide the focus underline on ComboBox -->
+        <Style Selector="ComboBox.formField /template/ Border#HighlightBackground">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="ComboBox.formField:focus /template/ Border">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+
+        <Style Selector="TextBox.outputBox">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontFamily" Value="Consolas,Menlo,monospace" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+        </Style>
+
+        <!-- Primary Button -->
+        <Style Selector="Button.primaryButton">
+            <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="20,10" />
+            <Setter Property="CornerRadius" Value="9" />
+        </Style>
+        <Style Selector="Button.primaryButton:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemAccentColorLight2}" />
+        </Style>
+
+        <!-- Back Button -->
+        <Style Selector="Button.backButton">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="Button.backButton:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
+        </Style>
+
+        <!-- Danger Button -->
+        <Style Selector="Button.dangerButton">
+            <Setter Property="Background" Value="#D13438" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="20,10" />
+            <Setter Property="CornerRadius" Value="9" />
+        </Style>
+        <Style Selector="Button.dangerButton:pointerover">
+            <Setter Property="Background" Value="#E74856" />
+        </Style>
+    </Window.Styles>
+
+    <Border Margin="14"
+            CornerRadius="20"
+            Background="{DynamicResource SystemControlPageBackgroundChromeLowBrush}"
+            BoxShadow="0 14 32 0 #330B121A"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+            BorderThickness="1"
+            Padding="1">
+        <Grid RowDefinitions="*,Auto">
+
+            <Grid Grid.Row="0" ColumnDefinitions="280,Auto,*">
+
+                <!-- Sidebar -->
+                <Border Grid.Column="0"
+                        CornerRadius="20,0,0,0"
+                        Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+                    <Grid RowDefinitions="Auto,*,Auto">
+                        <!-- Sidebar Header -->
+                        <Border Grid.Row="0" Padding="16,16,16,8">
+                            <Grid RowDefinitions="Auto,Auto">
+                                <TextBlock Grid.Row="0" Text="MCP Manager" FontSize="16" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="1" Text="Servers and targets"
+                                           FontSize="12" Opacity="0.75" Margin="0,2,0,0" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Navigation -->
+                        <ScrollViewer Grid.Row="1"
+                                      Margin="8,0,0,0"
+                                      Padding="0,0,12,0"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Spacing="10">
+                                <!-- Overview Section -->
+                                <Grid ColumnDefinitions="*" Margin="4,2,4,0">
+                                    <TextBlock Text="OVERVIEW" FontSize="11" FontWeight="SemiBold"
+                                               Opacity="0.75" VerticalAlignment="Center" />
+                                </Grid>
+                                <Button Command="{Binding ClearSelectionCommand}"
+                                        Classes="sidebar-nav"
+                                        Classes.sidebar-active="{Binding ShowOverview}"
+                                        BorderThickness="0"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left"
+                                        Padding="10,8,10,8"
+                                        CornerRadius="8">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <PathIcon Data="{StaticResource MdiViewDashboardOutline}"
+                                                  Width="16" Height="16"
+                                                  Foreground="{DynamicResource SystemAccentColor}"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,10,0" />
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="Dashboard" FontWeight="SemiBold" />
+                                            <TextBlock Text="Status and quick actions"
+                                                       FontSize="11" Opacity="0.75" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+
+                                <!-- Servers Section -->
+                                <Grid ColumnDefinitions="*,Auto" Margin="4,8,4,0">
+                                    <TextBlock Text="SERVERS" FontSize="11" FontWeight="SemiBold"
+                                               Opacity="0.75" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1"
+                                            Content="+"
+                                            Command="{Binding AddServerCommand}"
+                                            ToolTip.Tip="Add Server"
+                                            Padding="8,2"
+                                            Width="30"
+                                            FontSize="16"
+                                            FontWeight="Bold" />
+                                </Grid>
+
+                                <ListBox ItemsSource="{Binding Servers}"
+                                         SelectedItem="{Binding SelectedServer}"
+                                         Classes.sidebar-inactive="{Binding !IsServerListActive}"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate DataType="vm:McpServerViewModel">
+                                            <Grid ColumnDefinitions="Auto,*" Margin="4,4,4,6">
+                                                <PathIcon Data="{Binding SelectedTransportTypeItem.Value, Converter={x:Static vm:TransportIconConverter.Instance}}"
+                                                          Width="16" Height="16"
+                                                          Foreground="{DynamicResource SystemAccentColor}"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,10,0" />
+                                                <StackPanel Grid.Column="1" Spacing="2">
+                                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding SelectedTransportTypeItem.Value, Converter={x:Static vm:TransportBadgeConverter.Instance}}"
+                                                               FontSize="11" Opacity="0.75" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <!-- Empty state for servers -->
+                                <TextBlock Text="No servers yet"
+                                           IsVisible="{Binding !Servers.Count}"
+                                           Margin="8,0,8,2"
+                                           FontSize="11"
+                                           Opacity="0.65"
+                                           TextWrapping="Wrap" />
+
+                                <!-- Targets Section -->
+                                <Grid ColumnDefinitions="*,Auto" Margin="4,8,4,0">
+                                    <TextBlock Text="TARGETS" FontSize="11" FontWeight="SemiBold"
+                                               Opacity="0.75" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1"
+                                            Content="+"
+                                            Command="{Binding AddTargetFolderCommand}"
+                                            ToolTip.Tip="Add Folder Target"
+                                            Padding="8,2"
+                                            Width="30"
+                                            FontSize="16"
+                                            FontWeight="Bold" />
+                                </Grid>
+
+                                <ListBox ItemsSource="{Binding TargetFolders}"
+                                         SelectedItem="{Binding SelectedTarget}"
+                                         Classes.sidebar-inactive="{Binding !IsTargetListActive}"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:TargetFolderViewModel">
+                                            <Grid ColumnDefinitions="Auto,*" Margin="4,4,4,6">
+                                                <PathIcon Data="{Binding ., Converter={x:Static vm:TargetIconConverter.Instance}}"
+                                                          Width="16" Height="16"
+                                                          Foreground="{DynamicResource SystemAccentColor}"
+                                                          VerticalAlignment="Center"
+                                                          Margin="0,0,10,0" />
+                                                <StackPanel Grid.Column="1" Spacing="2">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding ., Converter={x:Static vm:TargetBadgeConverter.Instance}}"
+                                                               FontSize="11" Opacity="0.75" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <!-- Empty state for targets -->
+                                <TextBlock Text="No targets yet"
+                                           IsVisible="{Binding !TargetFolders.Count}"
+                                           Margin="8,0,8,2"
+                                           FontSize="11"
+                                           Opacity="0.65"
+                                           TextWrapping="Wrap" />
+
+                                <!-- Settings Section -->
+                                <Grid ColumnDefinitions="*" Margin="4,8,4,0">
+                                    <TextBlock Text="SETTINGS" FontSize="11" FontWeight="SemiBold"
+                                               Opacity="0.75" VerticalAlignment="Center" />
+                                </Grid>
+                                <Button Command="{Binding OpenSettingsCommand}"
+                                        Classes="sidebar-nav"
+                                        Classes.sidebar-active="{Binding ShowSettings}"
+                                        BorderThickness="0"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left"
+                                        Padding="10,8,10,8"
+                                        CornerRadius="8">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <PathIcon Data="{StaticResource MdiCogOutline}"
+                                                  Width="16" Height="16"
+                                                  Foreground="{DynamicResource SystemAccentColor}"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,10,0" />
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="Preferences" FontWeight="SemiBold" />
+                                            <TextBlock Text="Bridge and app settings"
+                                                       FontSize="11" Opacity="0.75" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- Bottom Actions -->
+                        <Border Grid.Row="2"
+                                Padding="12"
+                                CornerRadius="0,0,0,20"
+                                BorderThickness="0,1,0,0"
+                                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                            <StackPanel Spacing="6">
+                                <Button Content="Save all"
+                                        Command="{Binding SaveCommand}"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Center" />
+                                <Button Content="Export all"
+                                        Command="{Binding ExportAllTargetsCommand}"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Center" />
+                                <Button Command="{Binding OpenSponsorLinkCommand}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        HorizontalAlignment="Center"
+                                        MinHeight="0"
+                                        Padding="4,1"
+                                        Cursor="Hand"
+                                        Margin="0,2,0,0">
+                                    <TextBlock Text="Support this project"
+                                               FontSize="9"
+                                               Opacity="0.4"
+                                               TextDecorations="Underline"/>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Vertical separator -->
+                <Border Grid.Column="1" Width="1"
+                        Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+
+                <!-- Main Content -->
+                <Grid Grid.Column="2" RowDefinitions="Auto,*">
+
+                    <!-- Top Bar / Content Header -->
+                    <Border Grid.Row="0" Padding="24,20"
+                            CornerRadius="0,20,0,0"
+                            BorderThickness="0,0,0,1"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <!-- Status -->
+                            <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding StatusMessage}"
+                                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                           FontSize="12" />
+                                <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" Width="60" Height="3" />
+                            </StackPanel>
+
+                            <!-- Actions -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="{Binding Servers.Count, StringFormat='{}{0} servers'}"
+                                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                           FontSize="12" VerticalAlignment="Center" />
+                                <Button Content="Import" Command="{Binding ImportFromFileCommand}" Classes="toolbarButton" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Content Area -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="24,24,24,48">
+                            <!-- Settings View -->
+                            <StackPanel IsVisible="{Binding CurrentPage, Converter={x:Static vm:NavigationPageEqualsConverter.Instance}, ConverterParameter=Settings}" Spacing="20">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Preferences" FontSize="20" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                    <TextBlock Text="Keep bridge defaults tidy here, then run diagnostics only when you need to confirm local tooling."
+                                               Opacity="0.75"
+                                               TextWrapping="Wrap"
+                                               MaxWidth="760" />
+                                </StackPanel>
+
+                                <Border Classes="detailCard">
+                                    <StackPanel Spacing="18">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Bridge preferences" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock
+                                                Text="Set the commands Claude Desktop should use when a remote MCP server needs a stdio bridge."
+                                                Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto">
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="HTTP" Opacity="0.75"
+                                                       VerticalAlignment="Center" />
+                                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding BridgeCommandHttp}"
+                                                     Classes="formField"
+                                                     Watermark="mcp-proxy {args} {url}" />
+
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="SSE" Opacity="0.75"
+                                                       VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding BridgeCommandSse}"
+                                                     Classes="formField" Margin="0,8,0,0"
+                                                     Watermark="mcp-proxy {args} {url}" />
+
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Streamable HTTP"
+                                                       Opacity="0.75" VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="2" Grid.Column="1"
+                                                     Text="{Binding BridgeCommandStreamableHttp}" Classes="formField"
+                                                     Margin="0,8,0,0"
+                                                     Watermark="mcp-proxy {args} --transport streamablehttp {url}" />
+                                        </Grid>
+
+                                        <Border Classes="secondaryPanel">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="Placeholders" Classes="cardEyebrow" />
+                                                <TextBlock Text="{}{url} resolves to the server URL. {args} resolves to target-specific bridge arguments."
+                                                           Opacity="0.75"
+                                                           FontSize="11"
+                                                           TextWrapping="Wrap" />
+                                                <TextBox Text="Example: mcp-proxy {args} {url}"
+                                                         Classes="outputBox"
+                                                         IsReadOnly="True"
+                                                         IsTabStop="False" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="secondaryCard">
+                                    <StackPanel Spacing="14">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="Diagnostics" Classes="cardEyebrow" />
+                                                <TextBlock Text="Use this check when bridge behavior looks wrong or after changing the local install."
+                                                           Opacity="0.75"
+                                                           FontSize="12"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="Test Bridge"
+                                                    Command="{Binding TestBridgeCommand}"
+                                                    Classes="toolbarButton"
+                                                    VerticalAlignment="Top" />
+                                        </Grid>
+
+                                        <TextBox Text="{Binding BridgeTestResult}"
+                                                 Classes="outputBox"
+                                                 IsVisible="{Binding BridgeTestResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                 IsReadOnly="True"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="88" />
+
+                                        <TextBlock Text="The result stays selectable so you can copy details directly into notes or issue reports."
+                                                   Opacity="0.5"
+                                                   FontSize="11"
+                                                   IsVisible="{Binding BridgeTestResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Home View (nothing selected) -->
+                            <StackPanel IsEnabled="{Binding !ShowSettings}"
+                                        IsVisible="{Binding CurrentPage, Converter={x:Static vm:NavigationPageEqualsConverter.Instance}, ConverterParameter=Overview}"
+                                        Spacing="24">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Overview" FontSize="24" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                    <TextBlock Text="See the current state of your MCP setup, then jump into the next action from one place."
+                                               Opacity="0.75"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <WrapPanel Orientation="Horizontal">
+                                    <Border Classes="summaryCard">
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="Servers" FontSize="12" FontWeight="SemiBold"
+                                                       Opacity="0.75" />
+                                            <TextBlock Text="{Binding Servers.Count}" Classes="summaryValue" />
+                                            <TextBlock Text="Configured MCP endpoints"
+                                                       Opacity="0.5"
+                                                       FontSize="12" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Classes="summaryCard">
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="Targets" FontSize="12" FontWeight="SemiBold"
+                                                       Opacity="0.75" />
+                                            <TextBlock Text="{Binding TargetFolders.Count}" Classes="summaryValue" />
+                                            <TextBlock Text="Export destinations available"
+                                                       Opacity="0.5"
+                                                       FontSize="12" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Classes="summaryCard">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Text="Status" FontSize="12" FontWeight="SemiBold"
+                                                       Opacity="0.75" />
+                                            <TextBlock Text="{Binding StatusMessage}"
+                                                       Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                                                       FontWeight="SemiBold"
+                                                       TextWrapping="Wrap" />
+                                            <ProgressBar IsIndeterminate="True"
+                                                         IsVisible="{Binding IsLoading}"
+                                                         Height="4" />
+                                        </StackPanel>
+                                    </Border>
+                                </WrapPanel>
+
+                                <Border Classes="detailCard">
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
+                                        <StackPanel Spacing="14">
+                                            <TextBlock Text="Quick actions" FontSize="13" FontWeight="SemiBold"
+                                                       Opacity="0.75" />
+                                            <WrapPanel Orientation="Horizontal">
+                                                <Button Classes="actionCard" Command="{Binding AddServerCommand}">
+                                                    <StackPanel Spacing="8">
+                                                        <TextBlock Text="Add Server" FontWeight="SemiBold" />
+                                                        <TextBlock Text="Create a new MCP server definition."
+                                                                   FontSize="11"
+                                                                   Opacity="0.75"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Classes="actionCard" Command="{Binding AddTargetFolderCommand}">
+                                                    <StackPanel Spacing="8">
+                                                        <TextBlock Text="Add Target" FontWeight="SemiBold" />
+                                                        <TextBlock Text="Create another export destination."
+                                                                   FontSize="11"
+                                                                   Opacity="0.75"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Classes="actionCard" Command="{Binding ExportAllTargetsCommand}">
+                                                    <StackPanel Spacing="8">
+                                                        <TextBlock Text="Export All" FontWeight="SemiBold" />
+                                                        <TextBlock Text="Push current config to every target."
+                                                                   FontSize="11"
+                                                                   Opacity="0.75"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </WrapPanel>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1" Spacing="14">
+                                            <TextBlock Text="Import and discovery" FontSize="13" FontWeight="SemiBold"
+                                                       Opacity="0.75" />
+                                            <WrapPanel Orientation="Horizontal">
+                                                <Button Classes="actionCard" Command="{Binding ImportFromClaudeDesktopCommand}">
+                                                    <StackPanel Spacing="8">
+                                                        <TextBlock Text="Claude Desktop" FontWeight="SemiBold" />
+                                                        <TextBlock Text="Bring in existing desktop config."
+                                                                   FontSize="11"
+                                                                   Opacity="0.75"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Classes="actionCard" Command="{Binding ScanForMcpConfigsCommand}">
+                                                    <StackPanel Spacing="8">
+                                                        <TextBlock Text="Scan Projects" FontWeight="SemiBold" />
+                                                        <TextBlock Text="Search for `.mcp.json` files in common folders."
+                                                                   FontSize="11"
+                                                                   Opacity="0.75"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Classes="actionCard" Command="{Binding ImportFromFileCommand}">
+                                                    <StackPanel Spacing="8">
+                                                        <TextBlock Text="Import File" FontWeight="SemiBold" />
+                                                        <TextBlock Text="Load any supported JSON config file."
+                                                                   FontSize="11"
+                                                                   Opacity="0.75"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <Border Classes="emptyOverviewCard" IsVisible="{Binding Servers.Count, Converter={x:Static vm:CountIsZeroConverter.Instance}}">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+                                        <StackPanel Spacing="10">
+                                            <TextBlock Text="Start by adding a server" FontSize="20" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock Text="This overview becomes more useful once at least one server exists. You can create one from scratch or import an existing configuration."
+                                                       Opacity="0.75"
+                                                       TextWrapping="Wrap"
+                                                       MaxWidth="560" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="10" HorizontalAlignment="Right">
+                                            <Button Content="Add Server"
+                                                    Command="{Binding AddServerCommand}"
+                                                    Classes="primaryButton" />
+                                            <Button Content="Import Config"
+                                                    Command="{Binding ImportFromFileCommand}"
+                                                    Classes="toolbarButton" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <StackPanel Spacing="16" IsVisible="{Binding Servers.Count}">
+                                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Configured servers" FontSize="13" FontWeight="SemiBold"
+                                                       Opacity="0.75" />
+                                            <TextBlock Text="Open a server to edit transport, commands, and test settings."
+                                                       Opacity="0.5"
+                                                       FontSize="12" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1"
+                                                Content="Add Server"
+                                                Command="{Binding AddServerCommand}"
+                                                Classes="toolbarButton" />
+                                    </Grid>
+                                    <ItemsControl ItemsSource="{Binding Servers}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:McpServerViewModel">
+                                                <Button Classes="serverCard"
+                                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SelectServerCommand}"
+                                                        CommandParameter="{Binding}">
+                                                    <Grid RowDefinitions="Auto,Auto" Width="180">
+                                                        <TextBlock Grid.Row="0" Text="{Binding DisplayName}"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <Border Grid.Row="1" Classes="inlineBadge" HorizontalAlignment="Left" Margin="0,8,0,0">
+                                                            <TextBlock Text="{Binding SelectedTransportTypeItem.Value, Converter={x:Static vm:TransportBadgeConverter.Instance}}"
+                                                                       Classes="inlineBadgeText" />
+                                                        </Border>
+                                                    </Grid>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Server Detail View -->
+                            <StackPanel
+                                IsVisible="{Binding CurrentPage, Converter={x:Static vm:NavigationPageEqualsConverter.Instance}, ConverterParameter=Servers}"
+                                Spacing="20">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Server details" FontSize="20" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                        <TextBlock Text="Browse on the left, tune the selected server here."
+                                                   Opacity="0.75" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Delete" Classes="dangerButton"
+                                            Command="{Binding DeleteServerCommand}" />
+                                </Grid>
+
+                                <Border Classes="detailCard">
+                                    <StackPanel Spacing="16">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Identity" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock Text="Keep naming and grouping together so the browse list stays easy to scan."
+                                                       Opacity="0.75"
+                                                       FontSize="12"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto">
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" Opacity="0.75"
+                                                       VerticalAlignment="Center" />
+                                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedServer.Name}"
+                                                     Classes="formField" />
+
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Display Name"
+                                                       Opacity="0.75" VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="1" Grid.Column="1"
+                                                     Text="{Binding SelectedServer.DisplayName}" Classes="formField"
+                                                     Margin="0,8,0,0" />
+
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Group" Opacity="0.75"
+                                                       VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedServer.Group}"
+                                                     Classes="formField" Margin="0,8,0,0"
+                                                     Watermark="e.g., Development, AI Tools, Production" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="detailCard">
+                                    <StackPanel Spacing="16">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Connection setup" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock Text="Group transport selection, URLs, and detection so remote server setup stays in one place."
+                                                       Opacity="0.75"
+                                                       FontSize="12"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Type" Opacity="0.75"
+                                                       VerticalAlignment="Center" />
+                                            <ComboBox Grid.Row="0" Grid.Column="1"
+                                                      ItemsSource="{Binding SelectedServer.ConnectionModes}"
+                                                      SelectedItem="{Binding SelectedServer.SelectedConnectionMode}"
+                                                      Classes="formField" />
+
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,4,0,0"
+                                                       Opacity="0.75" FontSize="11"
+                                                       Text="{Binding SelectedServer.SelectedConnectionMode.Description}" />
+
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="URL" Opacity="0.75"
+                                                       VerticalAlignment="Center" Margin="0,16,0,0"
+                                                       IsVisible="{Binding SelectedServer.IsHttp}" />
+                                            <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,16,0,0"
+                                                  IsVisible="{Binding SelectedServer.IsHttp}">
+                                                <TextBox Grid.Column="0" Text="{Binding SelectedServer.Url}"
+                                                         Classes="formField"
+                                                         Watermark="http://localhost:8080/sse" />
+                                                <Button Grid.Column="1" Content="Detect" Margin="8,0,0,0"
+                                                        Command="{Binding DetectTransportTypeCommand}"
+                                                        ToolTip.Tip="Send MCP initialize request to detect protocol" />
+                                            </Grid>
+
+                                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Protocol" Opacity="0.75"
+                                                       VerticalAlignment="Center" Margin="0,8,0,0"
+                                                       IsVisible="{Binding SelectedServer.IsHttp}" />
+                                            <ComboBox Grid.Row="3" Grid.Column="1"
+                                                      ItemsSource="{Binding SelectedServer.HttpProtocols}"
+                                                      SelectedItem="{Binding SelectedServer.SelectedHttpProtocol}"
+                                                      Classes="formField" Margin="0,8,0,0"
+                                                      IsVisible="{Binding SelectedServer.IsHttp}" />
+
+                                            <TextBlock Grid.Row="4" Grid.Column="1" Margin="0,4,0,0"
+                                                       Opacity="0.75" FontSize="11" TextWrapping="Wrap"
+                                                       IsVisible="{Binding SelectedServer.IsHttp}"
+                                                       Text="{Binding SelectedServer.SelectedHttpProtocol.Description}" />
+
+                                            <Border Grid.Row="5" Grid.Column="1" Background="{DynamicResource SystemControlBackgroundAltHighBrush}" CornerRadius="4"
+                                                    Padding="12" Margin="0,12,0,0"
+                                                    IsVisible="{Binding DetectResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                <Grid RowDefinitions="Auto,Auto">
+                                                    <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
+                                                        <TextBlock Text="{Binding DetectResult}" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                                                                   FontSize="11"
+                                                                   FontFamily="Consolas,Menlo,monospace"
+                                                                   TextWrapping="Wrap" />
+                                                    </ScrollViewer>
+                                                    <Button Grid.Row="1" Content="Copy result"
+                                                            Command="{Binding CopyDetectResultCommand}"
+                                                            HorizontalAlignment="Right" Margin="0,8,0,0"
+                                                            Padding="8,4" FontSize="11" />
+                                                </Grid>
+                                            </Border>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="detailCard" IsVisible="{Binding SelectedServer.IsStdio}">
+                                    <StackPanel Spacing="16">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Local runtime" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock Text="Command, args, and environment stay grouped for stdio servers."
+                                                       Opacity="0.75"
+                                                       FontSize="12"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <Grid ColumnDefinitions="140,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Command" Opacity="0.75"
+                                                       VerticalAlignment="Center" />
+                                            <TextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
+                                                     Text="{Binding SelectedServer.Command}" Classes="formField"
+                                                     Watermark="npx, uvx, node, python..." />
+
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Arguments" Opacity="0.75"
+                                                       VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                                     Text="{Binding SelectedServer.ArgumentsText}" Classes="formField"
+                                                     Margin="0,8,0,0"
+                                                     Watermark="-y @anthropic/mcp-server-fetch" />
+
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Working Dir" Opacity="0.75"
+                                                       VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="2" Grid.Column="1"
+                                                     Text="{Binding SelectedServer.WorkingDirectory}" Classes="formField"
+                                                     Margin="0,8,0,0"
+                                                     Watermark="Optional" />
+                                            <Button Grid.Row="2" Grid.Column="2" Content="Browse" Margin="8,8,0,0"
+                                                    Command="{Binding BrowseWorkingDirectoryCommand}" />
+
+                                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Environment" Opacity="0.75"
+                                                       VerticalAlignment="Top" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2"
+                                                     Text="{Binding SelectedServer.EnvironmentText}"
+                                                     Classes="formField"
+                                                     AcceptsReturn="True"
+                                                     Height="100"
+                                                     Margin="0,8,0,0"
+                                                     Watermark="KEY=value&#x0a;ANOTHER_KEY=another_value" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="detailCard" IsVisible="{Binding SelectedServer.IsHttp}">
+                                    <StackPanel Spacing="16">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Remote startup and client support" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock Text="Keep HTTP startup helpers and bridge expectations next to each other."
+                                                       Opacity="0.75"
+                                                       FontSize="12"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <Grid ColumnDefinitions="140,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Command" Opacity="0.75"
+                                                       VerticalAlignment="Center" />
+                                            <TextBox Grid.Row="0" Grid.Column="1"
+                                                     Text="{Binding SelectedServer.StartupCommand}" Classes="formField"
+                                                     Watermark="docker compose up -d  or  open -a 'Autodesk Fusion'" />
+                                            <Button Grid.Row="0" Grid.Column="2" Content="Launch" Margin="8,0,0,0"
+                                                    Classes="primaryButton"
+                                                    Command="{Binding RunStartupCommandCommand}"
+                                                    CommandParameter="{Binding SelectedServer}"
+                                                    IsVisible="{Binding SelectedServer.HasStartupCommand}" />
+
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Working Dir" Opacity="0.75"
+                                                       VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="1" Grid.Column="1"
+                                                     Text="{Binding SelectedServer.StartupWorkingDirectory}"
+                                                     Classes="formField" Margin="0,8,0,0"
+                                                     Watermark="Optional" />
+                                            <Button Grid.Row="1" Grid.Column="2" Content="Browse" Margin="8,8,0,0"
+                                                    Command="{Binding BrowseWorkingDirectoryCommand}" />
+
+                                            <Border Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
+                                                    Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                                                    CornerRadius="9"
+                                                    Padding="12"
+                                                    Margin="0,12,0,0">
+                                                <StackPanel Spacing="6">
+                                                    <TextBlock Text="Client support" FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource SystemAccentColor}" FontSize="12" />
+                                                    <TextBlock Text="Claude Code has native HTTP, SSE, and Streamable HTTP support."
+                                                               Opacity="0.75" FontSize="12"
+                                                               TextWrapping="Wrap" />
+                                                    <TextBlock Text="Claude Desktop still needs the bridge command from Settings for non-stdio servers."
+                                                               Opacity="0.75" FontSize="12"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="secondaryCard">
+                                    <StackPanel Spacing="12">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="Diagnostics and access" Classes="cardEyebrow" />
+                                                <TextBlock Text="Keep tests and tool permissions nearby, but separate from day-to-day editing fields."
+                                                           Opacity="0.75"
+                                                           FontSize="12"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="Fetch Tools"
+                                                    Command="{Binding FetchToolsCommand}"
+                                                    VerticalAlignment="Top"
+                                                    ToolTip.Tip="Query the server for available tools" />
+                                        </Grid>
+
+                                        <Grid RowDefinitions="Auto,Auto"
+                                              IsVisible="{Binding McpTestResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                            <TextBox Text="{Binding McpTestResult}"
+                                                     Classes="outputBox"
+                                                     IsReadOnly="True"
+                                                     AcceptsReturn="True"
+                                                     TextWrapping="Wrap"
+                                                     MinHeight="140" />
+                                            <Button Grid.Row="1" Content="Copy result"
+                                                    Command="{Binding CopyMcpTestResultCommand}"
+                                                    HorizontalAlignment="Right" Margin="0,8,0,0"
+                                                    Padding="8,4" FontSize="11" />
+                                        </Grid>
+
+                                        <TextBox Text="{Binding FetchToolsResult}"
+                                                 Classes="outputBox"
+                                                 IsVisible="{Binding FetchToolsResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                 IsReadOnly="True"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="64" />
+
+                                        <TextBlock Text="Click 'Fetch Tools' to discover available tools from the server. Tool permissions are configured per target."
+                                                   Opacity="0.75" FontSize="12"
+                                                   IsVisible="{Binding !SelectedServer.HasTools}" />
+
+                                        <TextBlock Text="Tool permissions for this server are configured per target in the target detail view."
+                                                   Opacity="0.75" FontSize="12"
+                                                   IsVisible="{Binding SelectedServer.HasTools}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Target Detail View -->
+                            <StackPanel
+                                IsVisible="{Binding CurrentPage, Converter={x:Static vm:NavigationPageEqualsConverter.Instance}, ConverterParameter=Targets}"
+                                Spacing="20">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Target details" FontSize="20" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                        <TextBlock Text="Use the sidebar to browse targets, then adjust export details here."
+                                                   Opacity="0.75" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                        <Button Content="Export" Classes="primaryButton"
+                                                Command="{Binding ExportSelectedTargetCommand}" />
+                                        <Button Content="Delete" Classes="dangerButton"
+                                                Command="{Binding DeleteTargetFolderCommand}"
+                                                IsVisible="{Binding !SelectedTarget.IsClipboard}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Border Classes="detailCard">
+                                    <StackPanel Spacing="10">
+                                        <TextBlock Text="Selected target" Classes="cardEyebrow" />
+                                        <TextBlock Text="{Binding SelectedTarget.Name}"
+                                                   FontSize="22"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="Copy-ready destination for remote or ad-hoc exports."
+                                                   Opacity="0.75"
+                                                   TextWrapping="Wrap"
+                                                   IsVisible="{Binding SelectedTarget.IsClipboard}" />
+                                        <TextBlock Text="Global Claude Desktop destination with bridge arguments for HTTP servers."
+                                                   Opacity="0.75"
+                                                   TextWrapping="Wrap"
+                                                   IsVisible="{Binding SelectedTarget.IsGlobal}" />
+                                        <TextBlock Text="Project-scoped export destination for generated MCP config files."
+                                                   Opacity="0.75"
+                                                   TextWrapping="Wrap">
+                                            <TextBlock.IsVisible>
+                                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                    <Binding Path="!SelectedTarget.IsGlobal" />
+                                                    <Binding Path="!SelectedTarget.IsClipboard" />
+                                                </MultiBinding>
+                                            </TextBlock.IsVisible>
+                                        </TextBlock>
+                                        <StackPanel Spacing="6" Margin="0,4,0,0">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                                <TextBlock Text="Type" Classes="metaLabel" />
+                                                <Border Grid.Column="1" Classes="inlineBadge" IsVisible="{Binding SelectedTarget.IsClipboard}">
+                                                    <TextBlock Text="CLIPBOARD" Classes="inlineBadgeText" />
+                                                </Border>
+                                                <Border Grid.Column="1" Classes="inlineBadge" IsVisible="{Binding SelectedTarget.IsGlobal}">
+                                                    <TextBlock Text="DESKTOP" Classes="inlineBadgeText" />
+                                                </Border>
+                                                <Border Grid.Column="1" Classes="inlineBadge">
+                                                    <Border.IsVisible>
+                                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                            <Binding Path="!SelectedTarget.IsGlobal" />
+                                                            <Binding Path="!SelectedTarget.IsClipboard" />
+                                                        </MultiBinding>
+                                                    </Border.IsVisible>
+                                                    <TextBlock Text="FOLDER" Classes="inlineBadgeText" />
+                                                </Border>
+                                            </Grid>
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8"
+                                                  IsVisible="{Binding !SelectedTarget.IsClipboard}">
+                                                <TextBlock Text="Path" Classes="metaLabel" />
+                                                <TextBlock Grid.Column="1" Text="{Binding SelectedTarget.Path}" Classes="metaValue" TextWrapping="Wrap" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                                <TextBlock Text="Servers" Classes="metaLabel" />
+                                                <TextBlock Grid.Column="1" Text="{Binding SelectedTarget.ServerSelections.Count, StringFormat='{}{0} available'}" Classes="metaValue" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="detailCard" IsVisible="{Binding SelectedTarget.IsClipboard}">
+                                    <StackPanel Spacing="16">
+                                        <TextBlock Text="Clipboard target" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                        <TextBlock
+                                            Text="Export copies config to the clipboard instead of writing files. Useful for remote machines or quick sharing."
+                                            Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="detailCard">
+                                    <Border.IsVisible>
+                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                            <Binding Path="!SelectedTarget.IsGlobal" />
+                                            <Binding Path="!SelectedTarget.IsClipboard" />
+                                        </MultiBinding>
+                                    </Border.IsVisible>
+                                    <StackPanel Spacing="16">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Destination" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock Text="Keep the project name and folder path together for easier browsing."
+                                                       Opacity="0.75" FontSize="12" />
+                                        </StackPanel>
+
+                                        <Grid ColumnDefinitions="140,*,Auto" RowDefinitions="Auto,Auto">
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" Opacity="0.75"
+                                                       VerticalAlignment="Center" />
+                                            <TextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
+                                                     Text="{Binding SelectedTarget.Name}" Classes="formField" />
+
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Path" Opacity="0.75"
+                                                       VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedTarget.Path}"
+                                                     Classes="formField" Margin="0,8,0,0" />
+                                            <Button Grid.Row="1" Grid.Column="2" Content="Browse" Margin="8,8,0,0"
+                                                    Command="{Binding BrowseTargetPathCommand}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="detailCard" IsVisible="{Binding SelectedTarget.IsGlobal}">
+                                    <StackPanel Spacing="16">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Destination" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock
+                                                Text="Claude Desktop exports stay global, with bridge arguments close by for HTTP-based servers."
+                                                Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto">
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Config Path" Opacity="0.75"
+                                                       VerticalAlignment="Center" />
+                                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedTarget.Path}"
+                                                     Classes="formField" IsReadOnly="True" />
+
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Bridge Args" Opacity="0.75"
+                                                       VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="1" Grid.Column="1"
+                                                     Text="{Binding SelectedTarget.BridgeArgs}" Classes="formField"
+                                                     Margin="0,8,0,0"
+                                                     Watermark="--timeout 30 --verbose" />
+
+                                            <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,4,0,0"
+                                                       Opacity="0.75" FontSize="11" TextWrapping="Wrap"
+                                                       Text="Extra arguments for mcp-proxy. Use {args} in Settings bridge commands. Example: --timeout 30" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="detailCard">
+                                    <Border.IsVisible>
+                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                            <Binding Path="!SelectedTarget.IsGlobal" />
+                                            <Binding Path="!SelectedTarget.IsClipboard" />
+                                        </MultiBinding>
+                                    </Border.IsVisible>
+                                    <StackPanel Spacing="16">
+                                        <TextBlock Text="Export formats" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                        <TextBlock Text="Select one or more output formats for this project folder."
+                                                   Opacity="0.75" FontSize="12" />
+                                        <StackPanel Spacing="8">
+                                            <CheckBox Content="Claude Code (.mcp.json)"
+                                                      IsThreeState="False"
+                                                      IsChecked="{Binding SelectedTarget.EnableClaudeCode, Mode=TwoWay}" />
+                                            <CheckBox Content="OpenCode (opencode.json)"
+                                                      IsThreeState="False"
+                                                      IsChecked="{Binding SelectedTarget.EnableOpenCode, Mode=TwoWay}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="detailCard" IsVisible="{Binding SelectedTarget.IsClipboard}">
+                                    <StackPanel Spacing="16">
+                                        <TextBlock Text="Export format" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                        <TextBlock Text="Select which format should be copied to the clipboard."
+                                                   Opacity="0.75" FontSize="12" />
+                                        <StackPanel Spacing="8">
+                                            <CheckBox Content="Claude Code (.mcp.json)"
+                                                      IsThreeState="False"
+                                                      IsChecked="{Binding SelectedTarget.EnableClaudeCode, Mode=TwoWay}" />
+                                            <CheckBox Content="Claude Desktop (claude_desktop_config.json)"
+                                                      IsThreeState="False"
+                                                      IsChecked="{Binding SelectedTarget.EnableClaudeDesktop, Mode=TwoWay}" />
+                                            <CheckBox Content="OpenCode (opencode.json)"
+                                                      IsThreeState="False"
+                                                      IsChecked="{Binding SelectedTarget.EnableOpenCode, Mode=TwoWay}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="detailCard">
+                                    <StackPanel Spacing="16">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Included servers" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock Text="Enable or disable the server set for this target from one grouped list."
+                                                       Opacity="0.75" FontSize="12" />
+                                        </StackPanel>
+                                        <ItemsControl ItemsSource="{Binding SelectedTarget.ServerSelections}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:ServerSelectionViewModel">
+                                                    <CheckBox IsChecked="{Binding IsEnabled}"
+                                                              Margin="0,4,24,4">
+                                                        <TextBlock Text="{Binding ServerName}" />
+                                                    </CheckBox>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Text="No servers available. Add servers first."
+                                                   Opacity="0.75" FontSize="12"
+                                                   IsVisible="{Binding !SelectedTarget.ServerSelections.Count}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Per-server tool overrides -->
+                                <Border Classes="detailCard">
+                                    <StackPanel Spacing="16">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Tool permissions" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock Text="Override which tools are allowed per server for this target. Only enabled servers with discovered tools are shown."
+                                                       Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <ItemsControl ItemsSource="{Binding SelectedTarget.ServerSelections}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:ServerSelectionViewModel">
+                                                    <StackPanel Spacing="8" Margin="0,0,0,12">
+                                                        <StackPanel.IsVisible>
+                                                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                                <Binding Path="IsEnabled" />
+                                                                <Binding Path="HasToolOverrides" />
+                                                            </MultiBinding>
+                                                        </StackPanel.IsVisible>
+
+                                                        <Expander IsExpanded="False" HorizontalAlignment="Stretch">
+                                                            <Expander.Header>
+                                                                <TextBlock Text="{Binding ServerName}" FontWeight="SemiBold" />
+                                                            </Expander.Header>
+                                                            <StackPanel Spacing="8" Margin="8,8,0,0">
+                                                                <ItemsControl ItemsSource="{Binding ToolOverrides}">
+                                                                    <ItemsControl.ItemsPanel>
+                                                                        <ItemsPanelTemplate>
+                                                                            <WrapPanel />
+                                                                        </ItemsPanelTemplate>
+                                                                    </ItemsControl.ItemsPanel>
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate x:DataType="vm:ToolOverrideViewModel">
+                                                                            <CheckBox IsChecked="{Binding IsAllowed}" Margin="0,4,24,4">
+                                                                                <TextBlock Text="{Binding ToolName}" />
+                                                                            </CheckBox>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+
+                                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                    <Button Content="Allow All" Padding="8,4" FontSize="11"
+                                                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).AllowAllTargetToolsCommand}"
+                                                                            CommandParameter="{Binding}" />
+                                                                    <Button Content="Deny All" Padding="8,4" FontSize="11"
+                                                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).DenyAllTargetToolsCommand}"
+                                                                            CommandParameter="{Binding}" />
+                                                                </StackPanel>
+                                                            </StackPanel>
+                                                        </Expander>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <TextBlock Text="No tool overrides available. Use 'Fetch Tools' on servers to discover their tools first."
+                                                   Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+
+            <!-- Status Bar -->
+            <Border Grid.Row="1"
+                    CornerRadius="0,0,20,20"
+                    Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="16,8">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding StatusMessage}"
+                               FontSize="12"
+                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                               VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16">
+                        <TextBlock Text="{Binding Servers.Count, StringFormat='Servers: {0}'}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding TargetFolders.Count, StringFormat='Targets: {0}'}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
