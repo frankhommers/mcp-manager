@@ -1,0 +1,76 @@
+name: Release DMG
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish assets for (e.g. v1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-dmg:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [osx-arm64, osx-x64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Resolve release tag
+        id: release_tag
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build app bundle
+        shell: bash
+        run: |
+          bash ./scripts/build-macos-app.sh \
+            --rid "${{ matrix.rid }}" \
+            --configuration Release \
+            --version "${{ steps.release_tag.outputs.version }}" \
+            --output "$RUNNER_TEMP/dist"
+
+      - name: Create DMG
+        shell: bash
+        run: |
+          APP_PATH="$RUNNER_TEMP/dist/MCP Manager.app"
+          DMG_NAME="McpManager-${{ steps.release_tag.outputs.tag }}-${{ matrix.rid }}.dmg"
+          DMG_PATH="$RUNNER_TEMP/$DMG_NAME"
+          bash ./scripts/create-dmg.sh "$APP_PATH" "$DMG_PATH" "MCP Manager"
+          echo "DMG_PATH=$DMG_PATH" >> "$GITHUB_ENV"
+
+      - name: Generate SHA256
+        shell: bash
+        run: |
+          SHA_PATH="${DMG_PATH}.sha256"
+          shasum -a 256 "$DMG_PATH" > "$SHA_PATH"
+          echo "SHA_PATH=$SHA_PATH" >> "$GITHUB_ENV"
+
+      - name: Upload DMG to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          files: |
+            ${{ env.DMG_PATH }}
+            ${{ env.SHA_PATH }}
