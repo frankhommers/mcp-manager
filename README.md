@@ -36,6 +36,18 @@ A cross-platform desktop application for managing Model Context Protocol (MCP) s
 └──────────────────────────────────────────────────┘
 ```
 
+## Installation (macOS)
+
+```bash
+brew tap frankhommers/tap
+brew install --cask frankhommers/tap/mcp-manager
+```
+
+> **Note:** The app is not notarized by Apple. On first launch macOS may show a warning. The Homebrew cask automatically removes the quarantine flag. If you downloaded manually, run:
+> ```bash
+> xattr -d com.apple.quarantine "/Applications/MCP Manager.app"
+> ```
+
 ## Requirements
 
 - **.NET 10 SDK** or later
