@@ -74,3 +74,32 @@ jobs:
           files: |
             ${{ env.DMG_PATH }}
             ${{ env.SHA_PATH }}
+
+  update-tap:
+    needs: build-dmg
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch tap update
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.TAP_UPDATE_TOKEN }}
+          repository: frankhommers/homebrew-tap
+          event-type: update-cask
+          client-payload: |
+            {
+              "cask": "mcp-manager",
+              "version": "${{ steps.version.outputs.version }}",
+              "repo": "frankhommers/mcp-manager",
+              "dmg_prefix": "McpManager"
+            }
