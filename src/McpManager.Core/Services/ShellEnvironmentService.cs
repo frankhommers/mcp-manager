@@ -20,12 +20,14 @@ public class ShellEnvironmentService : IShellEnvironmentService
       ProcessStartInfo psi = new()
       {
         FileName = shell,
-        Arguments = "-lc \"echo $PATH\"",
         RedirectStandardOutput = true,
         RedirectStandardError = true,
         UseShellExecute = false,
         CreateNoWindow = true,
       };
+      psi.ArgumentList.Add("-l");
+      psi.ArgumentList.Add("-c");
+      psi.ArgumentList.Add("echo $PATH");
 
       using Process? process = Process.Start(psi);
       if (process is null)

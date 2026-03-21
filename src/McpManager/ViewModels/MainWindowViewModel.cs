@@ -563,7 +563,11 @@ public partial class MainWindowViewModel : ViewModelBase
     }
     catch (Exception ex)
     {
-      FetchToolsResult = $"Error: {ex.Message}";
+      string details = ex.InnerException != null
+        ? $"Error: {ex.Message}\nInner: {ex.InnerException.Message}"
+        : $"Error: {ex.Message}";
+      string path = Environment.GetEnvironmentVariable("PATH") ?? "(not set)";
+      FetchToolsResult = $"{details}\n\nPATH: {path}";
       StatusMessage = $"Fetch tools error: {ex.Message}";
     }
     finally
