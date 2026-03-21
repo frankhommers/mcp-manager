@@ -93,7 +93,7 @@ jobs:
       - name: Dispatch tap update
         uses: peter-evans/repository-dispatch@v3
         with:
-          token: ${{ secrets.TAP_UPDATE_TOKEN }}
+          token: ${{ secrets.HOMEBREW_TAP_UPDATE_TOKEN }}
           repository: frankhommers/homebrew-tap
           event-type: update-cask
           client-payload: |
