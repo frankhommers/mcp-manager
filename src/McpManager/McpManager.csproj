@@ -11,8 +11,6 @@
     <CFBundleName>MCP Manager</CFBundleName>
     <CFBundleDisplayName>MCP Manager</CFBundleDisplayName>
     <CFBundleIdentifier>com.mcpmanager.app</CFBundleIdentifier>
-    <CFBundleVersion>1.1.0</CFBundleVersion>
-    <CFBundleShortVersionString>1.1</CFBundleShortVersionString>
     <CFBundleIconFile>AppIcon</CFBundleIconFile>
   </PropertyGroup>
 

@@ -113,6 +113,7 @@ jobs:
           -c Release
           -r ${{ matrix.rid }}
           --self-contained true
+          -p:Version=${{ steps.release_tag.outputs.version }}
           -o publish
 
       - name: Create zip
