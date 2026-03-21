@@ -30,6 +30,7 @@ public partial class MainWindowViewModel : ViewModelBase
   private readonly IConfigImportService _configImportService;
   private readonly IHttpMcpTester _httpMcpTester;
   private readonly ITransportDetectionService _transportDetectionService;
+  private readonly IShellEnvironmentService _shellEnvironmentService;
   private McpRegistry? _registry;
 
   [ObservableProperty] private ObservableCollection<McpServerViewModel> _servers = [];
@@ -161,6 +162,7 @@ public partial class MainWindowViewModel : ViewModelBase
     _configImportService = new ConfigImportService();
     _httpMcpTester = new HttpMcpTester();
     _transportDetectionService = new TransportDetectionService();
+    _shellEnvironmentService = new ShellEnvironmentService();
   }
 
   public MainWindowViewModel(
@@ -168,18 +170,24 @@ public partial class MainWindowViewModel : ViewModelBase
     IConfigExportService configExportService,
     IConfigImportService configImportService,
     IHttpMcpTester httpMcpTester,
-    ITransportDetectionService transportDetectionService)
+    ITransportDetectionService transportDetectionService,
+    IShellEnvironmentService shellEnvironmentService)
   {
     _registryService = registryService;
     _configExportService = configExportService;
     _configImportService = configImportService;
     _httpMcpTester = httpMcpTester;
     _transportDetectionService = transportDetectionService;
+    _shellEnvironmentService = shellEnvironmentService;
   }
 
   public async Task InitializeAsync()
   {
     IsLoading = true;
+    StatusMessage = "Resolving shell environment...";
+
+    await _shellEnvironmentService.ResolveAsync();
+
     StatusMessage = "Loading registry...";
 
     try
