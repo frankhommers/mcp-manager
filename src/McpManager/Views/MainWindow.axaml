@@ -1053,10 +1053,14 @@
                                                            FontSize="12"
                                                            TextWrapping="Wrap" />
                                             </StackPanel>
-                                            <Button Grid.Column="1" Content="Fetch Tools"
-                                                    Command="{Binding FetchToolsCommand}"
-                                                    VerticalAlignment="Top"
-                                                    ToolTip.Tip="Query the server for available tools" />
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                                                <Button Content="Test"
+                                                        Command="{Binding TestMcpDirectCommand}"
+                                                        ToolTip.Tip="Test MCP connection to this server" />
+                                                <Button Content="Fetch Tools"
+                                                        Command="{Binding FetchToolsCommand}"
+                                                        ToolTip.Tip="Query the server for available tools" />
+                                            </StackPanel>
                                         </Grid>
 
                                         <Grid RowDefinitions="Auto,Auto"
