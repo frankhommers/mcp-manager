@@ -8,6 +8,7 @@ public class ConfigExportService : IConfigExportService
   private readonly ClaudeCodeConfigGenerator _claudeCodeGen = new();
   private readonly ClaudeDesktopConfigGenerator _claudeDesktopGen = new();
   private readonly OpenCodeConfigGenerator _openCodeGen = new();
+  private readonly CodexConfigGenerator _codexGen = new();
 
   public async Task ExportAsync(TargetFolder target, IEnumerable<McpServer> allServers, GlobalSettings? settings = null)
   {
@@ -38,6 +39,15 @@ public class ConfigExportService : IConfigExportService
     if (target.EnabledClients.HasFlag(TargetClientFlags.OpenCode))
     {
       await ExportConfigAsync(target.Path, _openCodeGen, servers, envOverrides, toolOverrides, bridgeArgs);
+    }
+
+    if (target.EnabledClients.HasFlag(TargetClientFlags.Codex))
+    {
+      // Codex config merges into existing config.toml
+      string codexConfigPath = settings?.CodexConfigPath ?? GetDefaultCodexConfigPath();
+      _codexGen.ExistingConfigPath = codexConfigPath;
+      string codexBasePath = Path.GetDirectoryName(codexConfigPath) ?? codexConfigPath;
+      await ExportConfigAsync(codexBasePath, _codexGen, servers, envOverrides, toolOverrides, bridgeArgs);
     }
   }
 
@@ -94,6 +104,13 @@ public class ConfigExportService : IConfigExportService
       result[path] = _openCodeGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
     }
 
+    if (target.EnabledClients.HasFlag(TargetClientFlags.Codex))
+    {
+      string codexConfigPath = settings?.CodexConfigPath ?? GetDefaultCodexConfigPath();
+      _codexGen.ExistingConfigPath = codexConfigPath;
+      result[codexConfigPath] = _codexGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+    }
+
     return result;
   }
 
@@ -125,5 +142,11 @@ public class ConfigExportService : IConfigExportService
     }
 
     return Path.Combine(basePath, generator.ConfigSubFolder, generator.ConfigFileName);
+  }
+
+  private static string GetDefaultCodexConfigPath()
+  {
+    string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    return Path.Combine(homeDir, ".codex", "config.toml");
   }
 }

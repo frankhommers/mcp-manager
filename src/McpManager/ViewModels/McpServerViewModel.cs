@@ -41,6 +41,9 @@ public partial class McpServerViewModel : ViewModelBase
   // Environment
   [ObservableProperty] private string _environmentText = string.Empty;
 
+  // HTTP Headers (for remote servers)
+  [ObservableProperty] private string _httpHeadersText = string.Empty;
+
   // Always Allow tools
   [ObservableProperty] private ObservableCollection<ToolSelectionViewModel> _toolSelections = [];
 
@@ -127,6 +130,10 @@ public partial class McpServerViewModel : ViewModelBase
     // Convert environment variables to text format
     IEnumerable<string> envLines = model.EnvironmentVariables.Select(kvp => $"{kvp.Key}={kvp.Value}");
     _environmentText = string.Join("\n", envLines);
+
+    // Convert HTTP headers to text format
+    IEnumerable<string> headerLines = model.HttpHeaders.Select(kvp => $"{kvp.Key}={kvp.Value}");
+    _httpHeadersText = string.Join("\n", headerLines);
 
     // Load tool selections from cached known tools + always-allow
     HashSet<string> allToolNames = new(model.KnownTools);
@@ -217,6 +224,26 @@ public partial class McpServerViewModel : ViewModelBase
           if (!string.IsNullOrEmpty(key))
           {
             _model.EnvironmentVariables[key] = value;
+          }
+        }
+      }
+    }
+
+    // Parse HTTP headers text into key-value pairs
+    _model.HttpHeaders.Clear();
+    if (!string.IsNullOrWhiteSpace(HttpHeadersText))
+    {
+      string[] lines = HttpHeadersText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+      foreach (string line in lines)
+      {
+        int eqIndex = line.IndexOf('=');
+        if (eqIndex > 0)
+        {
+          string key = line[..eqIndex].Trim();
+          string value = line[(eqIndex + 1)..].Trim();
+          if (!string.IsNullOrEmpty(key))
+          {
+            _model.HttpHeaders[key] = value;
           }
         }
       }

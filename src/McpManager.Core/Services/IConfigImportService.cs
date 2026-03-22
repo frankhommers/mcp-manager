@@ -15,6 +15,11 @@ public interface IConfigImportService
   Task<List<McpServer>> ImportFromOpenCodeAsync(string filePath);
 
   /// <summary>
+  /// Import MCP servers from a Codex config.toml file.
+  /// </summary>
+  Task<List<McpServer>> ImportFromCodexAsync(string filePath);
+
+  /// <summary>
   /// Auto-detect format and import.
   /// </summary>
   Task<List<McpServer>> ImportAutoDetectAsync(string filePath);

@@ -28,6 +28,8 @@ public partial class TargetFolderViewModel : ViewModelBase
 
   [ObservableProperty] private bool _enableOpenCode;
 
+  [ObservableProperty] private bool _enableCodex;
+
   [ObservableProperty] private string _bridgeArgs = string.Empty;
 
   [ObservableProperty] private ObservableCollection<ServerSelectionViewModel> _serverSelections = [];
@@ -44,6 +46,7 @@ public partial class TargetFolderViewModel : ViewModelBase
     _enableClaudeCode = model.EnabledClients.HasFlag(TargetClientFlags.ClaudeCode);
     _enableClaudeDesktop = model.EnabledClients.HasFlag(TargetClientFlags.ClaudeDesktop);
     _enableOpenCode = model.EnabledClients.HasFlag(TargetClientFlags.OpenCode);
+    _enableCodex = model.EnabledClients.HasFlag(TargetClientFlags.Codex);
     _bridgeArgs = model.BridgeArgs;
 
     // Build server selection list
@@ -124,6 +127,11 @@ public partial class TargetFolderViewModel : ViewModelBase
     if (EnableOpenCode)
     {
       _model.EnabledClients |= TargetClientFlags.OpenCode;
+    }
+
+    if (EnableCodex)
+    {
+      _model.EnabledClients |= TargetClientFlags.Codex;
     }
 
     _model.EnabledServers.Clear();

@@ -70,12 +70,14 @@ public enum TargetClientFlags
   ClaudeCode = 1,
   ClaudeDesktop = 2,
   OpenCode = 4,
-  All = ClaudeCode | ClaudeDesktop | OpenCode,
+  Codex = 8,
+  All = ClaudeCode | ClaudeDesktop | OpenCode | Codex,
 }
 
 public class GlobalSettings
 {
   public string? ClaudeDesktopConfigPath { get; set; }
+  public string? CodexConfigPath { get; set; }
   public string? DefaultProjectsRoot { get; set; }
   public bool AutoSyncOnChange { get; set; }
 

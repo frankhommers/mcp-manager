@@ -745,6 +745,15 @@
                                                                    TextWrapping="Wrap" />
                                                     </StackPanel>
                                                 </Button>
+                                                <Button Classes="actionCard" Command="{Binding ImportFromCodexCommand}">
+                                                    <StackPanel Spacing="8">
+                                                        <TextBlock Text="Codex" FontWeight="SemiBold" />
+                                                        <TextBlock Text="Bring in MCP servers from ~/.codex/config.toml."
+                                                                   FontSize="11"
+                                                                   Opacity="0.75"
+                                                                   TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Button>
                                                 <Button Classes="actionCard" Command="{Binding ScanForMcpConfigsCommand}">
                                                     <StackPanel Spacing="8">
                                                         <TextBlock Text="Scan Projects" FontWeight="SemiBold" />
@@ -995,35 +1004,45 @@
                                 <Border Classes="detailCard" IsVisible="{Binding SelectedServer.IsHttp}">
                                     <StackPanel Spacing="16">
                                         <StackPanel Spacing="4">
-                                            <TextBlock Text="Remote startup and client support" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
-                                            <TextBlock Text="Keep HTTP startup helpers and bridge expectations next to each other."
+                                            <TextBlock Text="Remote configuration" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock Text="HTTP headers, startup helpers, and bridge expectations for remote servers."
                                                        Opacity="0.75"
                                                        FontSize="12"
                                                        TextWrapping="Wrap" />
                                         </StackPanel>
 
-                                        <Grid ColumnDefinitions="140,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
-                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Command" Opacity="0.75"
-                                                       VerticalAlignment="Center" />
-                                            <TextBox Grid.Row="0" Grid.Column="1"
+                                        <Grid ColumnDefinitions="140,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="HTTP Headers" Opacity="0.75"
+                                                       VerticalAlignment="Top" />
+                                            <TextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
+                                                     Text="{Binding SelectedServer.HttpHeadersText}"
+                                                     Classes="formField"
+                                                     AcceptsReturn="True"
+                                                     Height="80"
+                                                     Watermark="Authorization=Bearer your-token&#x0a;X-Custom-Header=value" />
+
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Command" Opacity="0.75"
+                                                       VerticalAlignment="Center" Margin="0,12,0,0" />
+                                            <TextBox Grid.Row="1" Grid.Column="1"
                                                      Text="{Binding SelectedServer.StartupCommand}" Classes="formField"
+                                                     Margin="0,12,0,0"
                                                      Watermark="docker compose up -d  or  open -a 'Autodesk Fusion'" />
-                                            <Button Grid.Row="0" Grid.Column="2" Content="Launch" Margin="8,0,0,0"
+                                            <Button Grid.Row="1" Grid.Column="2" Content="Launch" Margin="8,12,0,0"
                                                     Classes="primaryButton"
                                                     Command="{Binding RunStartupCommandCommand}"
                                                     CommandParameter="{Binding SelectedServer}"
                                                     IsVisible="{Binding SelectedServer.HasStartupCommand}" />
 
-                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Working Dir" Opacity="0.75"
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Working Dir" Opacity="0.75"
                                                        VerticalAlignment="Center" Margin="0,8,0,0" />
-                                            <TextBox Grid.Row="1" Grid.Column="1"
+                                            <TextBox Grid.Row="2" Grid.Column="1"
                                                      Text="{Binding SelectedServer.StartupWorkingDirectory}"
                                                      Classes="formField" Margin="0,8,0,0"
                                                      Watermark="Optional" />
-                                            <Button Grid.Row="1" Grid.Column="2" Content="Browse" Margin="8,8,0,0"
+                                            <Button Grid.Row="2" Grid.Column="2" Content="Browse" Margin="8,8,0,0"
                                                     Command="{Binding BrowseWorkingDirectoryCommand}" />
 
-                                            <Border Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
+                                            <Border Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2"
                                                     Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
                                                     CornerRadius="9"
                                                     Padding="12"
@@ -1031,7 +1050,7 @@
                                                 <StackPanel Spacing="6">
                                                     <TextBlock Text="Client support" FontWeight="SemiBold"
                                                                Foreground="{DynamicResource SystemAccentColor}" FontSize="12" />
-                                                    <TextBlock Text="Claude Code has native HTTP, SSE, and Streamable HTTP support."
+                                                    <TextBlock Text="Claude Code and Codex have native HTTP support. Codex uses http_headers for authentication."
                                                                Opacity="0.75" FontSize="12"
                                                                TextWrapping="Wrap" />
                                                     <TextBlock Text="Claude Desktop still needs the bridge command from Settings for non-stdio servers."
@@ -1260,6 +1279,9 @@
                                             <CheckBox Content="OpenCode (opencode.json)"
                                                       IsThreeState="False"
                                                       IsChecked="{Binding SelectedTarget.EnableOpenCode, Mode=TwoWay}" />
+                                            <CheckBox Content="Codex (config.toml - global)"
+                                                      IsThreeState="False"
+                                                      IsChecked="{Binding SelectedTarget.EnableCodex, Mode=TwoWay}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -1279,6 +1301,9 @@
                                             <CheckBox Content="OpenCode (opencode.json)"
                                                       IsThreeState="False"
                                                       IsChecked="{Binding SelectedTarget.EnableOpenCode, Mode=TwoWay}" />
+                                            <CheckBox Content="Codex (config.toml)"
+                                                      IsThreeState="False"
+                                                      IsChecked="{Binding SelectedTarget.EnableCodex, Mode=TwoWay}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>

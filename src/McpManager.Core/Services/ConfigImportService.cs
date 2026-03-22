@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using McpManager.Core.Models;
+using Tomlyn;
+using Tomlyn.Model;
 
 namespace McpManager.Core.Services;
 
@@ -149,9 +151,96 @@ public class ConfigImportService : IConfigImportService
     return servers;
   }
 
+  public async Task<List<McpServer>> ImportFromCodexAsync(string filePath)
+  {
+    string toml = await File.ReadAllTextAsync(filePath);
+    TomlTable? root = TomlSerializer.Deserialize<TomlTable>(toml);
+    List<McpServer> servers = [];
+
+    if (root == null || !root.TryGetValue("mcp_servers", out object? mcpServersObj) || mcpServersObj is not TomlTable mcpServers)
+    {
+      return servers;
+    }
+
+    foreach ((string name, object? serverObj) in mcpServers)
+    {
+      if (serverObj is not TomlTable serverTable)
+      {
+        continue;
+      }
+
+      McpServer server = new()
+      {
+        Name = name,
+        DisplayName = FormatDisplayName(name),
+      };
+
+      // Determine if stdio or HTTP based on presence of "command" vs "url"
+      if (serverTable.TryGetValue("url", out object? urlObj) && urlObj is string url)
+      {
+        server.TransportType = McpTransportType.StreamableHttp;
+        server.Url = url;
+
+        // Import http_headers
+        if (serverTable.TryGetValue("http_headers", out object? headersObj) && headersObj is TomlTable headers)
+        {
+          foreach ((string key, object? value) in headers)
+          {
+            if (value is string headerValue)
+            {
+              server.HttpHeaders[key] = headerValue;
+            }
+          }
+        }
+      }
+      else if (serverTable.TryGetValue("command", out object? commandObj) && commandObj is string command)
+      {
+        server.TransportType = McpTransportType.Stdio;
+        server.Command = command;
+
+        if (serverTable.TryGetValue("args", out object? argsObj) && argsObj is TomlArray args)
+        {
+          server.Args = args.OfType<string>().ToList();
+        }
+
+        if (serverTable.TryGetValue("cwd", out object? cwdObj) && cwdObj is string cwd)
+        {
+          server.WorkingDirectory = cwd;
+        }
+      }
+
+      // Environment variables
+      if (serverTable.TryGetValue("env", out object? envObj) && envObj is TomlTable env)
+      {
+        foreach ((string key, object? value) in env)
+        {
+          if (value is string envValue)
+          {
+            server.EnvironmentVariables[key] = envValue;
+          }
+        }
+      }
+
+      // Tool lists
+      if (serverTable.TryGetValue("enabled_tools", out object? toolsObj) && toolsObj is TomlArray tools)
+      {
+        server.AlwaysAllow = tools.OfType<string>().ToList();
+      }
+
+      servers.Add(server);
+    }
+
+    return servers;
+  }
+
   public async Task<List<McpServer>> ImportAutoDetectAsync(string filePath)
   {
     string fileName = Path.GetFileName(filePath);
+
+    if (fileName == "config.toml" || filePath.EndsWith(".toml", StringComparison.OrdinalIgnoreCase))
+    {
+      return await ImportFromCodexAsync(filePath);
+    }
 
     if (fileName == ".mcp.json" || fileName == "claude_desktop_config.json")
     {

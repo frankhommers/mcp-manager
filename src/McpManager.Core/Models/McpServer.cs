@@ -31,6 +31,9 @@ public class McpServer
   // Environment variables
   public Dictionary<string, string> EnvironmentVariables { get; set; } = [];
 
+  // HTTP headers (e.g., Authorization: Bearer ...)
+  public Dictionary<string, string> HttpHeaders { get; set; } = [];
+
   // Tools that are always allowed without confirmation (Claude Code feature)
   public List<string> AlwaysAllow { get; set; } = [];
 

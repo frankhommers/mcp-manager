@@ -1133,7 +1133,7 @@ public partial class MainWindowViewModel : ViewModelBase
         [
           new FilePickerFileType("MCP Config Files")
           {
-            Patterns = ["*.json"],
+            Patterns = ["*.json", "*.toml"],
           },
         ],
       });
@@ -1209,6 +1209,42 @@ public partial class MainWindowViewModel : ViewModelBase
       List<McpServer> importedServers = await _configImportService.ImportFromClaudeCodeAsync(configPath);
       int addedCount = AddImportedServers(importedServers);
       StatusMessage = $"Imported {addedCount} servers from Claude Desktop";
+    }
+    catch (Exception ex)
+    {
+      StatusMessage = $"Import error: {ex.Message}";
+    }
+    finally
+    {
+      IsLoading = false;
+    }
+  }
+
+  [RelayCommand]
+  private async Task ImportFromCodexAsync()
+  {
+    if (_registry == null)
+    {
+      return;
+    }
+
+    string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    string configPath = Path.Combine(homeDir, ".codex", "config.toml");
+
+    if (!File.Exists(configPath))
+    {
+      StatusMessage = "Codex config not found at ~/.codex/config.toml";
+      return;
+    }
+
+    IsLoading = true;
+    StatusMessage = "Importing from Codex...";
+
+    try
+    {
+      List<McpServer> importedServers = await _configImportService.ImportFromCodexAsync(configPath);
+      int addedCount = AddImportedServers(importedServers);
+      StatusMessage = $"Imported {addedCount} servers from Codex";
     }
     catch (Exception ex)
     {
