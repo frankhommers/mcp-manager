@@ -507,19 +507,33 @@
                                         Command="{Binding ExportAllTargetsCommand}"
                                         HorizontalAlignment="Stretch"
                                         HorizontalContentAlignment="Center" />
-                                <Button Command="{Binding OpenSponsorLinkCommand}"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        HorizontalAlignment="Center"
-                                        MinHeight="0"
-                                        Padding="4,1"
-                                        Cursor="Hand"
-                                        Margin="0,2,0,0">
-                                    <TextBlock Text="Support this project"
-                                               FontSize="9"
-                                               Opacity="0.4"
-                                               TextDecorations="Underline"/>
-                                </Button>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                            Spacing="8" Margin="0,2,0,0">
+                                    <Button Command="{Binding OpenSponsorLinkCommand}"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            MinHeight="0"
+                                            Padding="4,1"
+                                            Cursor="Hand">
+                                        <TextBlock Text="Support this project"
+                                                   FontSize="9"
+                                                   Opacity="0.4"
+                                                   TextDecorations="Underline"/>
+                                    </Button>
+                                    <TextBlock Text="|" FontSize="9" Opacity="0.3"
+                                               VerticalAlignment="Center" />
+                                    <Button Click="AboutButton_OnClick"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            MinHeight="0"
+                                            Padding="4,1"
+                                            Cursor="Hand">
+                                        <TextBlock Text="About"
+                                                   FontSize="9"
+                                                   Opacity="0.4"
+                                                   TextDecorations="Underline"/>
+                                    </Button>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                     </Grid>
