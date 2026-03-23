@@ -230,8 +230,9 @@ public partial class MainWindowViewModel : ViewModelBase
       return;
     }
 
-    // Ensure clipboard target exists
+    // Ensure singleton targets exist
     EnsureClipboardTarget();
+    EnsureCodexTarget();
 
     // Unsubscribe from old servers
     foreach (McpServerViewModel server in Servers)
@@ -298,6 +299,36 @@ public partial class MainWindowViewModel : ViewModelBase
       };
       _registry.TargetFolders.Insert(0, clipboardTarget); // Add at the beginning
     }
+  }
+
+  private void EnsureCodexTarget()
+  {
+    if (_registry == null)
+    {
+      return;
+    }
+
+    // Check if Codex global target already exists
+    if (!_registry.TargetFolders.Any(t => t.IsGlobal && t.EnabledClients.HasFlag(TargetClientFlags.Codex)))
+    {
+      string codexConfigPath = _registry.Settings.CodexConfigPath
+                               ?? GetDefaultCodexConfigPath();
+      string codexPath = Path.GetDirectoryName(codexConfigPath) ?? string.Empty;
+      TargetFolder codexTarget = new()
+      {
+        Name = "Codex CLI",
+        Path = codexPath,
+        IsGlobal = true,
+        EnabledClients = TargetClientFlags.Codex,
+      };
+      _registry.TargetFolders.Add(codexTarget);
+    }
+  }
+
+  private static string GetDefaultCodexConfigPath()
+  {
+    string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    return Path.Combine(home, ".codex", "config.toml");
   }
 
   private static Window? GetMainWindow()

@@ -17,6 +17,11 @@ public class TargetBadgeConverter : IValueConverter
         return "CLIPBOARD";
       }
 
+      if (target.IsCodex)
+      {
+        return "CODEX";
+      }
+
       if (target.IsGlobal)
       {
         return "DESKTOP";

@@ -74,7 +74,26 @@ public class RegistryService : IRegistryService
         IsGlobal = true,
       });
 
+    // Set default Codex config path and add as global target
+    string codexConfigPath = GetDefaultCodexConfigPath();
+    registry.Settings.CodexConfigPath = codexConfigPath;
+    string codexPath = Path.GetDirectoryName(codexConfigPath) ?? string.Empty;
+    registry.TargetFolders.Add(
+      new TargetFolder
+      {
+        Name = "Codex CLI",
+        Path = codexPath,
+        EnabledClients = TargetClientFlags.Codex,
+        IsGlobal = true,
+      });
+
     return registry;
+  }
+
+  private static string GetDefaultCodexConfigPath()
+  {
+    string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    return Path.Combine(home, ".codex", "config.toml");
   }
 
   private static string GetDefaultClaudeDesktopConfigPath()

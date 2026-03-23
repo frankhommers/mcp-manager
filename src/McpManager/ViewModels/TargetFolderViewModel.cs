@@ -28,9 +28,26 @@ public partial class TargetFolderViewModel : ViewModelBase
 
   [ObservableProperty] private bool _enableOpenCode;
 
-  [ObservableProperty] private bool _enableCodex;
-
   [ObservableProperty] private string _bridgeArgs = string.Empty;
+
+  /// <summary>
+  /// True when this is the global Codex CLI target.
+  /// </summary>
+  public bool IsCodex => IsGlobal && _model.EnabledClients.HasFlag(TargetClientFlags.Codex);
+
+  /// <summary>
+  /// True when this is the global Claude Desktop target (not Codex).
+  /// </summary>
+  public bool IsClaudeDesktopGlobal => IsGlobal && !IsCodex && !IsClipboard;
+
+  /// <summary>
+  /// Full path to the config file for display purposes.
+  /// </summary>
+  public string ConfigFilePath => IsCodex
+    ? System.IO.Path.Combine(Path, "config.toml")
+    : IsClaudeDesktopGlobal
+      ? System.IO.Path.Combine(Path, "claude_desktop_config.json")
+      : Path;
 
   [ObservableProperty] private ObservableCollection<ServerSelectionViewModel> _serverSelections = [];
 
@@ -46,7 +63,6 @@ public partial class TargetFolderViewModel : ViewModelBase
     _enableClaudeCode = model.EnabledClients.HasFlag(TargetClientFlags.ClaudeCode);
     _enableClaudeDesktop = model.EnabledClients.HasFlag(TargetClientFlags.ClaudeDesktop);
     _enableOpenCode = model.EnabledClients.HasFlag(TargetClientFlags.OpenCode);
-    _enableCodex = model.EnabledClients.HasFlag(TargetClientFlags.Codex);
     _bridgeArgs = model.BridgeArgs;
 
     // Build server selection list
@@ -113,25 +129,24 @@ public partial class TargetFolderViewModel : ViewModelBase
     _model.IsClipboard = IsClipboard;
     _model.BridgeArgs = BridgeArgs;
 
-    _model.EnabledClients = TargetClientFlags.None;
-    if (EnableClaudeCode)
+    // Global targets have fixed client flags (set at creation, not user-selectable)
+    if (!IsGlobal)
     {
-      _model.EnabledClients |= TargetClientFlags.ClaudeCode;
-    }
+      _model.EnabledClients = TargetClientFlags.None;
+      if (EnableClaudeCode)
+      {
+        _model.EnabledClients |= TargetClientFlags.ClaudeCode;
+      }
 
-    if (EnableClaudeDesktop)
-    {
-      _model.EnabledClients |= TargetClientFlags.ClaudeDesktop;
-    }
+      if (EnableClaudeDesktop)
+      {
+        _model.EnabledClients |= TargetClientFlags.ClaudeDesktop;
+      }
 
-    if (EnableOpenCode)
-    {
-      _model.EnabledClients |= TargetClientFlags.OpenCode;
-    }
-
-    if (EnableCodex)
-    {
-      _model.EnabledClients |= TargetClientFlags.Codex;
+      if (EnableOpenCode)
+      {
+        _model.EnabledClients |= TargetClientFlags.OpenCode;
+      }
     }
 
     _model.EnabledServers.Clear();

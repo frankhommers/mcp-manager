@@ -1130,8 +1130,14 @@
                                         <Button Content="Export" Classes="primaryButton"
                                                 Command="{Binding ExportSelectedTargetCommand}" />
                                         <Button Content="Delete" Classes="dangerButton"
-                                                Command="{Binding DeleteTargetFolderCommand}"
-                                                IsVisible="{Binding !SelectedTarget.IsClipboard}" />
+                                                Command="{Binding DeleteTargetFolderCommand}">
+                                            <Button.IsVisible>
+                                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                    <Binding Path="!SelectedTarget.IsGlobal" />
+                                                    <Binding Path="!SelectedTarget.IsClipboard" />
+                                                </MultiBinding>
+                                            </Button.IsVisible>
+                                        </Button>
                                     </StackPanel>
                                 </Grid>
 
@@ -1150,7 +1156,11 @@
                                         <TextBlock Text="Global Claude Desktop destination with bridge arguments for HTTP servers."
                                                    Opacity="0.75"
                                                    TextWrapping="Wrap"
-                                                   IsVisible="{Binding SelectedTarget.IsGlobal}" />
+                                                   IsVisible="{Binding SelectedTarget.IsClaudeDesktopGlobal}" />
+                                        <TextBlock Text="Global Codex CLI destination. Exports MCP servers to ~/.codex/config.toml."
+                                                   Opacity="0.75"
+                                                   TextWrapping="Wrap"
+                                                   IsVisible="{Binding SelectedTarget.IsCodex}" />
                                         <TextBlock Text="Project-scoped export destination for generated MCP config files."
                                                    Opacity="0.75"
                                                    TextWrapping="Wrap">
@@ -1167,8 +1177,11 @@
                                                 <Border Grid.Column="1" Classes="inlineBadge" IsVisible="{Binding SelectedTarget.IsClipboard}">
                                                     <TextBlock Text="CLIPBOARD" Classes="inlineBadgeText" />
                                                 </Border>
-                                                <Border Grid.Column="1" Classes="inlineBadge" IsVisible="{Binding SelectedTarget.IsGlobal}">
+                                                <Border Grid.Column="1" Classes="inlineBadge" IsVisible="{Binding SelectedTarget.IsClaudeDesktopGlobal}">
                                                     <TextBlock Text="DESKTOP" Classes="inlineBadgeText" />
+                                                </Border>
+                                                <Border Grid.Column="1" Classes="inlineBadge" IsVisible="{Binding SelectedTarget.IsCodex}">
+                                                    <TextBlock Text="CODEX" Classes="inlineBadgeText" />
                                                 </Border>
                                                 <Border Grid.Column="1" Classes="inlineBadge">
                                                     <Border.IsVisible>
@@ -1232,7 +1245,8 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Border Classes="detailCard" IsVisible="{Binding SelectedTarget.IsGlobal}">
+                                <!-- Claude Desktop global target -->
+                                <Border Classes="detailCard" IsVisible="{Binding SelectedTarget.IsClaudeDesktopGlobal}">
                                     <StackPanel Spacing="16">
                                         <StackPanel Spacing="4">
                                             <TextBlock Text="Destination" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
@@ -1244,7 +1258,7 @@
                                         <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto">
                                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Config Path" Opacity="0.75"
                                                        VerticalAlignment="Center" />
-                                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedTarget.Path}"
+                                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedTarget.ConfigFilePath}"
                                                      Classes="formField" IsReadOnly="True" />
 
                                             <TextBlock Grid.Row="1" Grid.Column="0" Text="Bridge Args" Opacity="0.75"
@@ -1257,6 +1271,25 @@
                                             <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,4,0,0"
                                                        Opacity="0.75" FontSize="11" TextWrapping="Wrap"
                                                        Text="Extra arguments for mcp-proxy. Use {args} in Settings bridge commands. Example: --timeout 30" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Codex CLI global target -->
+                                <Border Classes="detailCard" IsVisible="{Binding SelectedTarget.IsCodex}">
+                                    <StackPanel Spacing="16">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Destination" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock
+                                                Text="Codex CLI config is global. MCP servers are written to the [mcp_servers] section while preserving other settings."
+                                                Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto">
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Config Path" Opacity="0.75"
+                                                       VerticalAlignment="Center" />
+                                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedTarget.ConfigFilePath}"
+                                                     Classes="formField" IsReadOnly="True" />
                                         </Grid>
                                     </StackPanel>
                                 </Border>
@@ -1279,9 +1312,6 @@
                                             <CheckBox Content="OpenCode (opencode.json)"
                                                       IsThreeState="False"
                                                       IsChecked="{Binding SelectedTarget.EnableOpenCode, Mode=TwoWay}" />
-                                            <CheckBox Content="Codex (config.toml - global)"
-                                                      IsThreeState="False"
-                                                      IsChecked="{Binding SelectedTarget.EnableCodex, Mode=TwoWay}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -1301,9 +1331,6 @@
                                             <CheckBox Content="OpenCode (opencode.json)"
                                                       IsThreeState="False"
                                                       IsChecked="{Binding SelectedTarget.EnableOpenCode, Mode=TwoWay}" />
-                                            <CheckBox Content="Codex (config.toml)"
-                                                      IsThreeState="False"
-                                                      IsChecked="{Binding SelectedTarget.EnableCodex, Mode=TwoWay}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
