@@ -15,7 +15,7 @@ public class TargetIconConverter : IValueConverter
     string resourceKey = value switch
     {
       TargetFolderViewModel target when target.IsClipboard => "MdiClipboardOutline",
-      TargetFolderViewModel target when target.IsCodex => "MdiConsole",
+      TargetFolderViewModel target when target.IsCodex => "CodexLogo",
       TargetFolderViewModel target when target.IsGlobal => "ClaudeLogo",
       _ => "MdiFolderOutline",
     };
