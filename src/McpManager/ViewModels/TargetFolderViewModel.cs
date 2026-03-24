@@ -48,6 +48,8 @@ public partial class TargetFolderViewModel : ViewModelBase
 
   public bool IsVsCode => IsGlobal && _model.EnabledClients.HasFlag(TargetClientFlags.VsCode);
 
+  public bool IsOpenCode => IsGlobal && _model.EnabledClients.HasFlag(TargetClientFlags.OpenCode);
+
   /// <summary>
   /// Selected clipboard format as string for RadioButton binding.
   /// Maps to/from EnabledClients flags ensuring exactly one is set.

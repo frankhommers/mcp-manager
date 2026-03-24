@@ -56,8 +56,14 @@ public partial class NewTargetDialog : Window
       RbVsCode.Opacity = 0.4;
     }
 
+    if (_existingGlobalTypes.Contains(TargetClientFlags.OpenCode))
+    {
+      RbOpenCode.IsEnabled = false;
+      RbOpenCode.Opacity = 0.4;
+    }
+
     // Select first enabled radio button
-    RadioButton[] buttons = [RbClaudeDesktop, RbCodex, RbCursor, RbWindsurf, RbVsCode, RbFolder];
+    RadioButton[] buttons = [RbClaudeDesktop, RbCodex, RbCursor, RbWindsurf, RbVsCode, RbOpenCode, RbFolder];
     foreach (RadioButton rb in buttons)
     {
       if (rb.IsEnabled)
@@ -70,7 +76,7 @@ public partial class NewTargetDialog : Window
 
   private string? GetSelectedTag()
   {
-    RadioButton[] buttons = [RbClaudeDesktop, RbCodex, RbCursor, RbWindsurf, RbVsCode, RbFolder];
+    RadioButton[] buttons = [RbClaudeDesktop, RbCodex, RbCursor, RbWindsurf, RbVsCode, RbOpenCode, RbFolder];
     foreach (RadioButton rb in buttons)
     {
       if (rb.IsChecked == true)
@@ -125,6 +131,13 @@ public partial class NewTargetDialog : Window
         Name = "VS Code",
         Path = RegistryService.GetDefaultVsCodeConfigPath(),
         EnabledClients = TargetClientFlags.VsCode,
+        IsGlobal = true,
+      },
+      "OpenCode" => new TargetFolder
+      {
+        Name = "OpenCode",
+        Path = RegistryService.GetDefaultOpenCodeConfigPath(),
+        EnabledClients = TargetClientFlags.OpenCode,
         IsGlobal = true,
       },
       "Folder" => new TargetFolder

@@ -20,6 +20,7 @@ public class TargetIconConverter : IValueConverter
       TargetFolderViewModel target when target.IsCursor => "MdiConsole",
       TargetFolderViewModel target when target.IsWindsurf => "MdiAccessPoint",
       TargetFolderViewModel target when target.IsVsCode => "MdiMonitor",
+      TargetFolderViewModel target when target.IsOpenCode => "MdiConsole",
       TargetFolderViewModel target when target.IsGlobal => "ClaudeLogo",
       _ => "MdiFolderOutline",
     };
@@ -70,6 +71,11 @@ public class TargetIconColorConverter : IValueConverter
       if (target.IsVsCode)
       {
         return new SolidColorBrush(Color.Parse("#007ACC"));
+      }
+
+      if (target.IsOpenCode)
+      {
+        return new SolidColorBrush(Color.Parse("#FF6B35"));
       }
 
       return new SolidColorBrush(Color.Parse("#D97757"));

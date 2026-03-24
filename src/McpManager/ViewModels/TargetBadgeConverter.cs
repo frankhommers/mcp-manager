@@ -42,6 +42,11 @@ public class TargetBadgeConverter : IValueConverter
         return "VSCODE";
       }
 
+      if (target.IsOpenCode)
+      {
+        return "OPENCODE";
+      }
+
       if (target.IsGlobal)
       {
         return "DESKTOP";

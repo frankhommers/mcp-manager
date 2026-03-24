@@ -23,6 +23,8 @@
                    Tag="Windsurf" />
       <RadioButton x:Name="RbVsCode" GroupName="TargetType" Content="VS Code"
                    Tag="VsCode" />
+      <RadioButton x:Name="RbOpenCode" GroupName="TargetType" Content="OpenCode"
+                   Tag="OpenCode" />
       <Separator Margin="0,4" />
       <RadioButton x:Name="RbFolder" GroupName="TargetType" Content="Project Folder"
                    Tag="Folder" />

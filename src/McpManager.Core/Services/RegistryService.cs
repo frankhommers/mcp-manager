@@ -102,4 +102,10 @@ public class RegistryService : IRegistryService
     string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     return home;
   }
+
+  public static string GetDefaultOpenCodeConfigPath()
+  {
+    string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    return home;
+  }
 }
