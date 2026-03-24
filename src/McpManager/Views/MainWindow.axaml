@@ -1359,13 +1359,11 @@
                                                 Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
                                         </StackPanel>
 
-                                        <Grid ColumnDefinitions="140,*,Auto" RowDefinitions="Auto">
+                                        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto">
                                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Config Path" Opacity="0.75"
                                                        VerticalAlignment="Center" />
-                                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedTarget.Path}"
-                                                     Classes="formField" />
-                                            <Button Grid.Row="0" Grid.Column="2" Content="Browse" Margin="8,0,0,0"
-                                                    Command="{Binding BrowseTargetPathCommand}" />
+                                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedTarget.ConfigFilePath}"
+                                                     Classes="formField" IsReadOnly="True" />
                                         </Grid>
                                     </StackPanel>
                                 </Border>
