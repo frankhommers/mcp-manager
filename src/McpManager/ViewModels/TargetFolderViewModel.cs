@@ -22,6 +22,8 @@ public partial class TargetFolderViewModel : ViewModelBase
 
   [ObservableProperty] private bool _isClipboard;
 
+  [ObservableProperty] private bool _isQuickExport;
+
   [ObservableProperty] private bool _enableClaudeCode;
 
   [ObservableProperty] private bool _enableClaudeDesktop;
@@ -39,6 +41,27 @@ public partial class TargetFolderViewModel : ViewModelBase
   /// True when this is the global Claude Desktop target (not Codex).
   /// </summary>
   public bool IsClaudeDesktopGlobal => IsGlobal && !IsCodex && !IsClipboard;
+
+  /// <summary>
+  /// Selected clipboard format as string for RadioButton binding.
+  /// Maps to/from EnabledClients flags ensuring exactly one is set.
+  /// </summary>
+  public string SelectedClipboardFormat
+  {
+    get
+    {
+      if (EnableClaudeDesktop) return "ClaudeDesktop";
+      if (EnableOpenCode) return "OpenCode";
+      return "ClaudeCode";
+    }
+    set
+    {
+      EnableClaudeCode = value == "ClaudeCode";
+      EnableClaudeDesktop = value == "ClaudeDesktop";
+      EnableOpenCode = value == "OpenCode";
+      OnPropertyChanged();
+    }
+  }
 
   /// <summary>
   /// Full path to the config file for display purposes.
@@ -60,6 +83,7 @@ public partial class TargetFolderViewModel : ViewModelBase
     _path = model.Path;
     _isGlobal = model.IsGlobal;
     _isClipboard = model.IsClipboard;
+    _isQuickExport = model.IsQuickExport;
     _enableClaudeCode = model.EnabledClients.HasFlag(TargetClientFlags.ClaudeCode);
     _enableClaudeDesktop = model.EnabledClients.HasFlag(TargetClientFlags.ClaudeDesktop);
     _enableOpenCode = model.EnabledClients.HasFlag(TargetClientFlags.OpenCode);
@@ -127,6 +151,7 @@ public partial class TargetFolderViewModel : ViewModelBase
     _model.Path = Path;
     _model.IsGlobal = IsGlobal;
     _model.IsClipboard = IsClipboard;
+    _model.IsQuickExport = IsQuickExport;
     _model.BridgeArgs = BridgeArgs;
 
     // Global targets have fixed client flags (set at creation, not user-selectable)

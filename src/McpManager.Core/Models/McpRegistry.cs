@@ -51,6 +51,11 @@ public class TargetFolder
   public bool IsClipboard { get; set; }
 
   /// <summary>
+  /// Is this a quick export target (reusable one-time export directory)?
+  /// </summary>
+  public bool IsQuickExport { get; set; }
+
+  /// <summary>
   /// Extra bridge arguments for this target. Used with {args} placeholder in bridge commands.
   /// Example: "--timeout 30 --verbose"
   /// </summary>

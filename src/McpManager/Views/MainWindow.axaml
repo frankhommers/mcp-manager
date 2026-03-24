@@ -565,7 +565,7 @@
                                 <TextBlock Text="{Binding Servers.Count, StringFormat='{}{0} servers'}"
                                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                            FontSize="12" VerticalAlignment="Center" />
-                                <Button Content="Import" Command="{Binding ImportFromFileCommand}" Classes="toolbarButton" />
+                                <Button Content="Export" Command="{Binding ExportAllTargetsCommand}" Classes="toolbarButton" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -1149,6 +1149,7 @@
                                                 <MultiBinding Converter="{x:Static BoolConverters.And}">
                                                     <Binding Path="!SelectedTarget.IsGlobal" />
                                                     <Binding Path="!SelectedTarget.IsClipboard" />
+                                                    <Binding Path="!SelectedTarget.IsQuickExport" />
                                                 </MultiBinding>
                                             </Button.IsVisible>
                                         </Button>
@@ -1167,6 +1168,10 @@
                                                    Opacity="0.75"
                                                    TextWrapping="Wrap"
                                                    IsVisible="{Binding SelectedTarget.IsClipboard}" />
+                                        <TextBlock Text="One-time export directory. Paste a path or browse to quickly export configs."
+                                                   Opacity="0.75"
+                                                   TextWrapping="Wrap"
+                                                   IsVisible="{Binding SelectedTarget.IsQuickExport}" />
                                         <TextBlock Text="Global Claude Desktop destination with bridge arguments for HTTP servers."
                                                    Opacity="0.75"
                                                    TextWrapping="Wrap"
@@ -1182,6 +1187,7 @@
                                                 <MultiBinding Converter="{x:Static BoolConverters.And}">
                                                     <Binding Path="!SelectedTarget.IsGlobal" />
                                                     <Binding Path="!SelectedTarget.IsClipboard" />
+                                                    <Binding Path="!SelectedTarget.IsQuickExport" />
                                                 </MultiBinding>
                                             </TextBlock.IsVisible>
                                         </TextBlock>
@@ -1197,11 +1203,15 @@
                                                 <Border Grid.Column="1" Classes="inlineBadge" IsVisible="{Binding SelectedTarget.IsCodex}">
                                                     <TextBlock Text="CODEX" Classes="inlineBadgeText" />
                                                 </Border>
+                                                <Border Grid.Column="1" Classes="inlineBadge" IsVisible="{Binding SelectedTarget.IsQuickExport}">
+                                                    <TextBlock Text="QUICK" Classes="inlineBadgeText" />
+                                                </Border>
                                                 <Border Grid.Column="1" Classes="inlineBadge">
                                                     <Border.IsVisible>
                                                         <MultiBinding Converter="{x:Static BoolConverters.And}">
                                                             <Binding Path="!SelectedTarget.IsGlobal" />
                                                             <Binding Path="!SelectedTarget.IsClipboard" />
+                                                            <Binding Path="!SelectedTarget.IsQuickExport" />
                                                         </MultiBinding>
                                                     </Border.IsVisible>
                                                     <TextBlock Text="FOLDER" Classes="inlineBadgeText" />
@@ -1229,11 +1239,31 @@
                                     </StackPanel>
                                 </Border>
 
+                                <Border Classes="detailCard" IsVisible="{Binding SelectedTarget.IsQuickExport}">
+                                    <StackPanel Spacing="16">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Destination" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock Text="Paste a path or browse to a folder."
+                                                       Opacity="0.75" FontSize="12" />
+                                        </StackPanel>
+
+                                        <Grid ColumnDefinitions="140,*,Auto">
+                                            <TextBlock Grid.Column="0" Text="Path" Opacity="0.75"
+                                                       VerticalAlignment="Center" />
+                                            <TextBox Grid.Column="1" Text="{Binding SelectedTarget.Path}"
+                                                     Classes="formField" />
+                                            <Button Grid.Column="2" Content="Browse" Margin="8,0,0,0"
+                                                    Command="{Binding BrowseTargetPathCommand}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
                                 <Border Classes="detailCard">
                                     <Border.IsVisible>
                                         <MultiBinding Converter="{x:Static BoolConverters.And}">
                                             <Binding Path="!SelectedTarget.IsGlobal" />
                                             <Binding Path="!SelectedTarget.IsClipboard" />
+                                            <Binding Path="!SelectedTarget.IsQuickExport" />
                                         </MultiBinding>
                                     </Border.IsVisible>
                                     <StackPanel Spacing="16">
@@ -1336,15 +1366,15 @@
                                         <TextBlock Text="Select which format should be copied to the clipboard."
                                                    Opacity="0.75" FontSize="12" />
                                         <StackPanel Spacing="8">
-                                            <CheckBox Content="Claude Code (.mcp.json)"
-                                                      IsThreeState="False"
-                                                      IsChecked="{Binding SelectedTarget.EnableClaudeCode, Mode=TwoWay}" />
-                                            <CheckBox Content="Claude Desktop (claude_desktop_config.json)"
-                                                      IsThreeState="False"
-                                                      IsChecked="{Binding SelectedTarget.EnableClaudeDesktop, Mode=TwoWay}" />
-                                            <CheckBox Content="OpenCode (opencode.json)"
-                                                      IsThreeState="False"
-                                                      IsChecked="{Binding SelectedTarget.EnableOpenCode, Mode=TwoWay}" />
+                                            <RadioButton Content="Claude Code (.mcp.json)"
+                                                         GroupName="ClipboardFormat"
+                                                         IsChecked="{Binding SelectedTarget.SelectedClipboardFormat, Converter={x:Static vm:StringEqualsConverter.Instance}, ConverterParameter=ClaudeCode}" />
+                                            <RadioButton Content="Claude Desktop (claude_desktop_config.json)"
+                                                         GroupName="ClipboardFormat"
+                                                         IsChecked="{Binding SelectedTarget.SelectedClipboardFormat, Converter={x:Static vm:StringEqualsConverter.Instance}, ConverterParameter=ClaudeDesktop}" />
+                                            <RadioButton Content="OpenCode (opencode.json)"
+                                                         GroupName="ClipboardFormat"
+                                                         IsChecked="{Binding SelectedTarget.SelectedClipboardFormat, Converter={x:Static vm:StringEqualsConverter.Instance}, ConverterParameter=OpenCode}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>

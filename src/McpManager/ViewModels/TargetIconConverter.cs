@@ -15,6 +15,7 @@ public class TargetIconConverter : IValueConverter
     string resourceKey = value switch
     {
       TargetFolderViewModel target when target.IsClipboard => "MdiClipboardOutline",
+      TargetFolderViewModel target when target.IsQuickExport => "MdiLightningBolt",
       TargetFolderViewModel target when target.IsCodex => "CodexLogo",
       TargetFolderViewModel target when target.IsGlobal => "ClaudeLogo",
       _ => "MdiFolderOutline",
@@ -41,6 +42,11 @@ public class TargetIconColorConverter : IValueConverter
 
   public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
   {
+    if (value is TargetFolderViewModel { IsQuickExport: true })
+    {
+      return new SolidColorBrush(Color.Parse("#E5C07B"));
+    }
+
     if (value is TargetFolderViewModel target && target.IsGlobal)
     {
       if (target.IsCodex)

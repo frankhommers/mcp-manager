@@ -232,6 +232,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     // Ensure singleton targets exist
     EnsureClipboardTarget();
+    EnsureQuickExportTarget();
     EnsureCodexTarget();
 
     // Unsubscribe from old servers
@@ -298,6 +299,29 @@ public partial class MainWindowViewModel : ViewModelBase
         EnabledClients = TargetClientFlags.ClaudeCode,
       };
       _registry.TargetFolders.Insert(0, clipboardTarget); // Add at the beginning
+    }
+  }
+
+  private void EnsureQuickExportTarget()
+  {
+    if (_registry == null)
+    {
+      return;
+    }
+
+    if (!_registry.TargetFolders.Any(t => t.IsQuickExport))
+    {
+      TargetFolder quickExportTarget = new()
+      {
+        Name = "Quick Export",
+        Path = "",
+        IsQuickExport = true,
+        EnabledClients = TargetClientFlags.ClaudeCode,
+      };
+
+      // Insert after clipboard target (index 1), or at beginning if no clipboard
+      int insertIndex = _registry.TargetFolders.FindIndex(t => t.IsClipboard);
+      _registry.TargetFolders.Insert(insertIndex >= 0 ? insertIndex + 1 : 0, quickExportTarget);
     }
   }
 
@@ -1102,6 +1126,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     // Cannot delete clipboard target
     if (SelectedTarget.IsClipboard)
+    {
+      return;
+    }
+
+    // Cannot delete quick export target
+    if (SelectedTarget.IsQuickExport)
     {
       return;
     }

@@ -17,6 +17,11 @@ public class TargetBadgeConverter : IValueConverter
         return "CLIPBOARD";
       }
 
+      if (target.IsQuickExport)
+      {
+        return "QUICK";
+      }
+
       if (target.IsCodex)
       {
         return "CODEX";
