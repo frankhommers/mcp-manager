@@ -5,13 +5,32 @@ using McpManager.Core.Models;
 namespace McpManager.Core.ConfigGenerators;
 
 /// <summary>
-/// Generates .opencode/opencode.json config files for OpenCode.
+/// Generates opencode.jsonc config for OpenCode (~/.config/opencode/).
+/// Only manages the "mcp" section; preserves all other config.
+/// Supports JSONC (comments and trailing commas).
 /// </summary>
 public class OpenCodeConfigGenerator : IConfigGenerator
 {
   public string ClientName => "OpenCode";
-  public string ConfigFileName => "opencode.json";
-  public string? ConfigSubFolder => ".opencode";
+  public string ConfigFileName => "opencode.jsonc";
+  public string? ConfigSubFolder => null;
+
+  /// <summary>
+  /// Path to the existing config file to merge with.
+  /// When set, existing non-MCP config is preserved.
+  /// </summary>
+  public string? ExistingConfigPath { get; set; }
+
+  private static readonly JsonSerializerOptions WriteOptions = new()
+  {
+    WriteIndented = true,
+  };
+
+  private static readonly JsonDocumentOptions ReadOptions = new()
+  {
+    CommentHandling = JsonCommentHandling.Skip,
+    AllowTrailingCommas = true,
+  };
 
   public string GenerateConfig(
     IEnumerable<McpServer> servers,
@@ -19,6 +38,10 @@ public class OpenCodeConfigGenerator : IConfigGenerator
     Dictionary<Guid, List<string>>? toolOverrides = null,
     string? bridgeArgs = null)
   {
+    // Load existing config or start fresh
+    JsonObject root = LoadExistingConfig();
+
+    // Build new mcp section
     JsonObject mcpSection = new();
 
     foreach (McpServer server in servers)
@@ -72,18 +95,69 @@ public class OpenCodeConfigGenerator : IConfigGenerator
       mcpSection[server.Name] = serverConfig;
     }
 
-    JsonObject root = new()
-    {
-      ["$schema"] = "https://opencode.ai/config.json",
-      ["mcp"] = mcpSection,
-    };
+    // Replace only the mcp section
+    root["mcp"] = mcpSection;
 
-    return JsonSerializer.Serialize(
-      root,
-      new JsonSerializerOptions
+    // Ensure $schema is present
+    if (!root.ContainsKey("$schema"))
+    {
+      // Insert at beginning by rebuilding
+      JsonObject ordered = new() {["$schema"] = "https://opencode.ai/config.json"};
+      foreach ((string key, JsonNode? value) in root)
       {
-        WriteIndented = true,
-      });
+        if (key != "$schema")
+        {
+          ordered[key] = value?.DeepClone();
+        }
+      }
+
+      return JsonSerializer.Serialize(ordered, WriteOptions);
+    }
+
+    return JsonSerializer.Serialize(root, WriteOptions);
+  }
+
+  private JsonObject LoadExistingConfig()
+  {
+    if (string.IsNullOrEmpty(ExistingConfigPath))
+    {
+      return new JsonObject();
+    }
+
+    // Try .jsonc first, then .json
+    string? filePath = null;
+    if (File.Exists(ExistingConfigPath))
+    {
+      filePath = ExistingConfigPath;
+    }
+    else
+    {
+      // Try the other extension
+      string alt = ExistingConfigPath.EndsWith(".jsonc", StringComparison.OrdinalIgnoreCase)
+        ? ExistingConfigPath[..^1] // .jsonc -> .json
+        : ExistingConfigPath + "c"; // .json -> .jsonc
+
+      if (File.Exists(alt))
+      {
+        filePath = alt;
+      }
+    }
+
+    if (filePath == null)
+    {
+      return new JsonObject();
+    }
+
+    try
+    {
+      string content = File.ReadAllText(filePath);
+      JsonNode? node = JsonNode.Parse(content, documentOptions: ReadOptions);
+      return node as JsonObject ?? new JsonObject();
+    }
+    catch
+    {
+      return new JsonObject();
+    }
   }
 
   private static Dictionary<string, string> GetMergedEnvVars(

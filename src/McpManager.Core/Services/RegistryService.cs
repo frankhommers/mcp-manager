@@ -106,6 +106,6 @@ public class RegistryService : IRegistryService
   public static string GetDefaultOpenCodeConfigPath()
   {
     string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-    return home;
+    return Path.Combine(home, ".config", "opencode");
   }
 }

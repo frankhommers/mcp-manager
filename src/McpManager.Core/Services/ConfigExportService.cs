@@ -41,6 +41,9 @@ public class ConfigExportService : IConfigExportService
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.OpenCode))
     {
+      // OpenCode config merges into existing opencode.jsonc
+      string openCodeConfigPath = Path.Combine(target.Path, "opencode.jsonc");
+      _openCodeGen.ExistingConfigPath = openCodeConfigPath;
       await ExportConfigAsync(target.Path, _openCodeGen, servers, envOverrides, toolOverrides, bridgeArgs);
     }
 
@@ -126,6 +129,8 @@ public class ConfigExportService : IConfigExportService
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.OpenCode))
     {
+      string openCodeConfigPath = Path.Combine(target.Path, "opencode.jsonc");
+      _openCodeGen.ExistingConfigPath = openCodeConfigPath;
       string path = GetConfigFilePath(target.Path, _openCodeGen);
       result[path] = _openCodeGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
     }

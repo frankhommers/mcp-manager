@@ -92,7 +92,7 @@ public partial class TargetFolderViewModel : ViewModelBase
       if (clients.HasFlag(TargetClientFlags.VsCode))
         return System.IO.Path.Combine(Path, ".vscode", "mcp.json");
       if (clients.HasFlag(TargetClientFlags.OpenCode))
-        return System.IO.Path.Combine(Path, ".opencode", "opencode.json");
+        return System.IO.Path.Combine(Path, "opencode.jsonc");
       return Path;
     }
   }
