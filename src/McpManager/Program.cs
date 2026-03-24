@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using System;
+using System.Threading.Tasks;
 
 namespace McpManager;
 
@@ -11,6 +12,18 @@ internal sealed class Program
   [STAThread]
   public static void Main(string[] args)
   {
+    // Prevent unhandled exceptions from crashing the app
+    AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+    {
+      Console.Error.WriteLine($"Unhandled exception: {e.ExceptionObject}");
+    };
+
+    TaskScheduler.UnobservedTaskException += (_, e) =>
+    {
+      Console.Error.WriteLine($"Unobserved task exception: {e.Exception}");
+      e.SetObserved();
+    };
+
     BuildAvaloniaApp()
       .StartWithClassicDesktopLifetime(args);
   }

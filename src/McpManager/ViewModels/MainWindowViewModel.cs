@@ -711,9 +711,27 @@ public partial class MainWindowViewModel : ViewModelBase
       });
     }
 
-    await using McpClient client = await McpClient.CreateAsync(transport, cancellationToken: cts.Token);
-    IList<McpClientTool> tools = await client.ListToolsAsync(cancellationToken: cts.Token);
-    return tools.Select(t => t.Name).ToList();
+    McpClient? client = null;
+    try
+    {
+      client = await McpClient.CreateAsync(transport, cancellationToken: cts.Token);
+      IList<McpClientTool> tools = await client.ListToolsAsync(cancellationToken: cts.Token);
+      return tools.Select(t => t.Name).ToList();
+    }
+    finally
+    {
+      if (client != null)
+      {
+        try
+        {
+          await client.DisposeAsync();
+        }
+        catch
+        {
+          // Swallow dispose errors from MCP SDK
+        }
+      }
+    }
   }
 
   private static Dictionary<string, string?> ParseEnvironmentText(string? environmentText)
