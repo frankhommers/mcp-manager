@@ -103,4 +103,9 @@ public class GlobalSettings
   /// Placeholders: {url} = server URL, {args} = extra args per target.
   /// </summary>
   public string BridgeCommandStreamableHttp { get; set; } = "mcp-proxy {args} --transport streamablehttp {url}";
+
+  /// <summary>
+  /// Selected theme mode: "Follow system", "Dark", or "Light".
+  /// </summary>
+  public string ThemeMode { get; set; } = "Follow system";
 }

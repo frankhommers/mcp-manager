@@ -587,6 +587,23 @@
                                 <Border Classes="detailCard">
                                     <StackPanel Spacing="18">
                                         <StackPanel Spacing="4">
+                                            <TextBlock Text="Appearance" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock Text="Choose how the application looks."
+                                                       Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Grid ColumnDefinitions="160,*">
+                                            <TextBlock Text="Theme" Opacity="0.75" VerticalAlignment="Center" />
+                                            <ComboBox Grid.Column="1" Width="200"
+                                                      ItemsSource="{Binding ThemeModes}"
+                                                      SelectedItem="{Binding SelectedThemeMode}"
+                                                      HorizontalAlignment="Left" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="detailCard">
+                                    <StackPanel Spacing="18">
+                                        <StackPanel Spacing="4">
                                             <TextBlock Text="Bridge preferences" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
                                             <TextBlock
                                                 Text="Set the commands Claude Desktop should use when a remote MCP server needs a stdio bridge."

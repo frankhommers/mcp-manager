@@ -13,6 +13,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input.Platform;
 using Avalonia.Platform.Storage;
+using Avalonia.Styling;
 using CliWrap;
 using CliWrap.Buffered;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -127,6 +128,10 @@ public partial class MainWindowViewModel : ViewModelBase
   [ObservableProperty]
   private string _bridgeCommandStreamableHttp = "mcp-proxy {args} --transport streamablehttp {url}";
 
+  [ObservableProperty] private string _selectedThemeMode = "Follow system";
+
+  public ObservableCollection<string> ThemeModes { get; } = ["Follow system", "Dark", "Light"];
+
   public IEnumerable<McpTransportType> TransportTypes => Enum.GetValues<McpTransportType>();
 
   /// <summary>
@@ -199,6 +204,11 @@ public partial class MainWindowViewModel : ViewModelBase
       BridgeCommandHttp = MigrateBridgeCommand(_registry.Settings.BridgeCommandHttp);
       BridgeCommandSse = MigrateBridgeCommand(_registry.Settings.BridgeCommandSse);
       BridgeCommandStreamableHttp = MigrateBridgeCommand(_registry.Settings.BridgeCommandStreamableHttp);
+
+      if (!string.IsNullOrEmpty(_registry.Settings.ThemeMode))
+      {
+        SelectedThemeMode = _registry.Settings.ThemeMode;
+      }
 
       // Save if migrated
       if (BridgeCommandHttp != _registry.Settings.BridgeCommandHttp ||
@@ -472,6 +482,24 @@ public partial class MainWindowViewModel : ViewModelBase
     if (_registry != null)
     {
       _registry.Settings.BridgeCommandStreamableHttp = value;
+    }
+  }
+
+  partial void OnSelectedThemeModeChanged(string value)
+  {
+    if (Application.Current is not null)
+    {
+      Application.Current.RequestedThemeVariant = value switch
+      {
+        "Dark" => ThemeVariant.Dark,
+        "Light" => ThemeVariant.Light,
+        _ => ThemeVariant.Default,
+      };
+    }
+
+    if (_registry != null)
+    {
+      _registry.Settings.ThemeMode = value;
     }
   }
 
