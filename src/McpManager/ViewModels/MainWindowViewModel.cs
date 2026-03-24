@@ -109,7 +109,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
   [ObservableProperty] private bool _isLoading;
 
-  [ObservableProperty] private string _statusMessage = "Ready";
+  [ObservableProperty] private string _statusMessage = "";
 
   [ObservableProperty] private bool _showSettings;
 
@@ -221,7 +221,7 @@ public partial class MainWindowViewModel : ViewModelBase
         await _registryService.SaveAsync(_registry);
       }
 
-      StatusMessage = $"Loaded {Servers.Count} servers, {TargetFolders.Count} targets";
+      StatusMessage = "";
     }
     catch (Exception ex)
     {
