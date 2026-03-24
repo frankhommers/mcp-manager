@@ -1150,7 +1150,6 @@
                                                 Command="{Binding DeleteTargetFolderCommand}">
                                             <Button.IsVisible>
                                                 <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                                    <Binding Path="!SelectedTarget.IsGlobal" />
                                                     <Binding Path="!SelectedTarget.IsClipboard" />
                                                     <Binding Path="!SelectedTarget.IsQuickExport" />
                                                 </MultiBinding>

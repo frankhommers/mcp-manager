@@ -57,7 +57,7 @@ public partial class NewTargetDialog : Window
     }
 
     // Select first enabled radio button
-    RadioButton[] buttons = [RbClaudeDesktop, RbCodex, RbCursor, RbWindsurf, RbVsCode, RbClipboard, RbFolder];
+    RadioButton[] buttons = [RbClaudeDesktop, RbCodex, RbCursor, RbWindsurf, RbVsCode, RbFolder];
     foreach (RadioButton rb in buttons)
     {
       if (rb.IsEnabled)
@@ -70,7 +70,7 @@ public partial class NewTargetDialog : Window
 
   private string? GetSelectedTag()
   {
-    RadioButton[] buttons = [RbClaudeDesktop, RbCodex, RbCursor, RbWindsurf, RbVsCode, RbClipboard, RbFolder];
+    RadioButton[] buttons = [RbClaudeDesktop, RbCodex, RbCursor, RbWindsurf, RbVsCode, RbFolder];
     foreach (RadioButton rb in buttons)
     {
       if (rb.IsChecked == true)
@@ -126,13 +126,6 @@ public partial class NewTargetDialog : Window
         Path = RegistryService.GetDefaultVsCodeConfigPath(),
         EnabledClients = TargetClientFlags.VsCode,
         IsGlobal = true,
-      },
-      "Clipboard" => new TargetFolder
-      {
-        Name = "Clipboard",
-        Path = "",
-        IsClipboard = true,
-        EnabledClients = TargetClientFlags.ClaudeCode,
       },
       "Folder" => new TargetFolder
       {

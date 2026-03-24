@@ -24,8 +24,6 @@
       <RadioButton x:Name="RbVsCode" GroupName="TargetType" Content="VS Code"
                    Tag="VsCode" />
       <Separator Margin="0,4" />
-      <RadioButton x:Name="RbClipboard" GroupName="TargetType" Content="Clipboard"
-                   Tag="Clipboard" />
       <RadioButton x:Name="RbFolder" GroupName="TargetType" Content="Project Folder"
                    Tag="Folder" />
     </StackPanel>
