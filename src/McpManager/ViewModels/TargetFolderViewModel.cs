@@ -38,9 +38,9 @@ public partial class TargetFolderViewModel : ViewModelBase
   public bool IsCodex => IsGlobal && _model.EnabledClients.HasFlag(TargetClientFlags.Codex);
 
   /// <summary>
-  /// True when this is the global Claude Desktop target (not Codex).
+  /// True when this is the global Claude Desktop target.
   /// </summary>
-  public bool IsClaudeDesktopGlobal => IsGlobal && !IsCodex && !IsClipboard;
+  public bool IsClaudeDesktopGlobal => IsGlobal && _model.EnabledClients.HasFlag(TargetClientFlags.ClaudeDesktop);
 
   public bool IsCursor => IsGlobal && _model.EnabledClients.HasFlag(TargetClientFlags.Cursor);
 
@@ -72,11 +72,28 @@ public partial class TargetFolderViewModel : ViewModelBase
   /// <summary>
   /// Full path to the config file for display purposes.
   /// </summary>
-  public string ConfigFilePath => IsCodex
-    ? System.IO.Path.Combine(Path, "config.toml")
-    : IsClaudeDesktopGlobal
-      ? System.IO.Path.Combine(Path, "claude_desktop_config.json")
-      : Path;
+  public string ConfigFilePath
+  {
+    get
+    {
+      TargetClientFlags clients = _model.EnabledClients;
+      if (clients.HasFlag(TargetClientFlags.Codex))
+        return System.IO.Path.Combine(Path, "config.toml");
+      if (clients.HasFlag(TargetClientFlags.ClaudeDesktop))
+        return System.IO.Path.Combine(Path, "claude_desktop_config.json");
+      if (clients.HasFlag(TargetClientFlags.ClaudeCode))
+        return System.IO.Path.Combine(Path, ".mcp.json");
+      if (clients.HasFlag(TargetClientFlags.Cursor))
+        return System.IO.Path.Combine(Path, ".cursor", "mcp.json");
+      if (clients.HasFlag(TargetClientFlags.Windsurf))
+        return System.IO.Path.Combine(Path, "mcp_config.json");
+      if (clients.HasFlag(TargetClientFlags.VsCode))
+        return System.IO.Path.Combine(Path, ".vscode", "mcp.json");
+      if (clients.HasFlag(TargetClientFlags.OpenCode))
+        return System.IO.Path.Combine(Path, ".opencode", "opencode.json");
+      return Path;
+    }
+  }
 
   [ObservableProperty] private ObservableCollection<ServerSelectionViewModel> _serverSelections = [];
 

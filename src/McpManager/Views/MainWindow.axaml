@@ -1340,6 +1340,36 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- Other global targets (Cursor, Windsurf, VS Code) -->
+                                <Border Classes="detailCard">
+                                    <Border.IsVisible>
+                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                            <Binding Path="SelectedTarget.IsGlobal" />
+                                            <Binding Path="!SelectedTarget.IsClaudeDesktopGlobal" />
+                                            <Binding Path="!SelectedTarget.IsCodex" />
+                                            <Binding Path="!SelectedTarget.IsClipboard" />
+                                            <Binding Path="!SelectedTarget.IsQuickExport" />
+                                        </MultiBinding>
+                                    </Border.IsVisible>
+                                    <StackPanel Spacing="16">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Destination" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock
+                                                Text="Config file path for this target. The path is auto-detected but can be adjusted."
+                                                Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <Grid ColumnDefinitions="140,*,Auto" RowDefinitions="Auto">
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Config Path" Opacity="0.75"
+                                                       VerticalAlignment="Center" />
+                                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedTarget.Path}"
+                                                     Classes="formField" />
+                                            <Button Grid.Row="0" Grid.Column="2" Content="Browse" Margin="8,0,0,0"
+                                                    Command="{Binding BrowseTargetPathCommand}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
                                 <Border Classes="detailCard">
                                     <Border.IsVisible>
                                         <MultiBinding Converter="{x:Static BoolConverters.And}">

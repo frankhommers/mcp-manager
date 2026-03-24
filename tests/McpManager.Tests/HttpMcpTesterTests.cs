@@ -91,3 +91,22 @@ public sealed class HttpMcpTesterTests
     return port;
   }
 }
+
+public sealed class WindsurfGeneratorTests
+{
+  [Fact]
+  public void WindsurfGenerator_HasCorrectFileName()
+  {
+    var gen = new McpManager.Core.ConfigGenerators.WindsurfConfigGenerator();
+    Assert.Equal("mcp_config.json", gen.ConfigFileName);
+    Assert.Equal("Windsurf", gen.ClientName);
+    Assert.Null(gen.ConfigSubFolder);
+  }
+
+  [Fact]
+  public void WindsurfGenerator_ViaInterface_HasCorrectFileName()
+  {
+    McpManager.Core.ConfigGenerators.IConfigGenerator gen = new McpManager.Core.ConfigGenerators.WindsurfConfigGenerator();
+    Assert.Equal("mcp_config.json", gen.ConfigFileName);
+  }
+}
