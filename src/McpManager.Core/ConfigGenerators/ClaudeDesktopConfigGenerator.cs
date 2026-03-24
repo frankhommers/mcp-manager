@@ -10,9 +10,9 @@ namespace McpManager.Core.ConfigGenerators;
 /// </summary>
 public class ClaudeDesktopConfigGenerator : IConfigGenerator
 {
-  public string ClientName => "Claude Desktop";
-  public string ConfigFileName => "claude_desktop_config.json";
-  public string? ConfigSubFolder => null;
+  public virtual string ClientName => "Claude Desktop";
+  public virtual string ConfigFileName => "claude_desktop_config.json";
+  public virtual string? ConfigSubFolder => null;
 
   /// <summary>
   /// Bridge command for wrapping HTTP servers. Use {url} as placeholder for the server URL.

@@ -5,13 +5,14 @@ using McpManager.Core.Models;
 namespace McpManager.Core.ConfigGenerators;
 
 /// <summary>
-/// Generates .mcp.json config files for Claude Code.
+/// Generates .vscode/mcp.json config files for VS Code (GitHub Copilot).
+/// Format: { "mcp": { "servers": { "name": { "type": "stdio", "command": "...", "args": [] } } } }
 /// </summary>
-public class ClaudeCodeConfigGenerator : IConfigGenerator
+public class VsCodeConfigGenerator : IConfigGenerator
 {
-  public virtual string ClientName => "Claude Code";
-  public virtual string ConfigFileName => ".mcp.json";
-  public virtual string? ConfigSubFolder => null;
+  public string ClientName => "VS Code";
+  public string ConfigFileName => "mcp.json";
+  public string? ConfigSubFolder => ".vscode";
 
   public string GenerateConfig(
     IEnumerable<McpServer> servers,
@@ -29,6 +30,7 @@ public class ClaudeCodeConfigGenerator : IConfigGenerator
       switch (server.TransportType)
       {
         case McpTransportType.Stdio:
+          serverConfig["type"] = "stdio";
           if (!string.IsNullOrEmpty(server.Command))
           {
             serverConfig["command"] = server.Command;
@@ -41,15 +43,17 @@ public class ClaudeCodeConfigGenerator : IConfigGenerator
           break;
 
         case McpTransportType.Http:
-        case McpTransportType.Sse:
         case McpTransportType.StreamableHttp:
-          serverConfig["type"] = server.TransportType switch
+          serverConfig["type"] = "http";
+          if (!string.IsNullOrEmpty(server.Url))
           {
-            McpTransportType.Http => "http",
-            McpTransportType.Sse => "sse",
-            McpTransportType.StreamableHttp => "streamable-http",
-            _ => "http",
-          };
+            serverConfig["url"] = server.Url;
+          }
+
+          break;
+
+        case McpTransportType.Sse:
+          serverConfig["type"] = "sse";
           if (!string.IsNullOrEmpty(server.Url))
           {
             serverConfig["url"] = server.Url;
@@ -69,18 +73,15 @@ public class ClaudeCodeConfigGenerator : IConfigGenerator
         serverConfig["env"] = envObj;
       }
 
-      List<string> allowedTools = GetEffectiveToolList(server, toolOverrides);
-      if (allowedTools.Count > 0)
-      {
-        serverConfig["alwaysAllow"] = new JsonArray(allowedTools.Select(a => JsonValue.Create(a)).ToArray());
-      }
-
       mcpServers[server.Name] = serverConfig;
     }
 
     JsonObject root = new()
     {
-      ["mcpServers"] = mcpServers,
+      ["mcp"] = new JsonObject
+      {
+        ["servers"] = mcpServers,
+      },
     };
 
     return JsonSerializer.Serialize(
@@ -91,19 +92,7 @@ public class ClaudeCodeConfigGenerator : IConfigGenerator
       });
   }
 
-  protected static List<string> GetEffectiveToolList(
-    McpServer server,
-    Dictionary<Guid, List<string>>? toolOverrides)
-  {
-    if (toolOverrides?.TryGetValue(server.Id, out List<string>? overrides) == true)
-    {
-      return overrides;
-    }
-
-    return server.AlwaysAllow;
-  }
-
-  protected static Dictionary<string, string> GetMergedEnvVars(
+  private static Dictionary<string, string> GetMergedEnvVars(
     McpServer server,
     Dictionary<Guid, Dictionary<string, string>>? envOverrides)
   {

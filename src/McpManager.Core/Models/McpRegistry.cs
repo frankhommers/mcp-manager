@@ -76,7 +76,10 @@ public enum TargetClientFlags
   ClaudeDesktop = 2,
   OpenCode = 4,
   Codex = 8,
-  All = ClaudeCode | ClaudeDesktop | OpenCode | Codex,
+  Cursor = 16,
+  Windsurf = 32,
+  VsCode = 64,
+  All = ClaudeCode | ClaudeDesktop | OpenCode | Codex | Cursor | Windsurf | VsCode,
 }
 
 public class GlobalSettings

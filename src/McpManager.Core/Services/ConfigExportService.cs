@@ -9,6 +9,9 @@ public class ConfigExportService : IConfigExportService
   private readonly ClaudeDesktopConfigGenerator _claudeDesktopGen = new();
   private readonly OpenCodeConfigGenerator _openCodeGen = new();
   private readonly CodexConfigGenerator _codexGen = new();
+  private readonly CursorConfigGenerator _cursorGen = new();
+  private readonly WindsurfConfigGenerator _windsurfGen = new();
+  private readonly VsCodeConfigGenerator _vsCodeGen = new();
 
   public async Task ExportAsync(TargetFolder target, IEnumerable<McpServer> allServers, GlobalSettings? settings = null)
   {
@@ -48,6 +51,29 @@ public class ConfigExportService : IConfigExportService
       _codexGen.ExistingConfigPath = codexConfigPath;
       string codexBasePath = Path.GetDirectoryName(codexConfigPath) ?? codexConfigPath;
       await ExportConfigAsync(codexBasePath, _codexGen, servers, envOverrides, toolOverrides, bridgeArgs);
+    }
+
+    if (target.EnabledClients.HasFlag(TargetClientFlags.Cursor))
+    {
+      await ExportConfigAsync(target.Path, _cursorGen, servers, envOverrides, toolOverrides, bridgeArgs);
+    }
+
+    if (target.EnabledClients.HasFlag(TargetClientFlags.Windsurf))
+    {
+      // Windsurf uses bridge commands like Claude Desktop
+      if (settings != null)
+      {
+        _windsurfGen.BridgeCommandHttp = settings.BridgeCommandHttp;
+        _windsurfGen.BridgeCommandSse = settings.BridgeCommandSse;
+        _windsurfGen.BridgeCommandStreamableHttp = settings.BridgeCommandStreamableHttp;
+      }
+
+      await ExportConfigAsync(target.Path, _windsurfGen, servers, envOverrides, toolOverrides, bridgeArgs);
+    }
+
+    if (target.EnabledClients.HasFlag(TargetClientFlags.VsCode))
+    {
+      await ExportConfigAsync(target.Path, _vsCodeGen, servers, envOverrides, toolOverrides, bridgeArgs);
     }
   }
 
@@ -109,6 +135,31 @@ public class ConfigExportService : IConfigExportService
       string codexConfigPath = settings?.CodexConfigPath ?? GetDefaultCodexConfigPath();
       _codexGen.ExistingConfigPath = codexConfigPath;
       result[codexConfigPath] = _codexGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+    }
+
+    if (target.EnabledClients.HasFlag(TargetClientFlags.Cursor))
+    {
+      string path = GetConfigFilePath(target.Path, _cursorGen);
+      result[path] = _cursorGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+    }
+
+    if (target.EnabledClients.HasFlag(TargetClientFlags.Windsurf))
+    {
+      if (settings != null)
+      {
+        _windsurfGen.BridgeCommandHttp = settings.BridgeCommandHttp;
+        _windsurfGen.BridgeCommandSse = settings.BridgeCommandSse;
+        _windsurfGen.BridgeCommandStreamableHttp = settings.BridgeCommandStreamableHttp;
+      }
+
+      string path = GetConfigFilePath(target.Path, _windsurfGen);
+      result[path] = _windsurfGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+    }
+
+    if (target.EnabledClients.HasFlag(TargetClientFlags.VsCode))
+    {
+      string path = GetConfigFilePath(target.Path, _vsCodeGen);
+      result[path] = _vsCodeGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
     }
 
     return result;

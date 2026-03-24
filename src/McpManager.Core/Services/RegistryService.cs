@@ -57,46 +57,16 @@ public class RegistryService : IRegistryService
 
   private static McpRegistry CreateDefaultRegistry()
   {
-    McpRegistry registry = new();
-
-    // Set default Claude Desktop config path based on OS
-    string claudeDesktopConfigPath = GetDefaultClaudeDesktopConfigPath();
-    registry.Settings.ClaudeDesktopConfigPath = claudeDesktopConfigPath;
-
-    // Add Claude Desktop as a default target
-    string claudeDesktopPath = Path.GetDirectoryName(claudeDesktopConfigPath) ?? string.Empty;
-    registry.TargetFolders.Add(
-      new TargetFolder
-      {
-        Name = "Claude Desktop",
-        Path = claudeDesktopPath,
-        EnabledClients = TargetClientFlags.ClaudeDesktop,
-        IsGlobal = true,
-      });
-
-    // Set default Codex config path and add as global target
-    string codexConfigPath = GetDefaultCodexConfigPath();
-    registry.Settings.CodexConfigPath = codexConfigPath;
-    string codexPath = Path.GetDirectoryName(codexConfigPath) ?? string.Empty;
-    registry.TargetFolders.Add(
-      new TargetFolder
-      {
-        Name = "Codex CLI",
-        Path = codexPath,
-        EnabledClients = TargetClientFlags.Codex,
-        IsGlobal = true,
-      });
-
-    return registry;
+    return new McpRegistry();
   }
 
-  private static string GetDefaultCodexConfigPath()
+  public static string GetDefaultCodexConfigPath()
   {
     string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     return Path.Combine(home, ".codex", "config.toml");
   }
 
-  private static string GetDefaultClaudeDesktopConfigPath()
+  public static string GetDefaultClaudeDesktopConfigPath()
   {
     if (OperatingSystem.IsMacOS())
     {
@@ -110,9 +80,26 @@ public class RegistryService : IRegistryService
     }
     else
     {
-      // Linux
       string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
       return Path.Combine(home, ".config", "claude", "claude_desktop_config.json");
     }
+  }
+
+  public static string GetDefaultCursorConfigPath()
+  {
+    string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    return home;
+  }
+
+  public static string GetDefaultWindsurfConfigPath()
+  {
+    string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    return Path.Combine(home, ".codeium", "windsurf");
+  }
+
+  public static string GetDefaultVsCodeConfigPath()
+  {
+    string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    return home;
   }
 }

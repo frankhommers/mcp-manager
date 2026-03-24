@@ -1123,22 +1123,41 @@ public partial class MainWindowViewModel : ViewModelBase
   #region Target Folder Commands
 
   [RelayCommand]
-  private void AddTargetFolder()
+  private async Task AddTargetFolderAsync()
   {
     if (_registry == null)
     {
       return;
     }
 
-    TargetFolder target = new()
+    Window? window = GetMainWindow();
+    if (window == null)
     {
-      Name = "New Project",
-      Path = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-      EnabledClients = TargetClientFlags.ClaudeCode,
-    };
+      return;
+    }
 
-    _registry.TargetFolders.Add(target);
-    TargetFolderViewModel vm = new(target, _registry.Servers);
+    // Collect existing global typed target flags to disable in dialog
+    HashSet<TargetClientFlags> existingGlobal = [];
+    foreach (TargetFolder t in _registry.TargetFolders)
+    {
+      if (t.IsGlobal && !t.IsClipboard && !t.IsQuickExport)
+      {
+        existingGlobal.Add(t.EnabledClients);
+      }
+    }
+
+    // Also check if clipboard already exists
+    bool hasClipboard = _registry.TargetFolders.Any(t => t.IsClipboard);
+
+    Views.NewTargetDialog dialog = new(existingGlobal);
+    TargetFolder? result = await dialog.ShowDialog<TargetFolder?>(window);
+    if (result == null)
+    {
+      return;
+    }
+
+    _registry.TargetFolders.Add(result);
+    TargetFolderViewModel vm = new(result, _registry.Servers);
     TargetFolders.Add(vm);
     SelectedTarget = vm;
   }

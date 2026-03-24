@@ -27,6 +27,21 @@ public class TargetBadgeConverter : IValueConverter
         return "CODEX";
       }
 
+      if (target.IsCursor)
+      {
+        return "CURSOR";
+      }
+
+      if (target.IsWindsurf)
+      {
+        return "WINDSURF";
+      }
+
+      if (target.IsVsCode)
+      {
+        return "VSCODE";
+      }
+
       if (target.IsGlobal)
       {
         return "DESKTOP";

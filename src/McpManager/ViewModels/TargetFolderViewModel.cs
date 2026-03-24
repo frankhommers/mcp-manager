@@ -42,6 +42,12 @@ public partial class TargetFolderViewModel : ViewModelBase
   /// </summary>
   public bool IsClaudeDesktopGlobal => IsGlobal && !IsCodex && !IsClipboard;
 
+  public bool IsCursor => IsGlobal && _model.EnabledClients.HasFlag(TargetClientFlags.Cursor);
+
+  public bool IsWindsurf => IsGlobal && _model.EnabledClients.HasFlag(TargetClientFlags.Windsurf);
+
+  public bool IsVsCode => IsGlobal && _model.EnabledClients.HasFlag(TargetClientFlags.VsCode);
+
   /// <summary>
   /// Selected clipboard format as string for RadioButton binding.
   /// Maps to/from EnabledClients flags ensuring exactly one is set.

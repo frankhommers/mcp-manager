@@ -17,6 +17,9 @@ public class TargetIconConverter : IValueConverter
       TargetFolderViewModel target when target.IsClipboard => "MdiClipboardOutline",
       TargetFolderViewModel target when target.IsQuickExport => "MdiLightningBolt",
       TargetFolderViewModel target when target.IsCodex => "CodexLogo",
+      TargetFolderViewModel target when target.IsCursor => "MdiConsole",
+      TargetFolderViewModel target when target.IsWindsurf => "MdiAccessPoint",
+      TargetFolderViewModel target when target.IsVsCode => "MdiMonitor",
       TargetFolderViewModel target when target.IsGlobal => "ClaudeLogo",
       _ => "MdiFolderOutline",
     };
@@ -52,6 +55,21 @@ public class TargetIconColorConverter : IValueConverter
       if (target.IsCodex)
       {
         return new SolidColorBrush(Color.Parse("#4EC9B0"));
+      }
+
+      if (target.IsCursor)
+      {
+        return new SolidColorBrush(Color.Parse("#00D1A7"));
+      }
+
+      if (target.IsWindsurf)
+      {
+        return new SolidColorBrush(Color.Parse("#36B5F0"));
+      }
+
+      if (target.IsVsCode)
+      {
+        return new SolidColorBrush(Color.Parse("#007ACC"));
       }
 
       return new SolidColorBrush(Color.Parse("#D97757"));
