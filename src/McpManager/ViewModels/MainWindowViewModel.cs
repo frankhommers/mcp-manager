@@ -859,30 +859,9 @@ public partial class MainWindowViewModel : ViewModelBase
     }
   }
 
-  private static void DiagLog(string message)
-  {
-    try
-    {
-      string logPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".config", "McpManager", "diag.log");
-      string? dir = Path.GetDirectoryName(logPath);
-      if (!string.IsNullOrEmpty(dir))
-      {
-        Directory.CreateDirectory(dir);
-      }
-
-      File.AppendAllText(logPath, $"[{DateTime.UtcNow:HH:mm:ss.fff}] {message}\n");
-    }
-    catch
-    {
-    }
-  }
-
   [RelayCommand]
   private async Task TestMcpDirectAsync()
   {
-    DiagLog("TestMcpDirectAsync: entered");
     if (SelectedServer == null)
     {
       return;
@@ -907,7 +886,6 @@ public partial class MainWindowViewModel : ViewModelBase
         ? SelectedServer.Command
         : $"{SelectedServer.Command} {SelectedServer.ArgumentsText}";
 
-      DiagLog($"TestMcpDirectAsync: calling TestViaCommandAsync with cmd={SelectedServer.Command}");
       await TestViaCommandAsync(SelectedServer.Command, SelectedServer.ArgumentsText ?? "", $"Direct stdio: {fullCmd}");
     }
     else
@@ -985,7 +963,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
   private async Task TestViaCommandAsync(string command, string args, string description)
   {
-    DiagLog($"TestViaCommandAsync: entered, command={command}, args={args}");
     // Send MCP initialize request via stdin and read response
     string initRequest =
       """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"MCP Manager Test","version":"1.0.0"}}}""";
@@ -1037,8 +1014,6 @@ public partial class MainWindowViewModel : ViewModelBase
       string shellArg = OperatingSystem.IsWindows() ? "/c" : "-c";
       string shellCommand = $"(echo '{initRequest.Replace("'", "'\\''")}'; sleep 5) | {envPrefix}{fullCommand}";
 
-      DiagLog($"TestViaCommandAsync: starting Process shell={shell}");
-
       ProcessStartInfo psi = new()
       {
         FileName = shell,
@@ -1054,14 +1029,11 @@ public partial class MainWindowViewModel : ViewModelBase
       using Process? process = Process.Start(psi);
       if (process is null)
       {
-        DiagLog("TestViaCommandAsync: Process.Start returned null");
         debugInfo.AppendLine("❌ Failed to start shell process");
         McpTestResult = debugInfo.ToString();
         StatusMessage = "Test failed: could not start process";
         return;
       }
-
-      DiagLog("TestViaCommandAsync: process started, reading output");
 
       using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
       Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cts.Token);
@@ -1073,7 +1045,6 @@ public partial class MainWindowViewModel : ViewModelBase
       }
       catch (OperationCanceledException)
       {
-        DiagLog("TestViaCommandAsync: read timed out");
       }
 
       try
@@ -1090,7 +1061,7 @@ public partial class MainWindowViewModel : ViewModelBase
       string output = stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result.Trim() : "";
       string error = stderrTask.IsCompletedSuccessfully ? stderrTask.Result.Trim() : "";
 
-      DiagLog($"TestViaCommandAsync: got output={output.Length} chars, error={error.Length} chars");
+
 
       debugInfo.AppendLine("📤 Stdout:");
       debugInfo.AppendLine(string.IsNullOrEmpty(output) ? "  (empty)" : $"  {output}");
