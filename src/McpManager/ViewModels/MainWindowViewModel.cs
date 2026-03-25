@@ -1016,6 +1016,15 @@ public partial class MainWindowViewModel : ViewModelBase
       string shell = OperatingSystem.IsWindows() ? "cmd" : "/bin/bash";
       string shellArg = OperatingSystem.IsWindows() ? "/c" : "-c";
 
+      // Verify the shell exists before attempting to run
+      if (!File.Exists(shell))
+      {
+        debugInfo.AppendLine($"❌ Shell not found: {shell}");
+        McpTestResult = debugInfo.ToString();
+        StatusMessage = "Test failed: shell not found";
+        return;
+      }
+
       // Keep stdin open with sleep, but use timeout to kill the process
       // mcp-proxy doesn't exit on its own - it's designed to run indefinitely
       string shellCommand = $"(echo '{initRequest.Replace("'", "'\\''")}'; sleep 5) | {envPrefix}{fullCommand}";
@@ -1029,15 +1038,32 @@ public partial class MainWindowViewModel : ViewModelBase
         .WithStandardOutputPipe(
           PipeTarget.ToDelegate(line =>
           {
-            stdoutBuilder.AppendLine(line);
-            // If we got a JSON response, we can signal completion
-            if (line.Contains("\"jsonrpc\"") && line.Contains("\"result\""))
+            try
             {
-              // Cancel after a short delay to capture any remaining output
-              Task.Delay(500).ContinueWith(_ => cts.Cancel());
+              stdoutBuilder.AppendLine(line);
+              // If we got a JSON response, we can signal completion
+              if (line.Contains("\"jsonrpc\"") && line.Contains("\"result\""))
+              {
+                // Cancel after a short delay to capture any remaining output
+                Task.Delay(500).ContinueWith(_ => cts.Cancel());
+              }
+            }
+            catch
+            {
+              // Swallow delegate errors to prevent background thread crash
             }
           }))
-        .WithStandardErrorPipe(PipeTarget.ToDelegate(line => stderrBuilder.AppendLine(line)));
+        .WithStandardErrorPipe(PipeTarget.ToDelegate(line =>
+        {
+          try
+          {
+            stderrBuilder.AppendLine(line);
+          }
+          catch
+          {
+            // Swallow delegate errors
+          }
+        }));
 
       try
       {
