@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -1032,81 +1033,64 @@ public partial class MainWindowViewModel : ViewModelBase
 
     try
     {
-      using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
-
-      // Use shell to keep stdin open while waiting for response
-      // mcp-proxy needs time to connect before processing stdin
       string shell = OperatingSystem.IsWindows() ? "cmd" : "/bin/bash";
       string shellArg = OperatingSystem.IsWindows() ? "/c" : "-c";
+      string shellCommand = $"(echo '{initRequest.Replace("'", "'\\''")}'; sleep 5) | {envPrefix}{fullCommand}";
 
-      DiagLog($"TestViaCommandAsync: shell={shell}, checking exists");
+      DiagLog($"TestViaCommandAsync: starting Process shell={shell}");
 
-      // Verify the shell exists before attempting to run
-      if (!File.Exists(shell))
+      ProcessStartInfo psi = new()
       {
-        DiagLog($"TestViaCommandAsync: shell not found!");
-        debugInfo.AppendLine($"❌ Shell not found: {shell}");
+        FileName = shell,
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        RedirectStandardInput = false,
+        UseShellExecute = false,
+        CreateNoWindow = true,
+      };
+      psi.ArgumentList.Add(shellArg);
+      psi.ArgumentList.Add(shellCommand);
+
+      using Process? process = Process.Start(psi);
+      if (process is null)
+      {
+        DiagLog("TestViaCommandAsync: Process.Start returned null");
+        debugInfo.AppendLine("❌ Failed to start shell process");
         McpTestResult = debugInfo.ToString();
-        StatusMessage = "Test failed: shell not found";
+        StatusMessage = "Test failed: could not start process";
         return;
       }
 
-      DiagLog("TestViaCommandAsync: about to create CliWrap command");
+      DiagLog("TestViaCommandAsync: process started, reading output");
 
-      // Keep stdin open with sleep, but use timeout to kill the process
-      // mcp-proxy doesn't exit on its own - it's designed to run indefinitely
-      string shellCommand = $"(echo '{initRequest.Replace("'", "'\\''")}'; sleep 5) | {envPrefix}{fullCommand}";
+      using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
+      Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cts.Token);
+      Task<string> stderrTask = process.StandardError.ReadToEndAsync(cts.Token);
 
-      StringBuilder stdoutBuilder = new();
-      StringBuilder stderrBuilder = new();
-
-      Command cmd = Cli.Wrap(shell)
-        .WithArguments([shellArg, shellCommand])
-        .WithValidation(CommandResultValidation.None)
-        .WithStandardOutputPipe(
-          PipeTarget.ToDelegate(line =>
-          {
-            try
-            {
-              stdoutBuilder.AppendLine(line);
-              // If we got a JSON response, we can signal completion
-              if (line.Contains("\"jsonrpc\"") && line.Contains("\"result\""))
-              {
-                // Cancel after a short delay to capture any remaining output
-                Task.Delay(500).ContinueWith(_ => cts.Cancel());
-              }
-            }
-            catch
-            {
-              // Swallow delegate errors to prevent background thread crash
-            }
-          }))
-        .WithStandardErrorPipe(PipeTarget.ToDelegate(line =>
-        {
-          try
-          {
-            stderrBuilder.AppendLine(line);
-          }
-          catch
-          {
-            // Swallow delegate errors
-          }
-        }));
-
-      DiagLog("TestViaCommandAsync: about to execute command");
       try
       {
-        await cmd.ExecuteAsync(cts.Token);
-        DiagLog("TestViaCommandAsync: command completed");
+        await Task.WhenAll(stdoutTask, stderrTask);
       }
-      catch (OperationCanceledException) when (stdoutBuilder.Length > 0)
+      catch (OperationCanceledException)
       {
-        DiagLog("TestViaCommandAsync: cancelled with output (expected)");
-        // Expected - we cancelled after getting output
+        DiagLog("TestViaCommandAsync: read timed out");
       }
 
-      string output = stdoutBuilder.ToString().Trim();
-      string error = stderrBuilder.ToString().Trim();
+      try
+      {
+        if (!process.HasExited)
+        {
+          process.Kill(true);
+        }
+      }
+      catch
+      {
+      }
+
+      string output = stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result.Trim() : "";
+      string error = stderrTask.IsCompletedSuccessfully ? stderrTask.Result.Trim() : "";
+
+      DiagLog($"TestViaCommandAsync: got output={output.Length} chars, error={error.Length} chars");
 
       debugInfo.AppendLine("📤 Stdout:");
       debugInfo.AppendLine(string.IsNullOrEmpty(output) ? "  (empty)" : $"  {output}");
