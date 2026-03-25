@@ -858,9 +858,30 @@ public partial class MainWindowViewModel : ViewModelBase
     }
   }
 
+  private static void DiagLog(string message)
+  {
+    try
+    {
+      string logPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".config", "McpManager", "diag.log");
+      string? dir = Path.GetDirectoryName(logPath);
+      if (!string.IsNullOrEmpty(dir))
+      {
+        Directory.CreateDirectory(dir);
+      }
+
+      File.AppendAllText(logPath, $"[{DateTime.UtcNow:HH:mm:ss.fff}] {message}\n");
+    }
+    catch
+    {
+    }
+  }
+
   [RelayCommand]
   private async Task TestMcpDirectAsync()
   {
+    DiagLog("TestMcpDirectAsync: entered");
     if (SelectedServer == null)
     {
       return;
@@ -885,6 +906,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ? SelectedServer.Command
         : $"{SelectedServer.Command} {SelectedServer.ArgumentsText}";
 
+      DiagLog($"TestMcpDirectAsync: calling TestViaCommandAsync with cmd={SelectedServer.Command}");
       await TestViaCommandAsync(SelectedServer.Command, SelectedServer.ArgumentsText ?? "", $"Direct stdio: {fullCmd}");
     }
     else
@@ -962,6 +984,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
   private async Task TestViaCommandAsync(string command, string args, string description)
   {
+    DiagLog($"TestViaCommandAsync: entered, command={command}, args={args}");
     // Send MCP initialize request via stdin and read response
     string initRequest =
       """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"MCP Manager Test","version":"1.0.0"}}}""";
@@ -1016,14 +1039,19 @@ public partial class MainWindowViewModel : ViewModelBase
       string shell = OperatingSystem.IsWindows() ? "cmd" : "/bin/bash";
       string shellArg = OperatingSystem.IsWindows() ? "/c" : "-c";
 
+      DiagLog($"TestViaCommandAsync: shell={shell}, checking exists");
+
       // Verify the shell exists before attempting to run
       if (!File.Exists(shell))
       {
+        DiagLog($"TestViaCommandAsync: shell not found!");
         debugInfo.AppendLine($"❌ Shell not found: {shell}");
         McpTestResult = debugInfo.ToString();
         StatusMessage = "Test failed: shell not found";
         return;
       }
+
+      DiagLog("TestViaCommandAsync: about to create CliWrap command");
 
       // Keep stdin open with sleep, but use timeout to kill the process
       // mcp-proxy doesn't exit on its own - it's designed to run indefinitely
@@ -1065,12 +1093,15 @@ public partial class MainWindowViewModel : ViewModelBase
           }
         }));
 
+      DiagLog("TestViaCommandAsync: about to execute command");
       try
       {
         await cmd.ExecuteAsync(cts.Token);
+        DiagLog("TestViaCommandAsync: command completed");
       }
       catch (OperationCanceledException) when (stdoutBuilder.Length > 0)
       {
+        DiagLog("TestViaCommandAsync: cancelled with output (expected)");
         // Expected - we cancelled after getting output
       }
 
