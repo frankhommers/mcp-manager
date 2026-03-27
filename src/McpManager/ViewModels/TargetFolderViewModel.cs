@@ -50,6 +50,8 @@ public partial class TargetFolderViewModel : ViewModelBase
 
   public bool IsOpenCode => IsGlobal && _model.EnabledClients.HasFlag(TargetClientFlags.OpenCode);
 
+  public bool IsClaudeCodeGlobal => IsGlobal && _model.EnabledClients.HasFlag(TargetClientFlags.ClaudeCodeGlobal);
+
   /// <summary>
   /// Selected clipboard format as string for RadioButton binding.
   /// Maps to/from EnabledClients flags ensuring exactly one is set.
@@ -83,6 +85,8 @@ public partial class TargetFolderViewModel : ViewModelBase
         return System.IO.Path.Combine(Path, "config.toml");
       if (clients.HasFlag(TargetClientFlags.ClaudeDesktop))
         return System.IO.Path.Combine(Path, "claude_desktop_config.json");
+      if (clients.HasFlag(TargetClientFlags.ClaudeCodeGlobal))
+        return System.IO.Path.Combine(Path, ".claude.json");
       if (clients.HasFlag(TargetClientFlags.ClaudeCode))
         return System.IO.Path.Combine(Path, ".mcp.json");
       if (clients.HasFlag(TargetClientFlags.Cursor))

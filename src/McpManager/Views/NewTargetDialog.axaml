@@ -13,8 +13,10 @@
                Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
 
     <StackPanel Spacing="6" x:Name="RadioPanel">
+      <RadioButton x:Name="RbClaudeCode" GroupName="TargetType" Content="Claude Code"
+                   Tag="ClaudeCodeGlobal" IsChecked="True" />
       <RadioButton x:Name="RbClaudeDesktop" GroupName="TargetType" Content="Claude Desktop"
-                   Tag="ClaudeDesktop" IsChecked="True" />
+                   Tag="ClaudeDesktop" />
       <RadioButton x:Name="RbCodex" GroupName="TargetType" Content="Codex CLI"
                    Tag="Codex" />
       <RadioButton x:Name="RbCursor" GroupName="TargetType" Content="Cursor"

@@ -47,6 +47,11 @@ public class TargetBadgeConverter : IValueConverter
         return "OPENCODE";
       }
 
+      if (target.IsClaudeCodeGlobal)
+      {
+        return "CLAUDE CODE";
+      }
+
       if (target.IsGlobal)
       {
         return "DESKTOP";

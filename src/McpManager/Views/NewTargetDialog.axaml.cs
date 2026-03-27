@@ -26,6 +26,12 @@ public partial class NewTargetDialog : Window
 
   private void DisableExistingGlobalTypes()
   {
+    if (_existingGlobalTypes.Contains(TargetClientFlags.ClaudeCodeGlobal))
+    {
+      RbClaudeCode.IsEnabled = false;
+      RbClaudeCode.Opacity = 0.4;
+    }
+
     if (_existingGlobalTypes.Contains(TargetClientFlags.ClaudeDesktop))
     {
       RbClaudeDesktop.IsEnabled = false;
@@ -63,7 +69,7 @@ public partial class NewTargetDialog : Window
     }
 
     // Select first enabled radio button
-    RadioButton[] buttons = [RbClaudeDesktop, RbCodex, RbCursor, RbWindsurf, RbVsCode, RbOpenCode, RbFolder];
+    RadioButton[] buttons = [RbClaudeCode, RbClaudeDesktop, RbCodex, RbCursor, RbWindsurf, RbVsCode, RbOpenCode, RbFolder];
     foreach (RadioButton rb in buttons)
     {
       if (rb.IsEnabled)
@@ -76,7 +82,7 @@ public partial class NewTargetDialog : Window
 
   private string? GetSelectedTag()
   {
-    RadioButton[] buttons = [RbClaudeDesktop, RbCodex, RbCursor, RbWindsurf, RbVsCode, RbOpenCode, RbFolder];
+    RadioButton[] buttons = [RbClaudeCode, RbClaudeDesktop, RbCodex, RbCursor, RbWindsurf, RbVsCode, RbOpenCode, RbFolder];
     foreach (RadioButton rb in buttons)
     {
       if (rb.IsChecked == true)
@@ -98,6 +104,13 @@ public partial class NewTargetDialog : Window
 
     Result = tag switch
     {
+      "ClaudeCodeGlobal" => new TargetFolder
+      {
+        Name = "Claude Code",
+        Path = System.IO.Path.GetDirectoryName(RegistryService.GetDefaultClaudeCodeGlobalConfigPath()) ?? "",
+        EnabledClients = TargetClientFlags.ClaudeCodeGlobal,
+        IsGlobal = true,
+      },
       "ClaudeDesktop" => new TargetFolder
       {
         Name = "Claude Desktop",
