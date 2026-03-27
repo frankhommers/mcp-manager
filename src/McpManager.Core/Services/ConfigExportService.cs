@@ -6,6 +6,7 @@ namespace McpManager.Core.Services;
 public class ConfigExportService : IConfigExportService
 {
   private readonly ClaudeCodeConfigGenerator _claudeCodeGen = new();
+  private readonly ClaudeCodeGlobalConfigGenerator _claudeCodeGlobalGen = new();
   private readonly ClaudeDesktopConfigGenerator _claudeDesktopGen = new();
   private readonly OpenCodeConfigGenerator _openCodeGen = new();
   private readonly CodexConfigGenerator _codexGen = new();
@@ -77,6 +78,14 @@ public class ConfigExportService : IConfigExportService
     if (target.EnabledClients.HasFlag(TargetClientFlags.VsCode))
     {
       await ExportConfigAsync(target.Path, _vsCodeGen, servers, envOverrides, toolOverrides, bridgeArgs);
+    }
+
+    if (target.EnabledClients.HasFlag(TargetClientFlags.ClaudeCodeGlobal))
+    {
+      string claudeCodeGlobalPath = RegistryService.GetDefaultClaudeCodeGlobalConfigPath();
+      _claudeCodeGlobalGen.ExistingConfigPath = claudeCodeGlobalPath;
+      string basePath = Path.GetDirectoryName(claudeCodeGlobalPath) ?? claudeCodeGlobalPath;
+      await ExportConfigAsync(basePath, _claudeCodeGlobalGen, servers, envOverrides, toolOverrides, bridgeArgs);
     }
   }
 
@@ -165,6 +174,13 @@ public class ConfigExportService : IConfigExportService
     {
       string path = GetConfigFilePath(target.Path, _vsCodeGen);
       result[path] = _vsCodeGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+    }
+
+    if (target.EnabledClients.HasFlag(TargetClientFlags.ClaudeCodeGlobal))
+    {
+      string claudeCodeGlobalPath = RegistryService.GetDefaultClaudeCodeGlobalConfigPath();
+      _claudeCodeGlobalGen.ExistingConfigPath = claudeCodeGlobalPath;
+      result[claudeCodeGlobalPath] = _claudeCodeGlobalGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
     }
 
     return result;

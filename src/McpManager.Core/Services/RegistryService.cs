@@ -108,4 +108,10 @@ public class RegistryService : IRegistryService
     string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     return Path.Combine(home, ".config", "opencode");
   }
+
+  public static string GetDefaultClaudeCodeGlobalConfigPath()
+  {
+    string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    return Path.Combine(home, ".claude.json");
+  }
 }
