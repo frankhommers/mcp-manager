@@ -13,7 +13,7 @@ public class ClaudeCodeConfigGenerator : IConfigGenerator
   public virtual string ConfigFileName => ".mcp.json";
   public virtual string? ConfigSubFolder => null;
 
-  public string GenerateConfig(
+  public virtual string GenerateConfig(
     IEnumerable<McpServer> servers,
     Dictionary<Guid, Dictionary<string, string>>? envOverrides = null,
     Dictionary<Guid, List<string>>? toolOverrides = null,
