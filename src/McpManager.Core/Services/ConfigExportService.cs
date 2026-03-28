@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using McpManager.Core.ConfigGenerators;
 using McpManager.Core.Models;
 
@@ -86,6 +88,8 @@ public class ConfigExportService : IConfigExportService
       _claudeCodeGlobalGen.ExistingConfigPath = claudeCodeGlobalPath;
       string basePath = Path.GetDirectoryName(claudeCodeGlobalPath) ?? claudeCodeGlobalPath;
       await ExportConfigAsync(basePath, _claudeCodeGlobalGen, servers, envOverrides, toolOverrides, bridgeArgs);
+
+      await WriteClaudeCodePermissionsAsync(servers, toolOverrides);
     }
   }
 
@@ -181,6 +185,9 @@ public class ConfigExportService : IConfigExportService
       string claudeCodeGlobalPath = RegistryService.GetDefaultClaudeCodeGlobalConfigPath();
       _claudeCodeGlobalGen.ExistingConfigPath = claudeCodeGlobalPath;
       result[claudeCodeGlobalPath] = _claudeCodeGlobalGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+
+      string settingsPath = GetClaudeCodeSettingsPath();
+      result[settingsPath] = GenerateClaudeCodePermissionsPreview(serverList, toolOverrides);
     }
 
     return result;
@@ -220,5 +227,195 @@ public class ConfigExportService : IConfigExportService
   {
     string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     return Path.Combine(homeDir, ".codex", "config.toml");
+  }
+
+  private static string GetClaudeCodeSettingsPath()
+  {
+    string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    return Path.Combine(homeDir, ".claude", "settings.json");
+  }
+
+  private static string GenerateClaudeCodePermissionsPreview(
+    IEnumerable<McpServer> servers,
+    Dictionary<Guid, List<string>>? toolOverrides)
+  {
+    string settingsPath = GetClaudeCodeSettingsPath();
+
+    JsonObject root;
+    if (File.Exists(settingsPath))
+    {
+      string existingContent = File.ReadAllText(settingsPath);
+      root = JsonNode.Parse(existingContent)?.AsObject() ?? new JsonObject();
+    }
+    else
+    {
+      root = new JsonObject();
+    }
+
+    if (!root.ContainsKey("permissions"))
+    {
+      root["permissions"] = new JsonObject();
+    }
+
+    JsonObject permissions = root["permissions"]!.AsObject();
+
+    if (!permissions.ContainsKey("allow"))
+    {
+      permissions["allow"] = new JsonArray();
+    }
+
+    JsonArray allowArray = permissions["allow"]!.AsArray();
+
+    HashSet<string> managedServerNames = servers.Select(s => s.Name).ToHashSet();
+    List<JsonNode?> nodesToRemove = [];
+
+    foreach (JsonNode? node in allowArray)
+    {
+      if (node is JsonValue value && value.TryGetValue<string>(out string? str) && str.StartsWith("mcp__"))
+      {
+        string[] parts = str.Split("__", 3);
+        if (parts.Length >= 2)
+        {
+          string serverName = parts[1];
+          if (managedServerNames.Contains(serverName))
+          {
+            nodesToRemove.Add(node);
+          }
+        }
+      }
+    }
+
+    foreach (JsonNode? node in nodesToRemove)
+    {
+      allowArray.Remove(node);
+    }
+
+    foreach (McpServer server in servers)
+    {
+      List<string> effectiveTools = GetEffectiveToolList(server, toolOverrides);
+
+      if (effectiveTools.Count > 0)
+      {
+        foreach (string tool in effectiveTools)
+        {
+          string permissionEntry = $"mcp__{server.Name}__{tool}";
+          allowArray.Add(permissionEntry);
+        }
+      }
+      else
+      {
+        string permissionEntry = $"mcp__{server.Name}__*";
+        allowArray.Add(permissionEntry);
+      }
+    }
+
+    return JsonSerializer.Serialize(
+      root,
+      new JsonSerializerOptions
+      {
+        WriteIndented = true,
+      });
+  }
+
+  private static async Task WriteClaudeCodePermissionsAsync(
+    IEnumerable<McpServer> servers,
+    Dictionary<Guid, List<string>>? toolOverrides)
+  {
+    string settingsPath = GetClaudeCodeSettingsPath();
+
+    JsonObject root;
+    if (File.Exists(settingsPath))
+    {
+      string existingContent = await File.ReadAllTextAsync(settingsPath);
+      root = JsonNode.Parse(existingContent)?.AsObject() ?? new JsonObject();
+    }
+    else
+    {
+      root = new JsonObject();
+    }
+
+    if (!root.ContainsKey("permissions"))
+    {
+      root["permissions"] = new JsonObject();
+    }
+
+    JsonObject permissions = root["permissions"]!.AsObject();
+
+    if (!permissions.ContainsKey("allow"))
+    {
+      permissions["allow"] = new JsonArray();
+    }
+
+    JsonArray allowArray = permissions["allow"]!.AsArray();
+
+    HashSet<string> managedServerNames = servers.Select(s => s.Name).ToHashSet();
+    List<JsonNode?> nodesToRemove = [];
+
+    foreach (JsonNode? node in allowArray)
+    {
+      if (node is JsonValue value && value.TryGetValue<string>(out string? str) && str.StartsWith("mcp__"))
+      {
+        string[] parts = str.Split("__", 3);
+        if (parts.Length >= 2)
+        {
+          string serverName = parts[1];
+          if (managedServerNames.Contains(serverName))
+          {
+            nodesToRemove.Add(node);
+          }
+        }
+      }
+    }
+
+    foreach (JsonNode? node in nodesToRemove)
+    {
+      allowArray.Remove(node);
+    }
+
+    foreach (McpServer server in servers)
+    {
+      List<string> effectiveTools = GetEffectiveToolList(server, toolOverrides);
+
+      if (effectiveTools.Count > 0)
+      {
+        foreach (string tool in effectiveTools)
+        {
+          string permissionEntry = $"mcp__{server.Name}__{tool}";
+          allowArray.Add(permissionEntry);
+        }
+      }
+      else
+      {
+        string permissionEntry = $"mcp__{server.Name}__*";
+        allowArray.Add(permissionEntry);
+      }
+    }
+
+    string directory = Path.GetDirectoryName(settingsPath) ?? settingsPath;
+    if (!Directory.Exists(directory))
+    {
+      Directory.CreateDirectory(directory);
+    }
+
+    string outputContent = JsonSerializer.Serialize(
+      root,
+      new JsonSerializerOptions
+      {
+        WriteIndented = true,
+      });
+
+    await File.WriteAllTextAsync(settingsPath, outputContent);
+  }
+
+  private static List<string> GetEffectiveToolList(
+    McpServer server,
+    Dictionary<Guid, List<string>>? toolOverrides)
+  {
+    if (toolOverrides?.TryGetValue(server.Id, out List<string>? overrides) == true)
+    {
+      return overrides;
+    }
+
+    return server.AlwaysAllow;
   }
 }
