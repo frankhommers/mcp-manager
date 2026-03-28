@@ -662,43 +662,51 @@ public partial class MainWindowViewModel : ViewModelBase
 
   private async Task<List<string>> FetchToolNamesAsync()
   {
-    if (SelectedServer == null)
+    if (SelectedServer == null || _registry == null)
     {
       return [];
     }
 
+    McpServer? server = _registry.Servers.FirstOrDefault(s => s.Id == SelectedServer.Id);
+    if (server == null)
+    {
+      return [];
+    }
+
+    return await FetchToolNamesForServerAsync(server);
+  }
+
+  private async Task<List<string>> FetchToolNamesForServerAsync(McpServer server)
+  {
     using CancellationTokenSource cts = new(TimeSpan.FromSeconds(15));
 
     IClientTransport transport;
-    if (SelectedServer.IsStdio)
+    if (server.TransportType == McpTransportType.Stdio)
     {
-      if (string.IsNullOrWhiteSpace(SelectedServer.Command))
+      if (string.IsNullOrEmpty(server.Command))
       {
         return [];
       }
 
-      List<string> arguments = string.IsNullOrWhiteSpace(SelectedServer.ArgumentsText)
-        ? []
-        : SelectedServer.ArgumentsText.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
-
-      Dictionary<string, string?> envVars = ParseEnvironmentText(SelectedServer.EnvironmentText);
+      Dictionary<string, string?> envVars = server.EnvironmentVariables
+        .ToDictionary(kv => kv.Key, kv => (string?)kv.Value);
 
       transport = new StdioClientTransport(new StdioClientTransportOptions
       {
-        Name = SelectedServer.DisplayName,
-        Command = SelectedServer.Command,
-        Arguments = arguments,
+        Name = server.DisplayName,
+        Command = server.Command,
+        Arguments = server.Args,
         EnvironmentVariables = envVars.Count > 0 ? envVars : null,
       });
     }
     else
     {
-      if (string.IsNullOrWhiteSpace(SelectedServer.Url))
+      if (string.IsNullOrEmpty(server.Url))
       {
         return [];
       }
 
-      HttpTransportMode mode = SelectedServer.TransportType switch
+      HttpTransportMode mode = server.TransportType switch
       {
         McpTransportType.Sse => HttpTransportMode.Sse,
         McpTransportType.StreamableHttp => HttpTransportMode.StreamableHttp,
@@ -707,7 +715,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
       transport = new HttpClientTransport(new HttpClientTransportOptions
       {
-        Endpoint = new Uri(SelectedServer.Url),
+        Endpoint = new Uri(server.Url),
         TransportMode = mode,
       });
     }
@@ -759,6 +767,75 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     return envVars;
+  }
+
+  [RelayCommand]
+  private async Task FetchAllTargetToolsAsync()
+  {
+    if (SelectedTarget == null || _registry == null)
+    {
+      return;
+    }
+
+    IsLoading = true;
+    StatusMessage = "Fetching tools for target servers...";
+    int totalFound = 0;
+
+    try
+    {
+      // Get enabled servers that don't have tools yet
+      List<ServerSelectionViewModel> serversToFetch = SelectedTarget.ServerSelections
+        .Where(s => s.IsEnabled && !s.HasToolOverrides)
+        .ToList();
+
+      if (serversToFetch.Count == 0)
+      {
+        StatusMessage = "All enabled servers already have tools";
+        return;
+      }
+
+      foreach (ServerSelectionViewModel selection in serversToFetch)
+      {
+        McpServer? server = _registry.Servers.FirstOrDefault(s => s.Id == selection.ServerId);
+        if (server == null)
+        {
+          continue;
+        }
+
+        StatusMessage = $"Fetching tools from {server.DisplayName}...";
+
+        try
+        {
+          List<string> toolNames = await FetchToolNamesForServerAsync(server);
+          if (toolNames.Count > 0)
+          {
+            // Update the server model
+            server.KnownTools = toolNames;
+
+            // Find and update the McpServerViewModel if it exists
+            McpServerViewModel? serverVm = Servers.FirstOrDefault(s => s.Id == server.Id);
+            serverVm?.SetAvailableTools(toolNames);
+
+            totalFound += toolNames.Count;
+          }
+        }
+        catch
+        {
+          // Skip servers that fail, continue with others
+        }
+      }
+
+      // Refresh target's tool overrides for all servers
+      SelectedTarget.RefreshServers(_registry.Servers);
+
+      StatusMessage = totalFound > 0
+        ? $"Discovered {totalFound} tools across {serversToFetch.Count} servers"
+        : "No new tools discovered";
+    }
+    finally
+    {
+      IsLoading = false;
+    }
   }
 
   [RelayCommand]

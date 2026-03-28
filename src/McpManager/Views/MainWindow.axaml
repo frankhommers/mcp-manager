@@ -1442,8 +1442,15 @@
                                     <StackPanel Spacing="16">
                                         <StackPanel Spacing="4">
                                             <TextBlock Text="Tool permissions" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
-                                            <TextBlock Text="Override which tools are allowed per server for this target. Only enabled servers with discovered tools are shown."
-                                                       Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Text="Override which tools are allowed per server for this target. Only enabled servers with discovered tools are shown."
+                                                           Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                                <Button Grid.Column="1" Content="Fetch All Tools"
+                                                        Command="{Binding FetchAllTargetToolsCommand}"
+                                                        VerticalAlignment="Top"
+                                                        Margin="8,0,0,0"
+                                                        ToolTip.Tip="Discover tools from all enabled servers that don't have tools yet" />
+                                            </Grid>
                                         </StackPanel>
 
                                         <ItemsControl ItemsSource="{Binding SelectedTarget.ServerSelections}">
