@@ -839,6 +839,51 @@ public partial class MainWindowViewModel : ViewModelBase
   }
 
   [RelayCommand]
+  private async Task FetchToolsForServerAsync(ServerSelectionViewModel? selection)
+  {
+    if (selection == null || _registry == null || SelectedTarget == null)
+    {
+      return;
+    }
+
+    McpServer? server = _registry.Servers.FirstOrDefault(s => s.Id == selection.ServerId);
+    if (server == null)
+    {
+      return;
+    }
+
+    IsLoading = true;
+    StatusMessage = $"Fetching tools from {server.DisplayName}...";
+
+    try
+    {
+      List<string> toolNames = await FetchToolNamesForServerAsync(server);
+      if (toolNames.Count > 0)
+      {
+        server.KnownTools = toolNames;
+
+        McpServerViewModel? serverVm = Servers.FirstOrDefault(s => s.Id == server.Id);
+        serverVm?.SetAvailableTools(toolNames);
+
+        SelectedTarget.RefreshServers(_registry.Servers);
+        StatusMessage = $"Found {toolNames.Count} tools for {server.DisplayName}";
+      }
+      else
+      {
+        StatusMessage = $"No tools found for {server.DisplayName}";
+      }
+    }
+    catch (Exception ex)
+    {
+      StatusMessage = $"Failed to fetch tools from {server.DisplayName}: {ex.Message}";
+    }
+    finally
+    {
+      IsLoading = false;
+    }
+  }
+
+  [RelayCommand]
   private void AllowAllTargetTools(ServerSelectionViewModel? serverSelection)
   {
     serverSelection?.AllowAllTools();
