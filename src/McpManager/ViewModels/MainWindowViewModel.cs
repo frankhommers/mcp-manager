@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 
 using System.Text;
 using System.Text.RegularExpressions;
@@ -629,6 +630,9 @@ public partial class MainWindowViewModel : ViewModelBase
     FetchToolsResult = "";
     StatusMessage = "Fetching tools from server...";
 
+    // Sync UI state to model before fetching
+    SelectedServer.UpdateModel();
+
     try
     {
       List<string> toolNames = await FetchToolNamesAsync();
@@ -713,11 +717,8 @@ public partial class MainWindowViewModel : ViewModelBase
         _ => HttpTransportMode.AutoDetect,
       };
 
-      transport = new HttpClientTransport(new HttpClientTransportOptions
-      {
-        Endpoint = new Uri(server.Url),
-        TransportMode = mode,
-      });
+      Dictionary<string, string>? headers = server.HttpHeaders.Count > 0 ? server.HttpHeaders : null;
+      transport = CreateHttpTransport(server.Url, mode, headers);
     }
 
     McpClient? client = null;
@@ -743,26 +744,44 @@ public partial class MainWindowViewModel : ViewModelBase
     }
   }
 
-  private static Dictionary<string, string?> ParseEnvironmentText(string? environmentText)
+  private static HttpClientTransport CreateHttpTransport(
+    string url,
+    HttpTransportMode mode,
+    Dictionary<string, string>? headers = null)
   {
-    Dictionary<string, string?> envVars = new();
-    if (string.IsNullOrWhiteSpace(environmentText))
+    HttpClient httpClient = new();
+    httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("McpManager/1.0");
+
+    if (headers is { Count: > 0 })
+    {
+      foreach ((string key, string value) in headers)
+      {
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation(key, value);
+      }
+    }
+
+    HttpClientTransportOptions httpOptions = new()
+    {
+      Endpoint = new Uri(url),
+      TransportMode = mode,
+    };
+
+    return new HttpClientTransport(httpOptions, httpClient, null!, true);
+  }
+
+  private static Dictionary<string, string> CollectEnvironmentVariables(McpServerViewModel? server)
+  {
+    Dictionary<string, string> envVars = new();
+    if (server == null)
     {
       return envVars;
     }
 
-    string[] lines = environmentText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-    foreach (string line in lines)
+    foreach (KeyValuePairViewModel kvp in server.EnvironmentVariables)
     {
-      int eqIndex = line.IndexOf('=');
-      if (eqIndex > 0)
+      if (!string.IsNullOrWhiteSpace(kvp.Key))
       {
-        string key = line[..eqIndex].Trim();
-        string value = line[(eqIndex + 1)..].Trim();
-        if (!string.IsNullOrEmpty(key))
-        {
-          envVars[key] = value;
-        }
+        envVars[kvp.Key] = kvp.Value;
       }
     }
 
@@ -846,6 +865,9 @@ public partial class MainWindowViewModel : ViewModelBase
       return;
     }
 
+    // Sync current UI state to model
+    Servers.FirstOrDefault(s => s.Id == selection.ServerId)?.UpdateModel();
+
     McpServer? server = _registry.Servers.FirstOrDefault(s => s.Id == selection.ServerId);
     if (server == null)
     {
@@ -905,13 +927,17 @@ public partial class MainWindowViewModel : ViewModelBase
       return;
     }
 
+    SelectedServer.UpdateModel();
     IsLoading = true;
     DetectResult = "";
     StatusMessage = "Detecting transport type (sending MCP initialize)...";
 
     try
     {
-      TransportDetectionResult result = await _transportDetectionService.DetectTransportTypeAsync(SelectedServer.Url);
+      McpServer? model = _registry?.Servers.FirstOrDefault(s => s.Id == SelectedServer.Id);
+      Dictionary<string, string>? headers = model?.HttpHeaders is { Count: > 0 } h ? h : null;
+      TransportDetectionResult result = await _transportDetectionService.DetectTransportTypeAsync(
+        SelectedServer.Url, headers);
 
       if (result.Success && result.DetectedType.HasValue)
       {
@@ -989,6 +1015,7 @@ public partial class MainWindowViewModel : ViewModelBase
       return;
     }
 
+    SelectedServer.UpdateModel();
     IsLoading = true;
     McpTestResult = "";
 
@@ -1004,11 +1031,12 @@ public partial class MainWindowViewModel : ViewModelBase
       }
 
       StatusMessage = "Testing stdio command directly...";
-      string? fullCmd = string.IsNullOrEmpty(SelectedServer.ArgumentsText)
+      string argsString = string.Join(" ", SelectedServer.Arguments.Select(a => a.Value.Contains(' ') ? $"\"{a.Value}\"" : a.Value));
+      string fullCmd = string.IsNullOrEmpty(argsString)
         ? SelectedServer.Command
-        : $"{SelectedServer.Command} {SelectedServer.ArgumentsText}";
+        : $"{SelectedServer.Command} {argsString}";
 
-      await TestViaCommandAsync(SelectedServer.Command, SelectedServer.ArgumentsText ?? "", $"Direct stdio: {fullCmd}");
+      await TestViaCommandAsync(SelectedServer.Command, argsString, $"Direct stdio: {fullCmd}");
     }
     else
     {
@@ -1022,7 +1050,9 @@ public partial class MainWindowViewModel : ViewModelBase
       }
 
       StatusMessage = "Testing via direct HTTP POST...";
-      await TestHttpDirectAsync(SelectedServer.Url, SelectedServer.TransportType);
+      McpServer? model = _registry?.Servers.FirstOrDefault(s => s.Id == SelectedServer.Id);
+      Dictionary<string, string> httpHeaders = model?.HttpHeaders ?? new();
+      await TestHttpDirectAsync(SelectedServer.Url, SelectedServer.TransportType, httpHeaders);
     }
   }
 
@@ -1034,6 +1064,7 @@ public partial class MainWindowViewModel : ViewModelBase
       return;
     }
 
+    SelectedServer.UpdateModel();
     IsLoading = true;
     McpTestResult = "";
 
@@ -1091,25 +1122,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     string fullCommand = string.IsNullOrEmpty(args) ? command : $"{command} {args}";
 
-    // Build environment variables for stdio servers
-    Dictionary<string, string> envVars = new();
-    if (SelectedServer?.IsStdio == true && !string.IsNullOrWhiteSpace(SelectedServer.EnvironmentText))
-    {
-      string[] lines = SelectedServer.EnvironmentText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-      foreach (string line in lines)
-      {
-        int eqIndex = line.IndexOf('=');
-        if (eqIndex > 0)
-        {
-          string key = line[..eqIndex].Trim();
-          string value = line[(eqIndex + 1)..].Trim();
-          if (!string.IsNullOrEmpty(key))
-          {
-            envVars[key] = value;
-          }
-        }
-      }
-    }
+    // Build environment variables from model (UpdateModel must be called before this)
+    McpServer? serverModel = _registry?.Servers.FirstOrDefault(s => s.Id == SelectedServer?.Id);
+    Dictionary<string, string> envVars = serverModel != null
+      ? new Dictionary<string, string>(serverModel.EnvironmentVariables)
+      : CollectEnvironmentVariables(SelectedServer);
 
     // Build env prefix for shell
     string envPrefix = "";
@@ -1262,9 +1279,9 @@ public partial class MainWindowViewModel : ViewModelBase
   /// <summary>
   /// Test HTTP MCP server directly via HTTP POST (for servers that don't need mcp-proxy)
   /// </summary>
-  private async Task TestHttpDirectAsync(string url, McpTransportType transportType)
+  private async Task TestHttpDirectAsync(string url, McpTransportType transportType, Dictionary<string, string>? httpHeaders = null)
   {
-    HttpMcpTestResult result = await _httpMcpTester.TestInitializeAsync(url, transportType);
+    HttpMcpTestResult result = await _httpMcpTester.TestInitializeAsync(url, transportType, httpHeaders);
     McpTestResult = result.ResultText;
     StatusMessage = result.StatusMessage;
     IsLoading = false;

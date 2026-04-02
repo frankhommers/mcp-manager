@@ -45,6 +45,19 @@ public class ConfigImportService : IConfigImportService
           _ => McpTransportType.Http,
         };
         server.Url = serverNode["url"]?.GetValue<string>();
+
+        // HTTP headers
+        JsonObject? headers = serverNode["headers"]?.AsObject();
+        if (headers != null)
+        {
+          foreach ((string hKey, JsonNode? hValue) in headers)
+          {
+            if (hValue != null)
+            {
+              server.HttpHeaders[hKey] = hValue.GetValue<string>();
+            }
+          }
+        }
       }
       else
       {

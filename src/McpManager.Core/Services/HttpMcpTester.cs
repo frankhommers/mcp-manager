@@ -1,3 +1,4 @@
+using System.Net.Http;
 using McpManager.Core.Models;
 using ModelContextProtocol.Client;
 
@@ -8,6 +9,7 @@ public interface IHttpMcpTester
   Task<HttpMcpTestResult> TestInitializeAsync(
     string url,
     McpTransportType transportType,
+    Dictionary<string, string>? httpHeaders = null,
     CancellationToken cancellationToken = default);
 }
 
@@ -23,6 +25,7 @@ public sealed class HttpMcpTester : IHttpMcpTester
   public async Task<HttpMcpTestResult> TestInitializeAsync(
     string url,
     McpTransportType transportType,
+    Dictionary<string, string>? httpHeaders = null,
     CancellationToken cancellationToken = default)
   {
     try
@@ -38,11 +41,24 @@ public sealed class HttpMcpTester : IHttpMcpTester
         _ => HttpTransportMode.AutoDetect,
       };
 
-      HttpClientTransport transport = new(new HttpClientTransportOptions
+      HttpClient httpClient = new();
+      httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("McpManager/1.0");
+
+      if (httpHeaders is { Count: > 0 })
+      {
+        foreach ((string key, string value) in httpHeaders)
+        {
+          httpClient.DefaultRequestHeaders.TryAddWithoutValidation(key, value);
+        }
+      }
+
+      HttpClientTransportOptions httpOptions = new()
       {
         Endpoint = new Uri(url),
         TransportMode = mode,
-      });
+      };
+
+      HttpClientTransport transport = new(httpOptions, httpClient, null!, true);
 
       await using McpClient client = await McpClient.CreateAsync(
         transport, cancellationToken: linkedCts.Token);

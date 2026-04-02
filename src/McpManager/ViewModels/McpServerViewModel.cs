@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using McpManager.Core.Models;
 
 namespace McpManager.ViewModels;
@@ -26,9 +27,10 @@ public partial class McpServerViewModel : ViewModelBase
   // Stdio fields
   [ObservableProperty] private string? _command;
 
-  [ObservableProperty] private string _argumentsText = string.Empty;
-
   [ObservableProperty] private string? _workingDirectory;
+
+  // Arguments list
+  public ObservableCollection<StringItemViewModel> Arguments { get; } = [];
 
   // HTTP fields
   [ObservableProperty] private string? _url;
@@ -38,11 +40,11 @@ public partial class McpServerViewModel : ViewModelBase
 
   [ObservableProperty] private string? _startupWorkingDirectory;
 
-  // Environment
-  [ObservableProperty] private string _environmentText = string.Empty;
+  // Environment key-value pairs
+  public ObservableCollection<KeyValuePairViewModel> EnvironmentVariables { get; } = [];
 
-  // HTTP Headers (for remote servers)
-  [ObservableProperty] private string _httpHeadersText = string.Empty;
+  // HTTP Headers key-value pairs
+  public ObservableCollection<KeyValuePairViewModel> HttpHeaders { get; } = [];
 
   // Always Allow tools
   [ObservableProperty] private ObservableCollection<ToolSelectionViewModel> _toolSelections = [];
@@ -121,19 +123,28 @@ public partial class McpServerViewModel : ViewModelBase
     _group = model.Group;
     _transportType = model.TransportType;
     _command = model.Command;
-    _argumentsText = string.Join(" ", model.Args);
     _workingDirectory = model.WorkingDirectory;
     _url = model.Url;
     _startupCommand = model.StartupCommand;
     _startupWorkingDirectory = model.StartupWorkingDirectory;
 
-    // Convert environment variables to text format
-    IEnumerable<string> envLines = model.EnvironmentVariables.Select(kvp => $"{kvp.Key}={kvp.Value}");
-    _environmentText = string.Join("\n", envLines);
+    // Populate arguments list
+    foreach (string arg in model.Args)
+    {
+      Arguments.Add(new StringItemViewModel(arg));
+    }
 
-    // Convert HTTP headers to text format
-    IEnumerable<string> headerLines = model.HttpHeaders.Select(kvp => $"{kvp.Key}={kvp.Value}");
-    _httpHeadersText = string.Join("\n", headerLines);
+    // Populate environment variables
+    foreach ((string key, string value) in model.EnvironmentVariables)
+    {
+      EnvironmentVariables.Add(new KeyValuePairViewModel(key, value));
+    }
+
+    // Populate HTTP headers
+    foreach ((string key, string value) in model.HttpHeaders)
+    {
+      HttpHeaders.Add(new KeyValuePairViewModel(key, value));
+    }
 
     // Load tool selections from cached known tools + always-allow
     HashSet<string> allToolNames = new(model.KnownTools);
@@ -175,6 +186,24 @@ public partial class McpServerViewModel : ViewModelBase
     OnPropertyChanged(nameof(HasTools));
   }
 
+  [RelayCommand]
+  private void AddArgument() => Arguments.Add(new StringItemViewModel());
+
+  [RelayCommand]
+  private void RemoveArgument(StringItemViewModel item) => Arguments.Remove(item);
+
+  [RelayCommand]
+  private void AddEnvironmentVariable() => EnvironmentVariables.Add(new KeyValuePairViewModel());
+
+  [RelayCommand]
+  private void RemoveEnvironmentVariable(KeyValuePairViewModel item) => EnvironmentVariables.Remove(item);
+
+  [RelayCommand]
+  private void AddHttpHeader() => HttpHeaders.Add(new KeyValuePairViewModel());
+
+  [RelayCommand]
+  private void RemoveHttpHeader(KeyValuePairViewModel item) => HttpHeaders.Remove(item);
+
   partial void OnTransportTypeChanged(McpTransportType value)
   {
     OnPropertyChanged(nameof(IsStdio));
@@ -197,9 +226,10 @@ public partial class McpServerViewModel : ViewModelBase
     _model.Group = Group;
     _model.TransportType = TransportType;
     _model.Command = Command;
-    _model.Args = string.IsNullOrWhiteSpace(ArgumentsText)
-      ? []
-      : ArgumentsText.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+    _model.Args = Arguments
+      .Select(a => a.Value)
+      .Where(v => !string.IsNullOrEmpty(v))
+      .ToList();
     _model.WorkingDirectory = WorkingDirectory;
     _model.Url = Url;
     _model.StartupCommand = StartupCommand;
@@ -209,43 +239,23 @@ public partial class McpServerViewModel : ViewModelBase
     _model.AlwaysAllow = ToolSelections.Where(t => t.IsAllowed).Select(t => t.ToolName).ToList();
     _model.KnownTools = ToolSelections.Select(t => t.ToolName).ToList();
 
-    // Parse environment text into key-value pairs
+    // Collect environment variables from key-value pairs
     _model.EnvironmentVariables.Clear();
-    if (!string.IsNullOrWhiteSpace(EnvironmentText))
+    foreach (KeyValuePairViewModel kvp in EnvironmentVariables)
     {
-      string[] lines = EnvironmentText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-      foreach (string line in lines)
+      if (!string.IsNullOrWhiteSpace(kvp.Key))
       {
-        int eqIndex = line.IndexOf('=');
-        if (eqIndex > 0)
-        {
-          string key = line[..eqIndex].Trim();
-          string value = line[(eqIndex + 1)..].Trim();
-          if (!string.IsNullOrEmpty(key))
-          {
-            _model.EnvironmentVariables[key] = value;
-          }
-        }
+        _model.EnvironmentVariables[kvp.Key] = kvp.Value;
       }
     }
 
-    // Parse HTTP headers text into key-value pairs
+    // Collect HTTP headers from key-value pairs
     _model.HttpHeaders.Clear();
-    if (!string.IsNullOrWhiteSpace(HttpHeadersText))
+    foreach (KeyValuePairViewModel kvp in HttpHeaders)
     {
-      string[] lines = HttpHeadersText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-      foreach (string line in lines)
+      if (!string.IsNullOrWhiteSpace(kvp.Key))
       {
-        int eqIndex = line.IndexOf('=');
-        if (eqIndex > 0)
-        {
-          string key = line[..eqIndex].Trim();
-          string value = line[(eqIndex + 1)..].Trim();
-          if (!string.IsNullOrEmpty(key))
-          {
-            _model.HttpHeaders[key] = value;
-          }
-        }
+        _model.HttpHeaders[kvp.Key] = kvp.Value;
       }
     }
   }

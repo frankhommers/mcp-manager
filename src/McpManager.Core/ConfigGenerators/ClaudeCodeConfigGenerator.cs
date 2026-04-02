@@ -55,6 +55,17 @@ public class ClaudeCodeConfigGenerator : IConfigGenerator
             serverConfig["url"] = server.Url;
           }
 
+          if (server.HttpHeaders.Count > 0)
+          {
+            JsonObject headersObj = new();
+            foreach ((string key, string value) in server.HttpHeaders)
+            {
+              headersObj[key] = value;
+            }
+
+            serverConfig["headers"] = headersObj;
+          }
+
           break;
       }
 

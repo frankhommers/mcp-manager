@@ -1,3 +1,4 @@
+using System.Net.Http;
 using McpManager.Core.Models;
 using ModelContextProtocol.Client;
 
@@ -5,7 +6,10 @@ namespace McpManager.Core.Services;
 
 public interface ITransportDetectionService
 {
-  Task<TransportDetectionResult> DetectTransportTypeAsync(string url, CancellationToken cancellationToken = default);
+  Task<TransportDetectionResult> DetectTransportTypeAsync(
+    string url,
+    Dictionary<string, string>? httpHeaders = null,
+    CancellationToken cancellationToken = default);
 }
 
 public record TransportDetectionResult(
@@ -21,6 +25,7 @@ public class TransportDetectionService : ITransportDetectionService
 {
   public async Task<TransportDetectionResult> DetectTransportTypeAsync(
     string url,
+    Dictionary<string, string>? httpHeaders = null,
     CancellationToken cancellationToken = default)
   {
     if (string.IsNullOrWhiteSpace(url))
@@ -47,7 +52,7 @@ public class TransportDetectionService : ITransportDetectionService
     {
       results.Add($"=== Testing {label} Transport (SDK) ===");
       TransportDetectionResult result = await TryConnectWithSdkAsync(
-        uri, transportType, httpMode, label, results, cancellationToken);
+        uri, transportType, httpMode, label, results, httpHeaders, cancellationToken);
 
       if (result.Success)
       {
@@ -75,6 +80,7 @@ public class TransportDetectionService : ITransportDetectionService
     HttpTransportMode httpMode,
     string label,
     List<string> results,
+    Dictionary<string, string>? httpHeaders,
     CancellationToken cancellationToken)
   {
     try
@@ -85,11 +91,24 @@ public class TransportDetectionService : ITransportDetectionService
       using CancellationTokenSource linkedCts =
         CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
-      HttpClientTransport transport = new(new HttpClientTransportOptions
+      HttpClient httpClient = new();
+      httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("McpManager/1.0");
+
+      if (httpHeaders is { Count: > 0 })
+      {
+        foreach ((string key, string value) in httpHeaders)
+        {
+          httpClient.DefaultRequestHeaders.TryAddWithoutValidation(key, value);
+        }
+      }
+
+      HttpClientTransportOptions httpOptions = new()
       {
         Endpoint = uri,
         TransportMode = httpMode,
-      });
+      };
+
+      HttpClientTransport transport = new(httpOptions, httpClient, null!, true);
 
       await using McpClient client = await McpClient.CreateAsync(
         transport, cancellationToken: linkedCts.Token);

@@ -50,6 +50,17 @@ public class VsCodeConfigGenerator : IConfigGenerator
             serverConfig["url"] = server.Url;
           }
 
+          if (server.HttpHeaders.Count > 0)
+          {
+            JsonObject headersObj = new();
+            foreach ((string key, string value) in server.HttpHeaders)
+            {
+              headersObj[key] = value;
+            }
+
+            serverConfig["headers"] = headersObj;
+          }
+
           break;
 
         case McpTransportType.Sse:
@@ -57,6 +68,17 @@ public class VsCodeConfigGenerator : IConfigGenerator
           if (!string.IsNullOrEmpty(server.Url))
           {
             serverConfig["url"] = server.Url;
+          }
+
+          if (server.HttpHeaders.Count > 0)
+          {
+            JsonObject headersObj = new();
+            foreach ((string key, string value) in server.HttpHeaders)
+            {
+              headersObj[key] = value;
+            }
+
+            serverConfig["headers"] = headersObj;
           }
 
           break;
