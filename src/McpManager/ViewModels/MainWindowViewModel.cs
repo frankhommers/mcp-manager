@@ -617,6 +617,23 @@ public partial class MainWindowViewModel : ViewModelBase
   }
 
   [ObservableProperty] private string _fetchToolsResult = "";
+  [ObservableProperty] private bool _isFetchingTools;
+
+  private CancellationTokenSource? _fetchToolsCts;
+  private static readonly TimeSpan FetchToolsTimeout = TimeSpan.FromSeconds(60);
+
+  [RelayCommand]
+  private void CancelFetchTools()
+  {
+    try
+    {
+      _fetchToolsCts?.Cancel();
+    }
+    catch
+    {
+      // Ignore - CTS may already be disposed
+    }
+  }
 
   [RelayCommand]
   private async Task FetchToolsAsync()
@@ -627,44 +644,71 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     IsLoading = true;
+    IsFetchingTools = true;
     FetchToolsResult = "";
     StatusMessage = "Fetching tools from server...";
 
     // Sync UI state to model before fetching
     SelectedServer.UpdateModel();
 
+    CancellationTokenSource? previousCts = Interlocked.Exchange(ref _fetchToolsCts, new CancellationTokenSource(FetchToolsTimeout));
+    previousCts?.Dispose();
+    CancellationToken token = _fetchToolsCts!.Token;
+
+    StringBuilder logBuffer = new();
+    void AppendLog(string line)
+    {
+      lock (logBuffer)
+      {
+        logBuffer.AppendLine(line);
+        string snapshot = logBuffer.ToString();
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => FetchToolsResult = snapshot);
+      }
+    }
+
     try
     {
-      List<string> toolNames = await FetchToolNamesAsync();
+      List<string> toolNames = await FetchToolNamesAsync(AppendLog, token);
 
       if (toolNames.Count > 0)
       {
         SelectedServer.SetAvailableTools(toolNames);
-        FetchToolsResult = $"Found {toolNames.Count} tools: {string.Join(", ", toolNames)}";
+        AppendLog($"[OK] Found {toolNames.Count} tools: {string.Join(", ", toolNames)}");
         StatusMessage = $"Found {toolNames.Count} tools";
       }
       else
       {
-        FetchToolsResult = "No tools found or server did not respond.";
+        AppendLog("[WARN] No tools found or server did not respond.");
         StatusMessage = "No tools found";
       }
+    }
+    catch (OperationCanceledException)
+    {
+      AppendLog(token.IsCancellationRequested && !(_fetchToolsCts?.IsCancellationRequested ?? false)
+        ? "[TIMEOUT] Fetch tools cancelled (timeout)"
+        : "[CANCELLED] Fetch tools cancelled by user");
+      StatusMessage = "Fetch tools cancelled";
     }
     catch (Exception ex)
     {
       string details = ex.InnerException != null
-        ? $"Error: {ex.Message}\nInner: {ex.InnerException.Message}"
-        : $"Error: {ex.Message}";
+        ? $"[ERROR] {ex.Message}\n        Inner: {ex.InnerException.Message}"
+        : $"[ERROR] {ex.Message}";
+      AppendLog(details);
       string path = Environment.GetEnvironmentVariable("PATH") ?? "(not set)";
-      FetchToolsResult = $"{details}\n\nPATH: {path}";
+      AppendLog($"[DEBUG] PATH: {path}");
       StatusMessage = $"Fetch tools error: {ex.Message}";
     }
     finally
     {
       IsLoading = false;
+      IsFetchingTools = false;
+      CancellationTokenSource? cts = Interlocked.Exchange(ref _fetchToolsCts, null);
+      cts?.Dispose();
     }
   }
 
-  private async Task<List<string>> FetchToolNamesAsync()
+  private async Task<List<string>> FetchToolNamesAsync(Action<string>? log = null, CancellationToken cancellationToken = default)
   {
     if (SelectedServer == null || _registry == null)
     {
@@ -677,23 +721,36 @@ public partial class MainWindowViewModel : ViewModelBase
       return [];
     }
 
-    return await FetchToolNamesForServerAsync(server);
+    return await FetchToolNamesForServerAsync(server, log, cancellationToken);
   }
 
-  private async Task<List<string>> FetchToolNamesForServerAsync(McpServer server)
+  private async Task<List<string>> FetchToolNamesForServerAsync(
+    McpServer server,
+    Action<string>? log = null,
+    CancellationToken cancellationToken = default)
   {
-    using CancellationTokenSource cts = new(TimeSpan.FromSeconds(15));
+    // Callers may pass CancellationToken.None; in that case fall back to the default timeout so
+    // slow-starting servers (uvx fresh install, lazy tool discovery, retry loops) have a chance.
+    CancellationTokenSource? fallbackCts = null;
+    if (!cancellationToken.CanBeCanceled)
+    {
+      fallbackCts = new CancellationTokenSource(FetchToolsTimeout);
+      cancellationToken = fallbackCts.Token;
+    }
 
     IClientTransport transport;
     if (server.TransportType == McpTransportType.Stdio)
     {
       if (string.IsNullOrEmpty(server.Command))
       {
+        fallbackCts?.Dispose();
         return [];
       }
 
       Dictionary<string, string?> envVars = server.EnvironmentVariables
         .ToDictionary(kv => kv.Key, kv => (string?)kv.Value);
+
+      log?.Invoke($"[INFO] Starting stdio: {server.Command} {string.Join(" ", server.Args)}");
 
       transport = new StdioClientTransport(new StdioClientTransportOptions
       {
@@ -701,12 +758,24 @@ public partial class MainWindowViewModel : ViewModelBase
         Command = server.Command,
         Arguments = server.Args,
         EnvironmentVariables = envVars.Count > 0 ? envVars : null,
+        StandardErrorLines = line =>
+        {
+          try
+          {
+            log?.Invoke($"[stderr] {line}");
+          }
+          catch
+          {
+            // Never let UI callback exceptions kill the SDK's stderr pump thread
+          }
+        },
       });
     }
     else
     {
       if (string.IsNullOrEmpty(server.Url))
       {
+        fallbackCts?.Dispose();
         return [];
       }
 
@@ -717,6 +786,8 @@ public partial class MainWindowViewModel : ViewModelBase
         _ => HttpTransportMode.AutoDetect,
       };
 
+      log?.Invoke($"[INFO] Connecting {mode}: {server.Url}");
+
       Dictionary<string, string>? headers = server.HttpHeaders.Count > 0 ? server.HttpHeaders : null;
       transport = CreateHttpTransport(server.Url, mode, headers);
     }
@@ -724,23 +795,39 @@ public partial class MainWindowViewModel : ViewModelBase
     McpClient? client = null;
     try
     {
-      client = await McpClient.CreateAsync(transport, cancellationToken: cts.Token);
-      IList<McpClientTool> tools = await client.ListToolsAsync(cancellationToken: cts.Token);
+      log?.Invoke("[INFO] Initializing MCP session...");
+      client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken);
+      log?.Invoke("[INFO] Session ready, requesting tools/list...");
+      IList<McpClientTool> tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
       return tools.Select(t => t.Name).ToList();
     }
     finally
     {
+      // Dispose the client with its own shutdown budget so that a user-cancelled or timed-out
+      // operation does not leak background read tasks that later surface as
+      // UnobservedTaskException and crash the process in Release builds.
       if (client != null)
       {
         try
         {
-          await client.DisposeAsync();
+          using CancellationTokenSource disposeCts = new(TimeSpan.FromSeconds(5));
+          ValueTask disposeTask = client.DisposeAsync();
+          if (!disposeTask.IsCompleted)
+          {
+            await disposeTask.AsTask().WaitAsync(disposeCts.Token).ConfigureAwait(false);
+          }
+          else
+          {
+            await disposeTask.ConfigureAwait(false);
+          }
         }
         catch
         {
-          // Swallow dispose errors from MCP SDK
+          // Swallow dispose errors from MCP SDK; we are already on the error path.
         }
       }
+
+      fallbackCts?.Dispose();
     }
   }
 
