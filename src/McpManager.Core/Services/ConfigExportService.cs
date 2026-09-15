@@ -16,80 +16,96 @@ public class ConfigExportService : IConfigExportService
   private readonly WindsurfConfigGenerator _windsurfGen = new();
   private readonly VsCodeConfigGenerator _vsCodeGen = new();
 
-  public async Task ExportAsync(TargetFolder target, IEnumerable<McpServer> allServers, GlobalSettings? settings = null)
+  public Dictionary<TargetClientFlags, string> GetConfigFilePaths(
+    TargetFolder target, GlobalSettings? settings = null)
   {
-    List<McpServer> servers = allServers
-      .Where(s => target.EnabledServers.Contains(s.Id) && !target.DisabledServers.Contains(s.Id)).ToList();
-    Dictionary<Guid, Dictionary<string, string>> envOverrides = target.ServerEnvOverrides;
-    Dictionary<Guid, List<string>> toolOverrides = target.ServerToolOverrides;
-    string bridgeArgs = target.BridgeArgs;
-
-    // Apply bridge commands from settings
-    if (settings != null)
+    Dictionary<TargetClientFlags, IConfigGenerator> generators = new()
     {
-      _claudeDesktopGen.BridgeCommandHttp = settings.BridgeCommandHttp;
-      _claudeDesktopGen.BridgeCommandSse = settings.BridgeCommandSse;
-      _claudeDesktopGen.BridgeCommandStreamableHttp = settings.BridgeCommandStreamableHttp;
-    }
-
-    if (target.EnabledClients.HasFlag(TargetClientFlags.ClaudeCode))
+      [TargetClientFlags.ClaudeCode] = _claudeCodeGen,
+      [TargetClientFlags.ClaudeDesktop] = _claudeDesktopGen,
+      [TargetClientFlags.OpenCode] = _openCodeGen,
+      [TargetClientFlags.Codex] = _codexGen,
+      [TargetClientFlags.Cursor] = _cursorGen,
+      [TargetClientFlags.Windsurf] = _windsurfGen,
+      [TargetClientFlags.VsCode] = _vsCodeGen,
+      [TargetClientFlags.ClaudeCodeGlobal] = _claudeCodeGlobalGen,
+    };
+    Dictionary<TargetClientFlags, string> paths = new();
+    foreach ((TargetClientFlags client, IConfigGenerator generator) in generators)
     {
-      await ExportConfigAsync(target.Path, _claudeCodeGen, servers, envOverrides, toolOverrides, bridgeArgs);
-    }
-
-    if (target.EnabledClients.HasFlag(TargetClientFlags.ClaudeDesktop))
-    {
-      await ExportConfigAsync(target.Path, _claudeDesktopGen, servers, envOverrides, toolOverrides, bridgeArgs);
-    }
-
-    if (target.EnabledClients.HasFlag(TargetClientFlags.OpenCode))
-    {
-      // OpenCode config merges into existing opencode.jsonc
-      string openCodeConfigPath = Path.Combine(target.Path, "opencode.jsonc");
-      _openCodeGen.ExistingConfigPath = openCodeConfigPath;
-      await ExportConfigAsync(target.Path, _openCodeGen, servers, envOverrides, toolOverrides, bridgeArgs);
-    }
-
-    if (target.EnabledClients.HasFlag(TargetClientFlags.Codex))
-    {
-      // Codex config merges into existing config.toml
-      string codexConfigPath = settings?.CodexConfigPath ?? GetDefaultCodexConfigPath();
-      _codexGen.ExistingConfigPath = codexConfigPath;
-      string codexBasePath = Path.GetDirectoryName(codexConfigPath) ?? codexConfigPath;
-      await ExportConfigAsync(codexBasePath, _codexGen, servers, envOverrides, toolOverrides, bridgeArgs);
-    }
-
-    if (target.EnabledClients.HasFlag(TargetClientFlags.Cursor))
-    {
-      await ExportConfigAsync(target.Path, _cursorGen, servers, envOverrides, toolOverrides, bridgeArgs);
-    }
-
-    if (target.EnabledClients.HasFlag(TargetClientFlags.Windsurf))
-    {
-      // Windsurf uses bridge commands like Claude Desktop
-      if (settings != null)
+      if (!target.EnabledClients.HasFlag(client))
       {
-        _windsurfGen.BridgeCommandHttp = settings.BridgeCommandHttp;
-        _windsurfGen.BridgeCommandSse = settings.BridgeCommandSse;
-        _windsurfGen.BridgeCommandStreamableHttp = settings.BridgeCommandStreamableHttp;
+        continue;
       }
 
-      await ExportConfigAsync(target.Path, _windsurfGen, servers, envOverrides, toolOverrides, bridgeArgs);
+      paths[client] = client switch
+      {
+        TargetClientFlags.Codex when target.IsGlobal =>
+          settings?.CodexConfigPath ?? RegistryService.GetDefaultCodexConfigPath(),
+        TargetClientFlags.Codex => Path.Combine(target.Path, ".codex", "config.toml"),
+        TargetClientFlags.ClaudeCodeGlobal => RegistryService.GetDefaultClaudeCodeGlobalConfigPath(),
+        _ => GetConfigFilePath(target.Path, generator),
+      };
     }
 
-    if (target.EnabledClients.HasFlag(TargetClientFlags.VsCode))
+    return paths;
+  }
+
+  public async Task ExportAsync(TargetFolder target, IEnumerable<McpServer> allServers, GlobalSettings? settings = null)
+  {
+    Dictionary<string, string> configs = PreviewConfigs(target, allServers, settings);
+    await WriteConfigsAsync(configs);
+  }
+
+  public async Task<Dictionary<string, string>?> PrepareExportAsync(
+    IEnumerable<TargetFolder> targets,
+    IEnumerable<McpServer> allServers,
+    GlobalSettings? settings,
+    Func<ExportConflict, Task<ExportConflictResolution?>> resolveConflictAsync)
+  {
+    List<TargetFolder> targetList = targets.ToList();
+    List<McpServer> serverList = allServers.ToList();
+    Dictionary<ExportConflict, ExportConflictResolution> resolutions = new();
+
+    while (true)
     {
-      await ExportConfigAsync(target.Path, _vsCodeGen, servers, envOverrides, toolOverrides, bridgeArgs);
+      try
+      {
+        Dictionary<string, string> configs = new();
+        foreach (TargetFolder target in targetList)
+        {
+          foreach ((string path, string content) in PreviewConfigs(target, serverList, settings, resolutions))
+          {
+            configs[path] = content;
+          }
+        }
+
+        return configs;
+      }
+      catch (ExportConflictException ex)
+      {
+        ExportConflictResolution? resolution = await resolveConflictAsync(ex.Conflict);
+        if (resolution == null)
+        {
+          return null;
+        }
+
+        resolutions[ex.Conflict] = resolution.Value;
+      }
     }
+  }
 
-    if (target.EnabledClients.HasFlag(TargetClientFlags.ClaudeCodeGlobal))
+  public async Task WriteConfigsAsync(IReadOnlyDictionary<string, string> configs)
+  {
+    foreach ((string filePath, string content) in configs)
     {
-      string claudeCodeGlobalPath = RegistryService.GetDefaultClaudeCodeGlobalConfigPath();
-      _claudeCodeGlobalGen.ExistingConfigPath = claudeCodeGlobalPath;
-      string basePath = Path.GetDirectoryName(claudeCodeGlobalPath) ?? claudeCodeGlobalPath;
-      await ExportConfigAsync(basePath, _claudeCodeGlobalGen, servers, envOverrides, toolOverrides, bridgeArgs);
+      string? directory = Path.GetDirectoryName(filePath);
+      if (!string.IsNullOrEmpty(directory))
+      {
+        Directory.CreateDirectory(directory);
+      }
 
-      await WriteClaudeCodePermissionsAsync(servers, toolOverrides);
+      await File.WriteAllTextAsync(filePath, content);
     }
   }
 
@@ -111,14 +127,27 @@ public class ConfigExportService : IConfigExportService
   public Dictionary<string, string> PreviewConfigs(
     TargetFolder target,
     IEnumerable<McpServer> allServers,
-    GlobalSettings? settings = null)
+    GlobalSettings? settings = null,
+    IReadOnlyDictionary<ExportConflict, ExportConflictResolution>? resolutions = null)
   {
     Dictionary<string, string> result = new();
     List<McpServer> serverList = allServers
       .Where(s => target.EnabledServers.Contains(s.Id) && !target.DisabledServers.Contains(s.Id)).ToList();
+    HashSet<string> names = new(StringComparer.Ordinal);
+    HashSet<Guid> ids = [];
+    foreach (McpServer server in serverList)
+    {
+      if (server.Id == Guid.Empty || !ids.Add(server.Id) ||
+          string.IsNullOrWhiteSpace(server.Name) || !names.Add(server.Name))
+      {
+        throw new InvalidOperationException("Export requires unique server names and non-empty, unique server IDs.");
+      }
+    }
+
     Dictionary<Guid, Dictionary<string, string>> envOverrides = target.ServerEnvOverrides;
     Dictionary<Guid, List<string>> toolOverrides = target.ServerToolOverrides;
     string bridgeArgs = target.BridgeArgs;
+    Dictionary<TargetClientFlags, string> paths = GetConfigFilePaths(target, settings);
 
     // Apply bridge commands from settings
     if (settings != null)
@@ -126,107 +155,103 @@ public class ConfigExportService : IConfigExportService
       _claudeDesktopGen.BridgeCommandHttp = settings.BridgeCommandHttp;
       _claudeDesktopGen.BridgeCommandSse = settings.BridgeCommandSse;
       _claudeDesktopGen.BridgeCommandStreamableHttp = settings.BridgeCommandStreamableHttp;
+      _claudeDesktopGen.BridgeHeaderArgumentTemplate = settings.BridgeHeaderArgumentTemplate;
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.ClaudeCode))
     {
-      string path = GetConfigFilePath(target.Path, _claudeCodeGen);
-      result[path] = _claudeCodeGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+      string path = paths[TargetClientFlags.ClaudeCode];
+      result[path] = GenerateMergedConfig(
+        path, _claudeCodeGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.ClaudeDesktop))
     {
-      string path = GetConfigFilePath(target.Path, _claudeDesktopGen);
-      result[path] = _claudeDesktopGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+      string path = paths[TargetClientFlags.ClaudeDesktop];
+      result[path] = GenerateMergedConfig(
+        path, _claudeDesktopGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.OpenCode))
     {
-      string openCodeConfigPath = Path.Combine(target.Path, "opencode.jsonc");
-      _openCodeGen.ExistingConfigPath = openCodeConfigPath;
-      string path = GetConfigFilePath(target.Path, _openCodeGen);
-      result[path] = _openCodeGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+      string path = paths[TargetClientFlags.OpenCode];
+      _openCodeGen.ExistingConfigPath = path;
+      result[path] = GenerateMergedConfig(
+        path, _openCodeGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.Codex))
     {
-      string codexConfigPath = settings?.CodexConfigPath ?? GetDefaultCodexConfigPath();
+      string codexConfigPath = paths[TargetClientFlags.Codex];
       _codexGen.ExistingConfigPath = codexConfigPath;
-      result[codexConfigPath] = _codexGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+      result[codexConfigPath] = GenerateMergedConfig(
+        codexConfigPath, _codexGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.Cursor))
     {
-      string path = GetConfigFilePath(target.Path, _cursorGen);
-      result[path] = _cursorGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+      string path = paths[TargetClientFlags.Cursor];
+      result[path] = GenerateMergedConfig(
+        path, _cursorGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.Windsurf))
     {
-      if (settings != null)
-      {
-        _windsurfGen.BridgeCommandHttp = settings.BridgeCommandHttp;
-        _windsurfGen.BridgeCommandSse = settings.BridgeCommandSse;
-        _windsurfGen.BridgeCommandStreamableHttp = settings.BridgeCommandStreamableHttp;
-      }
-
-      string path = GetConfigFilePath(target.Path, _windsurfGen);
-      result[path] = _windsurfGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+      string path = paths[TargetClientFlags.Windsurf];
+      result[path] = GenerateMergedConfig(
+        path, _windsurfGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.VsCode))
     {
-      string path = GetConfigFilePath(target.Path, _vsCodeGen);
-      result[path] = _vsCodeGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+      string path = paths[TargetClientFlags.VsCode];
+      result[path] = GenerateMergedConfig(
+        path, _vsCodeGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.ClaudeCodeGlobal))
     {
-      string claudeCodeGlobalPath = RegistryService.GetDefaultClaudeCodeGlobalConfigPath();
+      string claudeCodeGlobalPath = paths[TargetClientFlags.ClaudeCodeGlobal];
       _claudeCodeGlobalGen.ExistingConfigPath = claudeCodeGlobalPath;
-      result[claudeCodeGlobalPath] = _claudeCodeGlobalGen.GenerateConfig(serverList, envOverrides, toolOverrides, bridgeArgs);
+      result[claudeCodeGlobalPath] = GenerateMergedConfig(
+        claudeCodeGlobalPath, _claudeCodeGlobalGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
 
       string settingsPath = GetClaudeCodeSettingsPath();
-      result[settingsPath] = GenerateClaudeCodePermissionsPreview(serverList, toolOverrides);
+      JsonNode exportedServers = JsonNode.Parse(result[claudeCodeGlobalPath])!["mcpServers"]!;
+      result[settingsPath] = GenerateClaudeCodePermissionsPreview(
+        serverList.Where(s => ManagedServerIdentity.Read(exportedServers[s.Name]) == s.Id), toolOverrides);
     }
 
     return result;
   }
 
-  private static async Task ExportConfigAsync(
-    string basePath,
+  private static string GenerateMergedConfig(
+    string filePath,
     IConfigGenerator generator,
     IEnumerable<McpServer> servers,
     Dictionary<Guid, Dictionary<string, string>>? envOverrides,
-    Dictionary<Guid, List<string>>? toolOverrides = null,
-    string? bridgeArgs = null)
+    Dictionary<Guid, List<string>>? toolOverrides,
+    string? bridgeArgs,
+    IReadOnlyDictionary<ExportConflict, ExportConflictResolution>? resolutions)
   {
-    string filePath = GetConfigFilePath(basePath, generator);
-    string? directory = Path.GetDirectoryName(filePath);
-
-    if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-    {
-      Directory.CreateDirectory(directory);
-    }
-
-    string content = generator.GenerateConfig(servers, envOverrides, toolOverrides, bridgeArgs);
-    await File.WriteAllTextAsync(filePath, content);
+    string generated = generator.GenerateConfig(servers, envOverrides, toolOverrides, bridgeArgs);
+    return ManagedConfigMerger.Merge(filePath, generator, generated, resolutions);
   }
 
   private static string GetConfigFilePath(string basePath, IConfigGenerator generator)
   {
+    if (generator is OpenCodeConfigGenerator && !File.Exists(Path.Combine(basePath, "opencode.jsonc")) &&
+        File.Exists(Path.Combine(basePath, "opencode.json")))
+    {
+      return Path.Combine(basePath, "opencode.json");
+    }
+
     if (string.IsNullOrEmpty(generator.ConfigSubFolder))
     {
       return Path.Combine(basePath, generator.ConfigFileName);
     }
 
     return Path.Combine(basePath, generator.ConfigSubFolder, generator.ConfigFileName);
-  }
-
-  private static string GetDefaultCodexConfigPath()
-  {
-    string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-    return Path.Combine(homeDir, ".codex", "config.toml");
   }
 
   private static string GetClaudeCodeSettingsPath()
@@ -317,95 +342,6 @@ public class ConfigExportService : IConfigExportService
       });
   }
 
-  private static async Task WriteClaudeCodePermissionsAsync(
-    IEnumerable<McpServer> servers,
-    Dictionary<Guid, List<string>>? toolOverrides)
-  {
-    string settingsPath = GetClaudeCodeSettingsPath();
-
-    JsonObject root;
-    if (File.Exists(settingsPath))
-    {
-      string existingContent = await File.ReadAllTextAsync(settingsPath);
-      root = JsonNode.Parse(existingContent)?.AsObject() ?? new JsonObject();
-    }
-    else
-    {
-      root = new JsonObject();
-    }
-
-    if (!root.ContainsKey("permissions"))
-    {
-      root["permissions"] = new JsonObject();
-    }
-
-    JsonObject permissions = root["permissions"]!.AsObject();
-
-    if (!permissions.ContainsKey("allow"))
-    {
-      permissions["allow"] = new JsonArray();
-    }
-
-    JsonArray allowArray = permissions["allow"]!.AsArray();
-
-    HashSet<string> managedServerNames = servers.Select(s => s.Name).ToHashSet();
-    List<JsonNode?> nodesToRemove = [];
-
-    foreach (JsonNode? node in allowArray)
-    {
-      if (node is JsonValue value && value.TryGetValue<string>(out string? str) && str.StartsWith("mcp__"))
-      {
-        string[] parts = str.Split("__", 3);
-        if (parts.Length >= 2)
-        {
-          string serverName = parts[1];
-          if (managedServerNames.Contains(serverName))
-          {
-            nodesToRemove.Add(node);
-          }
-        }
-      }
-    }
-
-    foreach (JsonNode? node in nodesToRemove)
-    {
-      allowArray.Remove(node);
-    }
-
-    foreach (McpServer server in servers)
-    {
-      List<string> effectiveTools = GetEffectiveToolList(server, toolOverrides);
-
-      if (effectiveTools.Count > 0)
-      {
-        foreach (string tool in effectiveTools)
-        {
-          string permissionEntry = $"mcp__{server.Name}__{tool}";
-          allowArray.Add(permissionEntry);
-        }
-      }
-      else
-      {
-        string permissionEntry = $"mcp__{server.Name}__*";
-        allowArray.Add(permissionEntry);
-      }
-    }
-
-    string directory = Path.GetDirectoryName(settingsPath) ?? settingsPath;
-    if (!Directory.Exists(directory))
-    {
-      Directory.CreateDirectory(directory);
-    }
-
-    string outputContent = JsonSerializer.Serialize(
-      root,
-      new JsonSerializerOptions
-      {
-        WriteIndented = true,
-      });
-
-    await File.WriteAllTextAsync(settingsPath, outputContent);
-  }
 
   private static List<string> GetEffectiveToolList(
     McpServer server,

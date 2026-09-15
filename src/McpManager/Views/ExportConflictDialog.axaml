@@ -1,0 +1,47 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:models="using:McpManager.Core.Models"
+        x:Class="McpManager.Views.ExportConflictDialog"
+        x:DataType="models:ExportConflict"
+        Title="Export conflict"
+        Width="680" MinWidth="560" MaxHeight="760"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        SizeToContent="Height">
+  <Grid Margin="24" RowDefinitions="*,Auto" RowSpacing="20">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="12">
+        <TextBlock Text="Server already exists" FontSize="20" FontWeight="SemiBold" />
+        <SelectableTextBlock Text="{Binding ServerName}" FontSize="16" FontWeight="SemiBold"
+                             TextWrapping="Wrap" />
+        <TextBlock Text="Not owned by MCP Manager" FontWeight="SemiBold" />
+        <SelectableTextBlock Text="{Binding FilePath}" Opacity="0.75" TextWrapping="Wrap" />
+        <TextBlock Text="Replace it with the version from MCP Manager to manage it from now on, or keep the existing configuration and continue exporting the other servers."
+                   TextWrapping="Wrap" />
+        <TextBlock Text="Cancel export leaves all destination files unchanged."
+                   Opacity="0.75" TextWrapping="Wrap" />
+        <Expander Header="Compare configurations" HorizontalAlignment="Stretch">
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Existing configuration" FontWeight="SemiBold" />
+              <TextBox Text="{Binding ExistingConfiguration, Mode=OneWay}" IsReadOnly="True"
+                       AcceptsReturn="True" TextWrapping="Wrap" Height="220"
+                       FontFamily="monospace" FontSize="12" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="8">
+              <TextBlock Text="MCP Manager" FontWeight="SemiBold" />
+              <TextBox Text="{Binding ProposedConfiguration, Mode=OneWay}" IsReadOnly="True"
+                       AcceptsReturn="True" TextWrapping="Wrap" Height="220"
+                       FontFamily="monospace" FontSize="12" />
+            </StackPanel>
+          </Grid>
+        </Expander>
+      </StackPanel>
+    </ScrollViewer>
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+      <Button Content="Cancel export" IsCancel="True" Click="CancelButton_OnClick" />
+      <Button Content="Keep existing" Click="KeepButton_OnClick" />
+      <Button Content="Replace with MCP Manager" Click="ReplaceButton_OnClick" />
+    </StackPanel>
+  </Grid>
+</Window>

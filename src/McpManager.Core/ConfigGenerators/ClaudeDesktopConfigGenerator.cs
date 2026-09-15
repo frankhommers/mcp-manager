@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using McpManager.Core.Models;
+using McpManager.Core.Services;
 
 namespace McpManager.Core.ConfigGenerators;
 
@@ -15,19 +16,25 @@ public class ClaudeDesktopConfigGenerator : IConfigGenerator
   public virtual string? ConfigSubFolder => null;
 
   /// <summary>
-  /// Bridge command for wrapping HTTP servers. Use {url} as placeholder for the server URL.
+  /// Bridge command for wrapping HTTP servers. Supports {url}, {args}, and {headerArgs} placeholders.
   /// </summary>
-  public string BridgeCommandHttp { get; set; } = "mcp-proxy {url}";
+  public string BridgeCommandHttp { get; set; } = "mcp-proxy {args} {headerArgs} {url}";
 
   /// <summary>
-  /// Bridge command for wrapping SSE servers. Use {url} as placeholder for the server URL.
+  /// Bridge command for wrapping SSE servers. Supports {url}, {args}, and {headerArgs} placeholders.
   /// </summary>
-  public string BridgeCommandSse { get; set; } = "mcp-proxy {url}";
+  public string BridgeCommandSse { get; set; } = "mcp-proxy {args} {headerArgs} {url}";
 
   /// <summary>
-  /// Bridge command for wrapping Streamable HTTP servers. Use {url} as placeholder for the server URL.
+  /// Bridge command for wrapping Streamable HTTP servers. Supports {url}, {args}, and {headerArgs} placeholders.
   /// </summary>
-  public string BridgeCommandStreamableHttp { get; set; } = "mcp-proxy --transport streamablehttp {url}";
+  public string BridgeCommandStreamableHttp { get; set; } =
+    "mcp-proxy {args} {headerArgs} --transport streamablehttp {url}";
+
+  /// <summary>
+  /// Argument pattern repeated for every HTTP header. Supports {key} and {value} placeholders.
+  /// </summary>
+  public string BridgeHeaderArgumentTemplate { get; set; } = "--headers {key} {value}";
 
   public string GenerateConfig(
     IEnumerable<McpServer> servers,
@@ -55,6 +62,17 @@ public class ClaudeDesktopConfigGenerator : IConfigGenerator
             }
           }
 
+          if (envVars.Count > 0)
+          {
+            JsonObject envObj = new();
+            foreach ((string key, string value) in envVars)
+            {
+              envObj[key] = value;
+            }
+
+            serverConfig["env"] = envObj;
+          }
+
           break;
 
         case McpTransportType.Http:
@@ -69,47 +87,24 @@ public class ClaudeDesktopConfigGenerator : IConfigGenerator
             _ => BridgeCommandHttp,
           };
 
-          // Replace {url} and {args} placeholders
-          string resolvedCommand = bridgeCommand
-            .Replace("{url}", server.Url ?? "")
-            .Replace("{args}", bridgeArgs ?? "");
+          ResolvedCommand resolvedCommand = BridgeCommandResolver.Resolve(
+            bridgeCommand,
+            server.Url ?? string.Empty,
+            bridgeArgs,
+            BridgeHeaderArgumentTemplate,
+            server.HttpHeaders);
 
-          // Clean up multiple spaces that might result from empty {args}
-          while (resolvedCommand.Contains("  "))
+          if (!string.IsNullOrWhiteSpace(resolvedCommand.Command))
           {
-            resolvedCommand = resolvedCommand.Replace("  ", " ");
-          }
-
-          resolvedCommand = resolvedCommand.Trim();
-
-          string[] bridgeParts = resolvedCommand.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-          if (bridgeParts.Length > 0)
-          {
-            serverConfig["command"] = bridgeParts[0];
-            if (bridgeParts.Length > 1)
+            serverConfig["command"] = resolvedCommand.Command;
+            if (resolvedCommand.Arguments.Count > 0)
             {
-              JsonArray args = new();
-              for (int i = 1; i < bridgeParts.Length; i++)
-              {
-                args.Add(JsonValue.Create(bridgeParts[i]));
-              }
-
-              serverConfig["args"] = args;
+              serverConfig["args"] = new JsonArray(
+                resolvedCommand.Arguments.Select(a => JsonValue.Create(a)).ToArray());
             }
           }
 
           break;
-      }
-
-      if (envVars.Count > 0)
-      {
-        JsonObject envObj = new();
-        foreach ((string key, string value) in envVars)
-        {
-          envObj[key] = value;
-        }
-
-        serverConfig["env"] = envObj;
       }
 
       List<string> allowedTools = GetEffectiveToolList(server, toolOverrides);
@@ -118,6 +113,7 @@ public class ClaudeDesktopConfigGenerator : IConfigGenerator
         serverConfig["alwaysAllow"] = new JsonArray(allowedTools.Select(a => JsonValue.Create(a)).ToArray());
       }
 
+      ManagedServerIdentity.Stamp(serverConfig, server, local: true);
       mcpServers[server.Name] = serverConfig;
     }
 

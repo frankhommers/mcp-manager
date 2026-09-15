@@ -92,21 +92,31 @@ public class GlobalSettings
 
   /// <summary>
   /// Bridge command for wrapping HTTP servers for Claude Desktop.
-  /// Placeholders: {url} = server URL, {args} = extra args per target.
+  /// Placeholders: {url} = server URL, {args} = extra args per target,
+  /// {headerArgs} = expanded header arguments.
   /// </summary>
-  public string BridgeCommandHttp { get; set; } = "mcp-proxy {args} {url}";
+  public string BridgeCommandHttp { get; set; } = "mcp-proxy {args} {headerArgs} {url}";
 
   /// <summary>
   /// Bridge command for wrapping SSE servers for Claude Desktop.
-  /// Placeholders: {url} = server URL, {args} = extra args per target.
+  /// Placeholders: {url} = server URL, {args} = extra args per target,
+  /// {headerArgs} = expanded header arguments.
   /// </summary>
-  public string BridgeCommandSse { get; set; } = "mcp-proxy {args} {url}";
+  public string BridgeCommandSse { get; set; } = "mcp-proxy {args} {headerArgs} {url}";
 
   /// <summary>
   /// Bridge command for wrapping Streamable HTTP servers for Claude Desktop.
-  /// Placeholders: {url} = server URL, {args} = extra args per target.
+  /// Placeholders: {url} = server URL, {args} = extra args per target,
+  /// {headerArgs} = expanded header arguments.
   /// </summary>
-  public string BridgeCommandStreamableHttp { get; set; } = "mcp-proxy {args} --transport streamablehttp {url}";
+  public string BridgeCommandStreamableHttp { get; set; } =
+    "mcp-proxy {args} {headerArgs} --transport streamablehttp {url}";
+
+  /// <summary>
+  /// Argument pattern repeated for every HTTP header passed to a bridge.
+  /// Placeholders: {key} = header name, {value} = header value.
+  /// </summary>
+  public string BridgeHeaderArgumentTemplate { get; set; } = "--headers {key} {value}";
 
   /// <summary>
   /// Selected theme mode: "Follow system", "Dark", or "Light".

@@ -45,15 +45,9 @@ public class ClaudeCodeGlobalConfigGenerator : ClaudeCodeConfigGenerator
       return new JsonObject();
     }
 
-    try
-    {
-      string content = File.ReadAllText(ExistingConfigPath);
-      JsonNode? node = JsonNode.Parse(content);
-      return node as JsonObject ?? new JsonObject();
-    }
-    catch
-    {
-      return new JsonObject();
-    }
+    string content = File.ReadAllText(ExistingConfigPath);
+    JsonNode? node = JsonNode.Parse(content);
+    return node as JsonObject
+           ?? throw new InvalidDataException($"Expected a configuration object in '{ExistingConfigPath}'.");
   }
 }

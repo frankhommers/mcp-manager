@@ -12,4 +12,8 @@
     <PackageReference Include="Tomlyn" Version="2.2.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="McpManager.Tests" />
+  </ItemGroup>
+
 </Project>

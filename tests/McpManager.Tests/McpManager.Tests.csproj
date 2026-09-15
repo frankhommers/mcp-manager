@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/McpManager.Core/McpManager.Core.csproj" />
+    <ProjectReference Include="../../src/McpManager/McpManager.csproj" />
   </ItemGroup>
 
 </Project>

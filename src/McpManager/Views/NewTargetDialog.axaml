@@ -17,7 +17,7 @@
                    Tag="ClaudeCodeGlobal" IsChecked="True" />
       <RadioButton x:Name="RbClaudeDesktop" GroupName="TargetType" Content="Claude Desktop"
                    Tag="ClaudeDesktop" />
-      <RadioButton x:Name="RbCodex" GroupName="TargetType" Content="Codex CLI"
+      <RadioButton x:Name="RbCodex" GroupName="TargetType" Content="Codex (global)"
                    Tag="Codex" />
       <RadioButton x:Name="RbCursor" GroupName="TargetType" Content="Cursor"
                    Tag="Cursor" />
@@ -28,7 +28,7 @@
       <RadioButton x:Name="RbOpenCode" GroupName="TargetType" Content="OpenCode"
                    Tag="OpenCode" />
       <Separator Margin="0,4" />
-      <RadioButton x:Name="RbFolder" GroupName="TargetType" Content="Project Folder"
+      <RadioButton x:Name="RbFolder" GroupName="TargetType" Content="Project Folder (Claude Code, OpenCode, Codex)"
                    Tag="Folder" />
     </StackPanel>
 

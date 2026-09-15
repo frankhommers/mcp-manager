@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using McpManager.Core.Models;
+using McpManager.Core.Services;
 
 namespace McpManager.Core.ConfigGenerators;
 
@@ -67,6 +68,17 @@ public class OpenCodeConfigGenerator : IConfigGenerator
             serverConfig["command"] = commandArray;
           }
 
+          if (envVars.Count > 0)
+          {
+            JsonObject envObj = new();
+            foreach ((string key, string value) in envVars)
+            {
+              envObj[key] = value;
+            }
+
+            serverConfig["environment"] = envObj;
+          }
+
           break;
 
         case McpTransportType.Http:
@@ -78,20 +90,22 @@ public class OpenCodeConfigGenerator : IConfigGenerator
             serverConfig["url"] = server.Url;
           }
 
+          if (server.HttpHeaders.Count > 0)
+          {
+            JsonObject headersObj = new();
+            foreach ((string key, string value) in server.HttpHeaders)
+            {
+              headersObj[key] = value;
+            }
+
+            serverConfig["headers"] = headersObj;
+          }
+
           break;
       }
 
-      if (envVars.Count > 0)
-      {
-        JsonObject envObj = new();
-        foreach ((string key, string value) in envVars)
-        {
-          envObj[key] = value;
-        }
-
-        serverConfig["environment"] = envObj;
-      }
-
+      ManagedServerIdentity.Stamp(
+        serverConfig, server, server.TransportType == McpTransportType.Stdio, "environment");
       mcpSection[server.Name] = serverConfig;
     }
 
@@ -148,16 +162,10 @@ public class OpenCodeConfigGenerator : IConfigGenerator
       return new JsonObject();
     }
 
-    try
-    {
-      string content = File.ReadAllText(filePath);
-      JsonNode? node = JsonNode.Parse(content, documentOptions: ReadOptions);
-      return node as JsonObject ?? new JsonObject();
-    }
-    catch
-    {
-      return new JsonObject();
-    }
+    string content = File.ReadAllText(filePath);
+    JsonNode? node = JsonNode.Parse(content, documentOptions: ReadOptions);
+    return node as JsonObject
+           ?? throw new InvalidDataException($"Expected a configuration object in '{filePath}'.");
   }
 
   private static Dictionary<string, string> GetMergedEnvVars(

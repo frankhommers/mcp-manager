@@ -14,9 +14,15 @@ public partial class McpServerViewModel : ViewModelBase
 
   public Guid Id => _model.Id;
 
-  [ObservableProperty] private string _name;
+  [ObservableProperty]
+  [NotifyPropertyChangedFor(nameof(ListName))]
+  private string _name;
 
-  [ObservableProperty] private string _displayName;
+  [ObservableProperty]
+  [NotifyPropertyChangedFor(nameof(ListName))]
+  private string _displayName;
+
+  public string ListName => string.IsNullOrWhiteSpace(DisplayName) ? Name : DisplayName;
 
   [ObservableProperty] private string? _description;
 
@@ -163,6 +169,26 @@ public partial class McpServerViewModel : ViewModelBase
           IsAllowed = allowedSet.Contains(name),
         });
     }
+  }
+
+  /// <summary>
+  /// Apply a parsed command-line to this server's stdio fields.
+  /// Overwrites Command/Args/EnvironmentVariables. Does not change TransportType.
+  /// </summary>
+  public string ApplyParsed(ParsedCommand parsed)
+  {
+    Command = parsed.Command;
+    Arguments.Clear();
+    foreach (string a in parsed.Args)
+    {
+      Arguments.Add(new StringItemViewModel(a));
+    }
+    EnvironmentVariables.Clear();
+    foreach ((string key, string value) in parsed.EnvironmentVariables)
+    {
+      EnvironmentVariables.Add(new KeyValuePairViewModel(key, value));
+    }
+    return $"Pasted command: {parsed.Command}";
   }
 
   /// <summary>

@@ -1,11 +1,12 @@
 using McpManager.Core.Models;
+using McpManager.Core.Services;
 using Tomlyn;
 using Tomlyn.Model;
 
 namespace McpManager.Core.ConfigGenerators;
 
 /// <summary>
-/// Generates TOML config for Codex CLI (~/.codex/config.toml).
+/// Generates TOML config for Codex, at global or project scope.
 /// Only manages the [mcp_servers.*] sections; preserves all other config.
 /// </summary>
 public class CodexConfigGenerator : IConfigGenerator
@@ -113,6 +114,7 @@ public class CodexConfigGenerator : IConfigGenerator
         serverConfig["enabled_tools"] = enabledTools;
       }
 
+      ManagedServerIdentity.Stamp(serverConfig, server);
       mcpServers[server.Name] = serverConfig;
     }
 
@@ -128,16 +130,9 @@ public class CodexConfigGenerator : IConfigGenerator
   {
     if (!string.IsNullOrEmpty(ExistingConfigPath) && File.Exists(ExistingConfigPath))
     {
-      try
-      {
-        string existingToml = File.ReadAllText(ExistingConfigPath);
-        TomlTable? table = TomlSerializer.Deserialize<TomlTable>(existingToml);
-        return table ?? new TomlTable();
-      }
-      catch
-      {
-        return new TomlTable();
-      }
+      string existingToml = File.ReadAllText(ExistingConfigPath);
+      TomlTable? table = TomlSerializer.Deserialize<TomlTable>(existingToml);
+      return table ?? throw new InvalidDataException($"Expected a configuration table in '{ExistingConfigPath}'.");
     }
 
     return new TomlTable();

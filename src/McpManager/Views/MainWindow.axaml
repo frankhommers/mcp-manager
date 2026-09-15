@@ -308,6 +308,19 @@
         <Style Selector="Button.dangerButton:pointerover">
             <Setter Property="Background" Value="#E74856" />
         </Style>
+        <Style Selector="CheckBox.serverSelectionRow">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Margin" Value="12,0,0,0" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="MinHeight" Value="54" />
+        </Style>
+        <Style Selector="CheckBox.serverSelectionRow:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+        </Style>
+        <Style Selector="CheckBox.serverSelectionRow:checked">
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+        </Style>
     </Window.Styles>
 
     <Border Margin="14"
@@ -370,10 +383,19 @@
                                 </Button>
 
                                 <!-- Servers Section -->
-                                <Grid ColumnDefinitions="*,Auto" Margin="4,8,4,0">
+                                <Grid ColumnDefinitions="*,Auto,Auto" Margin="4,8,4,0">
                                     <TextBlock Text="SERVERS" FontSize="11" FontWeight="SemiBold"
                                                Opacity="0.75" VerticalAlignment="Center" />
                                     <Button Grid.Column="1"
+                                            Command="{Binding PasteServerFromClipboardCommand}"
+                                            ToolTip.Tip="Paste command from clipboard as new server"
+                                            Padding="6,2"
+                                            Width="30"
+                                            Margin="0,0,4,0">
+                                        <PathIcon Data="{StaticResource MdiClipboardOutline}"
+                                                  Width="14" Height="14" />
+                                    </Button>
+                                    <Button Grid.Column="2"
                                             Content="+"
                                             Command="{Binding AddServerCommand}"
                                             ToolTip.Tip="Add Server"
@@ -383,7 +405,7 @@
                                             FontWeight="Bold" />
                                 </Grid>
 
-                                <ListBox ItemsSource="{Binding Servers}"
+                                <ListBox ItemsSource="{Binding SidebarServers}"
                                          SelectedItem="{Binding SelectedServer}"
                                          Classes.sidebar-inactive="{Binding !IsServerListActive}"
                                          Background="Transparent"
@@ -399,7 +421,9 @@
                                                           VerticalAlignment="Center"
                                                           Margin="0,0,10,0" />
                                                 <StackPanel Grid.Column="1" Spacing="2">
-                                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding ListName}" FontWeight="SemiBold"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip.Tip="{Binding ListName}" />
                                                     <TextBlock Text="{Binding SelectedTransportTypeItem.Value, Converter={x:Static vm:TransportBadgeConverter.Instance}}"
                                                                FontSize="11" Opacity="0.75" />
                                                 </StackPanel>
@@ -430,7 +454,7 @@
                                             FontWeight="Bold" />
                                 </Grid>
 
-                                <ListBox ItemsSource="{Binding TargetFolders}"
+                                <ListBox ItemsSource="{Binding SidebarTargets}"
                                          SelectedItem="{Binding SelectedTarget}"
                                          Classes.sidebar-inactive="{Binding !IsTargetListActive}"
                                          Background="Transparent"
@@ -598,35 +622,48 @@
                                                 Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
                                         </StackPanel>
 
-                                        <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto">
+                                        <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto,Auto">
                                             <TextBlock Grid.Row="0" Grid.Column="0" Text="HTTP" Opacity="0.75"
                                                        VerticalAlignment="Center" />
                                             <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding BridgeCommandHttp}"
                                                      Classes="formField"
-                                                     Watermark="mcp-proxy {args} {url}" />
+                                                     Watermark="mcp-proxy {args} {headerArgs} {url}" />
 
                                             <TextBlock Grid.Row="1" Grid.Column="0" Text="SSE" Opacity="0.75"
                                                        VerticalAlignment="Center" Margin="0,8,0,0" />
                                             <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding BridgeCommandSse}"
                                                      Classes="formField" Margin="0,8,0,0"
-                                                     Watermark="mcp-proxy {args} {url}" />
+                                                     Watermark="mcp-proxy {args} {headerArgs} {url}" />
 
                                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Streamable HTTP"
                                                        Opacity="0.75" VerticalAlignment="Center" Margin="0,8,0,0" />
                                             <TextBox Grid.Row="2" Grid.Column="1"
                                                      Text="{Binding BridgeCommandStreamableHttp}" Classes="formField"
                                                      Margin="0,8,0,0"
-                                                     Watermark="mcp-proxy {args} --transport streamablehttp {url}" />
+                                                     Watermark="mcp-proxy {args} {headerArgs} --transport streamablehttp {url}" />
+
+                                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Header arguments"
+                                                       Opacity="0.75" VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="3" Grid.Column="1"
+                                                     Text="{Binding BridgeHeaderArgumentTemplate}"
+                                                     Classes="formField" Margin="0,8,0,0"
+                                                     Watermark="--headers {key} {value}" />
                                         </Grid>
 
                                         <Border Classes="secondaryPanel">
                                             <StackPanel Spacing="4">
                                                 <TextBlock Text="Placeholders" Classes="cardEyebrow" />
-                                                <TextBlock Text="{}{url} resolves to the server URL. {args} resolves to target-specific bridge arguments."
+                                                <TextBlock
+                                                           Text="{}{url} is the server URL. {args} contains target-specific arguments. Add {headerArgs} as a separate item where the configured header arguments should be inserted."
                                                            Opacity="0.75"
                                                            FontSize="11"
                                                            TextWrapping="Wrap" />
-                                                <TextBox Text="Example: mcp-proxy {args} {url}"
+                                                <TextBlock
+                                                           Text="The header pattern is repeated for every header. Use {key} and {value}, for example: --headers {key} {value} or -H '{key}: {value}'."
+                                                           Opacity="0.75"
+                                                           FontSize="11"
+                                                           TextWrapping="Wrap" />
+                                                <TextBox Text="Example: mcp-proxy {args} {headerArgs} {url}"
                                                          Classes="outputBox"
                                                          IsReadOnly="True"
                                                          IsTabStop="False" />
@@ -907,13 +944,26 @@
 
                                 <Border Classes="detailCard">
                                     <StackPanel Spacing="16">
-                                        <StackPanel Spacing="4">
-                                            <TextBlock Text="Connection setup" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
-                                            <TextBlock Text="Group transport selection, URLs, and detection so remote server setup stays in one place."
-                                                       Opacity="0.75"
-                                                       FontSize="12"
-                                                       TextWrapping="Wrap" />
-                                        </StackPanel>
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="Connection setup" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                                <TextBlock Text="Group transport selection, URLs, and detection so remote server setup stays in one place."
+                                                           Opacity="0.75"
+                                                           FontSize="12"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1"
+                                                    Command="{Binding PasteIntoSelectedServerCommand}"
+                                                    ToolTip.Tip="Paste command from clipboard into this server (overwrites command, args, env, URL, transport)"
+                                                    VerticalAlignment="Top"
+                                                    Padding="10,6">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <PathIcon Data="{StaticResource MdiClipboardOutline}"
+                                                              Width="14" Height="14" />
+                                                    <TextBlock Text="Paste command" FontSize="12" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
 
                                         <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
                                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Type" Opacity="0.75"
@@ -1110,7 +1160,7 @@
                                                 <StackPanel Spacing="6">
                                                     <TextBlock Text="Client support" FontWeight="SemiBold"
                                                                Foreground="{DynamicResource SystemAccentColor}" FontSize="12" />
-                                                    <TextBlock Text="Claude Code and Codex have native HTTP support. Codex uses http_headers for authentication."
+                                                    <TextBlock Text="Claude Code, Codex, Cursor, VS Code, OpenCode, and Windsurf use native remote MCP transport with headers."
                                                                Opacity="0.75" FontSize="12"
                                                                TextWrapping="Wrap" />
                                                     <TextBlock Text="Claude Desktop still needs the bridge command from Settings for non-stdio servers."
@@ -1376,7 +1426,7 @@
                                         <StackPanel Spacing="4">
                                             <TextBlock Text="Destination" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
                                             <TextBlock
-                                                Text="Codex CLI config is global. MCP servers are written to the [mcp_servers] section while preserving other settings."
+                                                Text="This target uses the global Codex config. For project-local config, add a Project Folder target and enable Codex. Other settings are preserved."
                                                 Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
                                         </StackPanel>
 
@@ -1435,6 +1485,12 @@
                                             <CheckBox Content="OpenCode (opencode.json)"
                                                       IsThreeState="False"
                                                       IsChecked="{Binding SelectedTarget.EnableOpenCode, Mode=TwoWay}" />
+                                            <CheckBox Content="Codex (.codex/config.toml)"
+                                                      IsThreeState="False"
+                                                      IsChecked="{Binding SelectedTarget.EnableCodex, Mode=TwoWay}" />
+                                            <TextBlock Text="Codex loads project config only for trusted projects."
+                                                       IsVisible="{Binding SelectedTarget.EnableCodex}"
+                                                       Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -1461,101 +1517,210 @@
                                 <Border Classes="detailCard">
                                     <StackPanel Spacing="16">
                                         <StackPanel Spacing="4">
-                                            <TextBlock Text="Included servers" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
-                                            <TextBlock Text="Enable or disable the server set for this target from one grouped list."
-                                                       Opacity="0.75" FontSize="12" />
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                <TextBlock Text="Servers and tool permissions" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                                                <Button Grid.Column="1" Content="Fetch missing tools"
+                                                        Command="{Binding FetchAllTargetToolsCommand}"
+                                                        FontSize="12" Padding="10,5"
+                                                        ToolTip.Tip="Discover tools for all included servers that have no tools yet" />
+                                            </Grid>
+                                            <TextBlock Text="Include a server, then open Tools to choose its tool permissions."
+                                                       Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                            <TextBlock Text="Tool checkboxes use MCP Manager’s saved choices for this target, or the server defaults. Fetch tools discovers tool names."
+                                                       Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
                                         </StackPanel>
-                                        <ItemsControl ItemsSource="{Binding SelectedTarget.ServerSelections}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <WrapPanel />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
+                                        <StackPanel Spacing="8" IsVisible="{Binding !SelectedTarget.IsClipboard}">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                <StackPanel Spacing="4" VerticalAlignment="Center">
+                                                    <TextBlock Text="Server selection from config" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding SelectedTarget.ConfigReadStatus}"
+                                                               FontSize="11" Opacity="0.75" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="Re-read config" VerticalAlignment="Center"
+                                                        FontSize="12" Padding="10,5"
+                                                        Command="{Binding RefreshTargetConfigCommand}"
+                                                        IsEnabled="{Binding SelectedTarget.CanReadConfig}"
+                                                        ToolTip.Tip="Check the target files again. Saved and current server choices take priority; tool choices are kept." />
+                                            </Grid>
+                                            <ProgressBar IsIndeterminate="True" Height="3"
+                                                         IsVisible="{Binding SelectedTarget.IsReadingConfig}" />
+                                            <TextBlock Text="Checked when you open this target, change its path or formats, and Save or Export. Saved and current server choices take priority."
+                                                       Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding SelectedTarget.ExistingServersStatus}"
+                                                       Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <TextBox Text="{Binding SelectedTarget.ServerSearchText}"
+                                                     Watermark="Search by name or group…"
+                                                     AutomationProperties.Name="Search servers"
+                                                     Classes="formField" />
+                                            <Button Grid.Column="1" Content="Clear"
+                                                    Command="{Binding SelectedTarget.ClearServerSearchCommand}"
+                                                    IsVisible="{Binding SelectedTarget.HasServerSearch}"
+                                                    ToolTip.Tip="Clear the server search" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                            <TextBlock Text="{Binding SelectedTarget.ServerSelectionSummary}"
+                                                       VerticalAlignment="Center" TextWrapping="Wrap"
+                                                       FontSize="12" Opacity="0.75" />
+                                            <Button Grid.Column="1" Content="Select shown"
+                                                    Command="{Binding SelectedTarget.SelectVisibleServersCommand}"
+                                                    ToolTip.Tip="Select all servers matching the search"
+                                                    FontSize="12" Padding="10,5" />
+                                            <Button Grid.Column="2" Content="Clear shown"
+                                                    Command="{Binding SelectedTarget.DeselectVisibleServersCommand}"
+                                                    ToolTip.Tip="Deselect all servers matching the search"
+                                                    FontSize="12" Padding="10,5" />
+                                        </Grid>
+                                        <ItemsControl ItemsSource="{Binding SelectedTarget.VisibleServerSelections}"
+                                                      Grid.IsSharedSizeScope="True"
+                                                      IsVisible="{Binding SelectedTarget.HasVisibleServers}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate x:DataType="vm:ServerSelectionViewModel">
-                                                    <CheckBox IsChecked="{Binding IsEnabled}"
-                                                              Margin="0,4,24,4">
-                                                        <TextBlock Text="{Binding ServerName}" />
-                                                    </CheckBox>
+                                                    <Border Margin="0,0,0,8" CornerRadius="10" BorderThickness="1"
+                                                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                                                        <Grid RowDefinitions="Auto,Auto">
+                                                            <Grid ColumnSpacing="8">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" SharedSizeGroup="ServerTools" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                                                          IsThreeState="False" Classes="serverSelectionRow"
+                                                                          AutomationProperties.Name="{Binding ServerName}">
+                                                                    <StackPanel Spacing="2">
+                                                                        <TextBlock Text="{Binding ServerName}" FontWeight="SemiBold"
+                                                                                   TextTrimming="CharacterEllipsis"
+                                                                                   ToolTip.Tip="{Binding ServerName}" />
+                                                                        <TextBlock Text="{Binding Details}" FontSize="11" Opacity="0.65"
+                                                                                   TextTrimming="CharacterEllipsis"
+                                                                                   ToolTip.Tip="{Binding Details}" />
+                                                                        <TextBlock Text="{Binding TransportType, Converter={x:Static vm:TransportBadgeConverter.Instance}}"
+                                                                                   FontSize="10" Opacity="0.65" />
+                                                                    </StackPanel>
+                                                                </CheckBox>
+                                                                <ToggleButton Grid.Column="1" IsChecked="{Binding AreToolsExpanded, Mode=TwoWay}"
+                                                                              Theme="{StaticResource {x:Type Button}}"
+                                                                              Margin="0,8,8,8" Padding="10,6" VerticalAlignment="Center"
+                                                                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                                                              AutomationProperties.Name="{Binding ServerName, StringFormat='Tool permissions for {0}'}">
+                                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                                        <StackPanel Spacing="2">
+                                                                            <TextBlock Text="Tools" FontWeight="SemiBold" />
+                                                                            <TextBlock Text="{Binding ToolSelectionSummary}" FontSize="11" Opacity="0.75" />
+                                                                        </StackPanel>
+                                                                        <TextBlock Grid.Column="1" Text="▾" VerticalAlignment="Center"
+                                                                                   IsVisible="{Binding !AreToolsExpanded}" />
+                                                                        <TextBlock Grid.Column="1" Text="▴" VerticalAlignment="Center"
+                                                                                   IsVisible="{Binding AreToolsExpanded}" />
+                                                                    </Grid>
+                                                                </ToggleButton>
+                                                            </Grid>
+                                                            <Border Grid.Row="1" IsVisible="{Binding AreToolsExpanded}" Padding="16,12"
+                                                                    BorderThickness="0,1,0,0"
+                                                                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                                                                <StackPanel Spacing="10">
+                                                                    <TextBlock Text="Include this server to edit its tool selection."
+                                                                               IsVisible="{Binding !IsEnabled}" TextWrapping="Wrap"
+                                                                               FontSize="12" Opacity="0.75" />
+                                                                    <StackPanel Spacing="10">
+                                                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                                            <TextBlock Text="Tool selection" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                                            <Button Grid.Column="1" Content="Fetch tools" FontSize="12" Padding="10,5"
+                                                                                    IsEnabled="{Binding IsEnabled}"
+                                                                                    Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).FetchToolsForServerCommand}"
+                                                                                    CommandParameter="{Binding}"
+                                                                                    ToolTip.Tip="Discover or refresh tools from this server" />
+                                                                        </Grid>
+                                                                        <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding IsFetchingTools}" />
+                                                                        <TextBlock Text="{Binding ToolFetchStatus}" IsVisible="{Binding HasToolFetchStatus}"
+                                                                                   TextWrapping="Wrap" FontSize="12" Opacity="0.75" />
+                                                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding HasToolOverrides}">
+                                                                            <TextBox Text="{Binding ToolSearchText}" Watermark="Search tools…"
+                                                                                     AutomationProperties.Name="{Binding ServerName, StringFormat='Search tools for {0}'}"
+                                                                                     Classes="formField" />
+                                                                            <Button Grid.Column="1" Content="Clear" Command="{Binding ClearToolSearchCommand}"
+                                                                                    IsVisible="{Binding HasToolSearch}" ToolTip.Tip="Clear the tool search" />
+                                                                        </Grid>
+                                                                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasToolOverrides}">
+                                                                            <Button Content="Select shown" Command="{Binding SelectVisibleToolsCommand}"
+                                                                                    FontSize="12" Padding="10,5" ToolTip.Tip="Select the tools matching this search" />
+                                                                            <Button Content="Clear shown" Command="{Binding ClearVisibleToolsCommand}"
+                                                                                    FontSize="12" Padding="10,5" ToolTip.Tip="Deselect the tools matching this search" />
+                                                                        </StackPanel>
+                                                                        <ScrollViewer MaxHeight="240" HorizontalScrollBarVisibility="Disabled"
+                                                                                      IsVisible="{Binding HasVisibleTools}">
+                                                                            <ItemsControl ItemsSource="{Binding VisibleTools}" IsEnabled="{Binding IsEnabled}">
+                                                                                <ItemsControl.ItemTemplate>
+                                                                                    <DataTemplate x:DataType="vm:ToolOverrideViewModel">
+                                                                                        <CheckBox IsChecked="{Binding IsAllowed, Mode=TwoWay}"
+                                                                                                  IsThreeState="False" HorizontalAlignment="Stretch"
+                                                                                                  HorizontalContentAlignment="Stretch" Padding="6,4"
+                                                                                                  AutomationProperties.Name="{Binding ToolName}">
+                                                                                            <TextBlock Text="{Binding ToolName}" TextWrapping="Wrap" />
+                                                                                        </CheckBox>
+                                                                                    </DataTemplate>
+                                                                                </ItemsControl.ItemTemplate>
+                                                                            </ItemsControl>
+                                                                        </ScrollViewer>
+                                                                        <TextBlock Text="No tools match your search. Your choices are kept."
+                                                                                   IsVisible="{Binding HasNoToolMatches}" TextWrapping="Wrap" FontSize="12" Opacity="0.75" />
+                                                                        <TextBlock Text="No tools discovered yet. Use Fetch tools to load them."
+                                                                                   IsVisible="{Binding !HasToolOverrides}" TextWrapping="Wrap" FontSize="12" Opacity="0.75" />
+                                                                    </StackPanel>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </Grid>
+                                                    </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
+                                        <TextBlock Text="No servers match your search. Your selection is unchanged."
+                                                   Opacity="0.75" FontSize="12" TextWrapping="Wrap"
+                                                   IsVisible="{Binding SelectedTarget.HasNoServerMatches}" />
                                         <TextBlock Text="No servers available. Add servers first."
                                                    Opacity="0.75" FontSize="12"
                                                    IsVisible="{Binding !SelectedTarget.ServerSelections.Count}" />
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Per-server tool overrides -->
-                                <Border Classes="detailCard">
+                                <Border Classes="detailCard" IsVisible="{Binding SelectedTarget.HasFoundServers}">
                                     <StackPanel Spacing="16">
                                         <StackPanel Spacing="4">
-                                            <TextBlock Text="Tool permissions" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
-                                            <Grid ColumnDefinitions="*,Auto">
-                                                <TextBlock Text="Manage tool permissions per enabled server. Use Fetch Tools to discover available tools."
-                                                           Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
-                                                <Button Grid.Column="1" Content="Fetch All Tools"
-                                                        Command="{Binding FetchAllTargetToolsCommand}"
-                                                        VerticalAlignment="Top"
-                                                        Margin="8,0,0,0"
-                                                        ToolTip.Tip="Discover tools from all enabled servers that don't have tools yet" />
-                                            </Grid>
+                                            <TextBlock Text="Found in this target" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                            <TextBlock Text="These servers are in the target configuration and missing from your library. Import a server to add it to MCP Manager and select it for this target."
+                                                       Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                            <TextBlock Text="Save keeps your library changes. Export updates the target configuration."
+                                                       Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
                                         </StackPanel>
-
-                                        <ItemsControl ItemsSource="{Binding SelectedTarget.ServerSelections}">
+                                        <ItemsControl ItemsSource="{Binding SelectedTarget.FoundServers}">
                                             <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:ServerSelectionViewModel">
-                                                    <Expander IsExpanded="False" HorizontalAlignment="Stretch"
-                                                              Margin="0,0,0,4"
-                                                              IsVisible="{Binding IsEnabled}">
-                                                        <Expander.Header>
-                                                            <TextBlock Text="{Binding ServerName}" FontWeight="SemiBold" />
-                                                        </Expander.Header>
-                                                        <StackPanel Spacing="8" Margin="8,8,0,0">
-                                                            <ItemsControl ItemsSource="{Binding ToolOverrides}"
-                                                                          IsVisible="{Binding HasToolOverrides}">
-                                                                <ItemsControl.ItemsPanel>
-                                                                    <ItemsPanelTemplate>
-                                                                        <WrapPanel />
-                                                                    </ItemsPanelTemplate>
-                                                                </ItemsControl.ItemsPanel>
-                                                                <ItemsControl.ItemTemplate>
-                                                                    <DataTemplate x:DataType="vm:ToolOverrideViewModel">
-                                                                        <CheckBox IsChecked="{Binding IsAllowed}" Margin="0,4,24,4">
-                                                                            <TextBlock Text="{Binding ToolName}" />
-                                                                        </CheckBox>
-                                                                    </DataTemplate>
-                                                                </ItemsControl.ItemTemplate>
-                                                            </ItemsControl>
-
-                                                            <TextBlock Text="No tools discovered yet. Click (Re)fetch Tools to discover."
-                                                                       Opacity="0.6" FontSize="11"
-                                                                       IsVisible="{Binding !HasToolOverrides}" />
-
-                                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                                <Button Content="(Re)fetch Tools" Padding="8,4" FontSize="11"
-                                                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).FetchToolsForServerCommand}"
-                                                                        CommandParameter="{Binding}"
-                                                                        ToolTip.Tip="Discover or refresh available tools from this server" />
-                                                                <Button Content="Allow All" Padding="8,4" FontSize="11"
-                                                                        IsVisible="{Binding HasToolOverrides}"
-                                                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).AllowAllTargetToolsCommand}"
-                                                                        CommandParameter="{Binding}" />
-                                                                <Button Content="Deny All" Padding="8,4" FontSize="11"
-                                                                        IsVisible="{Binding HasToolOverrides}"
-                                                                        Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).DenyAllTargetToolsCommand}"
-                                                                        CommandParameter="{Binding}" />
-                                                            </StackPanel>
+                                                <DataTemplate x:DataType="vm:FoundTargetServerViewModel">
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="0,0,0,12">
+                                                        <StackPanel Spacing="3">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                                       TextWrapping="Wrap" />
+                                                            <TextBlock Text="{Binding ClientName}" FontSize="11" Opacity="0.75" />
+                                                            <TextBlock Text="{Binding Status}" FontSize="11" Opacity="0.75"
+                                                                       TextWrapping="Wrap" />
+                                                            <SelectableTextBlock Text="{Binding FilePath}" FontSize="11"
+                                                                                 Opacity="0.65" TextWrapping="Wrap" />
                                                         </StackPanel>
-                                                    </Expander>
+                                                        <Button Grid.Column="1" Content="Import into MCP Manager"
+                                                                VerticalAlignment="Center"
+                                                                Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ImportFoundServerCommand}"
+                                                                CommandParameter="{Binding}" />
+                                                    </Grid>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
-
-                                        <TextBlock Text="Enable servers above to manage their tool permissions."
-                                                   Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Border>
+
+
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
@@ -1572,6 +1737,9 @@
                 <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Grid.Column="0"
                                Text="{Binding StatusMessage}"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="{Binding StatusMessage}"
+                               Margin="0,0,16,0"
                                FontSize="12"
                                Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                VerticalAlignment="Center" />

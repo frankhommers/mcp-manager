@@ -1,12 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using McpManager.Core.Models;
+using McpManager.Core.Services;
 
 namespace McpManager.Core.ConfigGenerators;
 
 /// <summary>
 /// Generates .vscode/mcp.json config files for VS Code (GitHub Copilot).
-/// Format: { "mcp": { "servers": { "name": { "type": "stdio", "command": "...", "args": [] } } } }
+/// Format: { "servers": { "name": { "type": "stdio", "command": "...", "args": [] } } }
 /// </summary>
 public class VsCodeConfigGenerator : IConfigGenerator
 {
@@ -38,6 +39,17 @@ public class VsCodeConfigGenerator : IConfigGenerator
             {
               serverConfig["args"] = new JsonArray(server.Args.Select(a => JsonValue.Create(a)).ToArray());
             }
+          }
+
+          if (envVars.Count > 0)
+          {
+            JsonObject envObj = new();
+            foreach ((string key, string value) in envVars)
+            {
+              envObj[key] = value;
+            }
+
+            serverConfig["env"] = envObj;
           }
 
           break;
@@ -84,26 +96,13 @@ public class VsCodeConfigGenerator : IConfigGenerator
           break;
       }
 
-      if (envVars.Count > 0)
-      {
-        JsonObject envObj = new();
-        foreach ((string key, string value) in envVars)
-        {
-          envObj[key] = value;
-        }
-
-        serverConfig["env"] = envObj;
-      }
-
+      ManagedServerIdentity.Stamp(serverConfig, server, server.TransportType == McpTransportType.Stdio);
       mcpServers[server.Name] = serverConfig;
     }
 
     JsonObject root = new()
     {
-      ["mcp"] = new JsonObject
-      {
-        ["servers"] = mcpServers,
-      },
+      ["servers"] = mcpServers,
     };
 
     return JsonSerializer.Serialize(

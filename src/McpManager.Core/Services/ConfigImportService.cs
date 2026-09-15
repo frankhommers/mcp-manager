@@ -6,7 +6,7 @@ using Tomlyn.Model;
 
 namespace McpManager.Core.Services;
 
-public class ConfigImportService : IConfigImportService
+public partial class ConfigImportService : IConfigImportService
 {
   public async Task<List<McpServer>> ImportFromClaudeCodeAsync(string filePath)
   {
@@ -95,6 +95,7 @@ public class ConfigImportService : IConfigImportService
           .ToList();
       }
 
+      ManagedServerIdentity.RestoreImportedId(server);
       servers.Add(server);
     }
 
@@ -131,6 +132,18 @@ public class ConfigImportService : IConfigImportService
       {
         server.TransportType = McpTransportType.Http;
         server.Url = serverNode["url"]?.GetValue<string>();
+
+        JsonObject? headers = serverNode["headers"]?.AsObject();
+        if (headers != null)
+        {
+          foreach ((string key, JsonNode? value) in headers)
+          {
+            if (value != null)
+            {
+              server.HttpHeaders[key] = value.GetValue<string>();
+            }
+          }
+        }
       }
       else
       {
@@ -158,6 +171,7 @@ public class ConfigImportService : IConfigImportService
         }
       }
 
+      ManagedServerIdentity.RestoreImportedId(server);
       servers.Add(server);
     }
 
@@ -240,6 +254,7 @@ public class ConfigImportService : IConfigImportService
         server.AlwaysAllow = tools.OfType<string>().ToList();
       }
 
+      ManagedServerIdentity.RestoreImportedId(server);
       servers.Add(server);
     }
 
@@ -288,7 +303,7 @@ public class ConfigImportService : IConfigImportService
     // Convert "home-assistant" to "Home Assistant"
     return string.Join(
       " ",
-      name.Split('-', '_')
+      name.Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries)
         .Select(word => char.ToUpperInvariant(word[0]) + word[1..]));
   }
 }

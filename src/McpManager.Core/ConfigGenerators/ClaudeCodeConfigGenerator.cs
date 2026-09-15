@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using McpManager.Core.Models;
+using McpManager.Core.Services;
 
 namespace McpManager.Core.ConfigGenerators;
 
@@ -38,6 +39,17 @@ public class ClaudeCodeConfigGenerator : IConfigGenerator
             }
           }
 
+          if (envVars.Count > 0)
+          {
+            JsonObject envObj = new();
+            foreach ((string key, string value) in envVars)
+            {
+              envObj[key] = value;
+            }
+
+            serverConfig["env"] = envObj;
+          }
+
           break;
 
         case McpTransportType.Http:
@@ -69,23 +81,13 @@ public class ClaudeCodeConfigGenerator : IConfigGenerator
           break;
       }
 
-      if (envVars.Count > 0)
-      {
-        JsonObject envObj = new();
-        foreach ((string key, string value) in envVars)
-        {
-          envObj[key] = value;
-        }
-
-        serverConfig["env"] = envObj;
-      }
-
       List<string> allowedTools = GetEffectiveToolList(server, toolOverrides);
       if (allowedTools.Count > 0)
       {
         serverConfig["alwaysAllow"] = new JsonArray(allowedTools.Select(a => JsonValue.Create(a)).ToArray());
       }
 
+      ManagedServerIdentity.Stamp(serverConfig, server, server.TransportType == McpTransportType.Stdio);
       mcpServers[server.Name] = serverConfig;
     }
 

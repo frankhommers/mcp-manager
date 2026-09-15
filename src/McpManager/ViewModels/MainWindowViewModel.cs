@@ -32,6 +32,7 @@ public partial class MainWindowViewModel : ViewModelBase
   private readonly IConfigExportService _configExportService;
   private readonly IConfigImportService _configImportService;
   private readonly IHttpMcpTester _httpMcpTester;
+  private readonly IStdioMcpTester _stdioMcpTester;
   private readonly ITransportDetectionService _transportDetectionService;
   private readonly IShellEnvironmentService _shellEnvironmentService;
   private McpRegistry? _registry;
@@ -101,6 +102,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
       SelectedServer = null;
       ShowSettings = false;
+      _ = value.RefreshExistingServersAsync(_registry?.Settings);
     }
 
     OnPropertyChanged(nameof(CurrentPage));
@@ -123,12 +125,15 @@ public partial class MainWindowViewModel : ViewModelBase
     OnPropertyChanged(nameof(IsTargetListActive));
   }
 
-  [ObservableProperty] private string _bridgeCommandHttp = "mcp-proxy {args} {url}";
+  [ObservableProperty] private string _bridgeCommandHttp = "mcp-proxy {args} {headerArgs} {url}";
 
-  [ObservableProperty] private string _bridgeCommandSse = "mcp-proxy {args} {url}";
+  [ObservableProperty] private string _bridgeCommandSse = "mcp-proxy {args} {headerArgs} {url}";
 
   [ObservableProperty]
-  private string _bridgeCommandStreamableHttp = "mcp-proxy {args} --transport streamablehttp {url}";
+  private string _bridgeCommandStreamableHttp =
+    "mcp-proxy {args} {headerArgs} --transport streamablehttp {url}";
+
+  [ObservableProperty] private string _bridgeHeaderArgumentTemplate = "--headers {key} {value}";
 
   [ObservableProperty] private string _selectedThemeMode = "Follow system";
 
@@ -137,29 +142,36 @@ public partial class MainWindowViewModel : ViewModelBase
   public IEnumerable<McpTransportType> TransportTypes => Enum.GetValues<McpTransportType>();
 
   /// <summary>
-  /// Migrates old bridge commands to include {args} placeholder.
-  /// Inserts {args} after the command name (e.g., mcp-proxy {url} → mcp-proxy {args} {url})
+  /// Migrates mcp-proxy commands to include the supported placeholders.
   /// </summary>
   private static string MigrateBridgeCommand(string command)
   {
-    if (string.IsNullOrWhiteSpace(command) || command.Contains("{args}"))
+    if (string.IsNullOrWhiteSpace(command))
     {
       return command;
     }
 
-    // Insert {args} after the first word (the command)
-    string[] parts = command.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-    if (parts.Length == 2)
+    string migrated = command.Replace("{headers}", "{headerArgs}");
+    if (!migrated.Contains("{args}"))
     {
-      return $"{parts[0]} {{args}} {parts[1]}";
+      int urlIndex = migrated.IndexOf("{url}", StringComparison.Ordinal);
+      migrated = urlIndex >= 0
+        ? migrated.Insert(urlIndex, "{args} ")
+        : $"{migrated} {{args}}";
     }
 
-    if (parts.Length == 1)
+    ParsedCommand parsed = CommandLineParser.Parse(migrated);
+    string executableName = Path.GetFileNameWithoutExtension(parsed.Command);
+    if (executableName.Equals("mcp-proxy", StringComparison.OrdinalIgnoreCase) &&
+        !migrated.Contains("{headerArgs}"))
     {
-      return $"{parts[0]} {{args}}";
+      int urlIndex = migrated.IndexOf("{url}", StringComparison.Ordinal);
+      migrated = urlIndex >= 0
+        ? migrated.Insert(urlIndex, "{headerArgs} ")
+        : $"{migrated} {{headerArgs}}";
     }
 
-    return command;
+    return migrated;
   }
 
   public MainWindowViewModel()
@@ -168,8 +180,10 @@ public partial class MainWindowViewModel : ViewModelBase
     _configExportService = new ConfigExportService();
     _configImportService = new ConfigImportService();
     _httpMcpTester = new HttpMcpTester();
+    _stdioMcpTester = new StdioMcpTester();
     _transportDetectionService = new TransportDetectionService();
     _shellEnvironmentService = new ShellEnvironmentService();
+    InitializeSidebar();
   }
 
   public MainWindowViewModel(
@@ -177,6 +191,7 @@ public partial class MainWindowViewModel : ViewModelBase
     IConfigExportService configExportService,
     IConfigImportService configImportService,
     IHttpMcpTester httpMcpTester,
+    IStdioMcpTester stdioMcpTester,
     ITransportDetectionService transportDetectionService,
     IShellEnvironmentService shellEnvironmentService)
   {
@@ -184,8 +199,10 @@ public partial class MainWindowViewModel : ViewModelBase
     _configExportService = configExportService;
     _configImportService = configImportService;
     _httpMcpTester = httpMcpTester;
+    _stdioMcpTester = stdioMcpTester;
     _transportDetectionService = transportDetectionService;
     _shellEnvironmentService = shellEnvironmentService;
+    InitializeSidebar();
   }
 
   public async Task InitializeAsync()
@@ -202,10 +219,19 @@ public partial class MainWindowViewModel : ViewModelBase
       _registry = await _registryService.LoadAsync();
       RefreshFromRegistry();
 
-      // Load settings and migrate old bridge commands to include {args}
-      BridgeCommandHttp = MigrateBridgeCommand(_registry.Settings.BridgeCommandHttp);
-      BridgeCommandSse = MigrateBridgeCommand(_registry.Settings.BridgeCommandSse);
-      BridgeCommandStreamableHttp = MigrateBridgeCommand(_registry.Settings.BridgeCommandStreamableHttp);
+      // Load settings and migrate old bridge commands to the current placeholders
+      string migratedHttpCommand = MigrateBridgeCommand(_registry.Settings.BridgeCommandHttp);
+      string migratedSseCommand = MigrateBridgeCommand(_registry.Settings.BridgeCommandSse);
+      string migratedStreamableCommand = MigrateBridgeCommand(
+        _registry.Settings.BridgeCommandStreamableHttp);
+      bool bridgeSettingsMigrated = migratedHttpCommand != _registry.Settings.BridgeCommandHttp ||
+                                    migratedSseCommand != _registry.Settings.BridgeCommandSse ||
+                                    migratedStreamableCommand != _registry.Settings.BridgeCommandStreamableHttp;
+
+      BridgeCommandHttp = migratedHttpCommand;
+      BridgeCommandSse = migratedSseCommand;
+      BridgeCommandStreamableHttp = migratedStreamableCommand;
+      BridgeHeaderArgumentTemplate = _registry.Settings.BridgeHeaderArgumentTemplate;
 
       if (!string.IsNullOrEmpty(_registry.Settings.ThemeMode))
       {
@@ -213,9 +239,7 @@ public partial class MainWindowViewModel : ViewModelBase
       }
 
       // Save if migrated
-      if (BridgeCommandHttp != _registry.Settings.BridgeCommandHttp ||
-          BridgeCommandSse != _registry.Settings.BridgeCommandSse ||
-          BridgeCommandStreamableHttp != _registry.Settings.BridgeCommandStreamableHttp)
+      if (bridgeSettingsMigrated)
       {
         _registry.Settings.BridgeCommandHttp = BridgeCommandHttp;
         _registry.Settings.BridgeCommandSse = BridgeCommandSse;
@@ -261,13 +285,41 @@ public partial class MainWindowViewModel : ViewModelBase
       Servers.Add(vm);
     }
 
+    foreach (TargetFolderViewModel target in TargetFolders)
+    {
+      target.PropertyChanged -= OnTargetPropertyChanged;
+    }
+
     TargetFolders.Clear();
     foreach (TargetFolder target in _registry.TargetFolders)
     {
-      TargetFolders.Add(new TargetFolderViewModel(target, _registry.Servers));
+      TargetFolderViewModel vm = new(target, _registry.Servers, _configExportService);
+      vm.PropertyChanged += OnTargetPropertyChanged;
+      TargetFolders.Add(vm);
     }
 
     OnPropertyChanged(nameof(ServerGroups));
+  }
+
+  private void OnTargetPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+  {
+    if (sender is TargetFolderViewModel target &&
+        e.PropertyName is nameof(TargetFolderViewModel.Path) or nameof(TargetFolderViewModel.EnableClaudeCode)
+          or nameof(TargetFolderViewModel.EnableClaudeDesktop) or nameof(TargetFolderViewModel.EnableOpenCode)
+          or nameof(TargetFolderViewModel.EnableCodex))
+    {
+      _ = target.RefreshExistingServersAsync(_registry?.Settings, debounce: true);
+    }
+  }
+
+  [RelayCommand]
+  private async Task RefreshTargetConfigAsync()
+  {
+    TargetFolderViewModel? target = SelectedTarget;
+    if (target?.CanReadConfig == true)
+    {
+      await target.RefreshExistingServersAsync(_registry?.Settings);
+    }
   }
 
   private void OnServerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -279,15 +331,19 @@ public partial class MainWindowViewModel : ViewModelBase
       OnPropertyChanged(nameof(ServerGroups));
     }
 
-    // Update server name in target checkboxes
-    if (e.PropertyName is nameof(McpServerViewModel.DisplayName) && sender is McpServerViewModel serverVm)
+    if (e.PropertyName is nameof(McpServerViewModel.DisplayName) or nameof(McpServerViewModel.Name)
+        or nameof(McpServerViewModel.Group) or nameof(McpServerViewModel.TransportType) &&
+        sender is McpServerViewModel serverVm)
     {
       foreach (TargetFolderViewModel target in TargetFolders)
       {
         ServerSelectionViewModel? selection = target.ServerSelections.FirstOrDefault(s => s.ServerId == serverVm.Id);
         if (selection != null)
         {
-          selection.ServerName = serverVm.DisplayName;
+          selection.ServerName = serverVm.ListName;
+          selection.ServerKey = serverVm.Name;
+          selection.Group = serverVm.Group;
+          selection.TransportType = serverVm.TransportType;
         }
       }
     }
@@ -412,14 +468,17 @@ public partial class MainWindowViewModel : ViewModelBase
 
     try
     {
-      // Extract the command name from the bridge command (first word before space or {url})
-      string bridgeCmd = BridgeCommandHttp.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ??
-                         "mcp-proxy";
+      ParsedCommand parsedCommand = CommandLineParser.Parse(BridgeCommandHttp);
+      string bridgeCmd = string.IsNullOrWhiteSpace(parsedCommand.Command)
+        ? "mcp-proxy"
+        : parsedCommand.Command;
 
       // Try to run --version or --help to check if it exists
       string shell = OperatingSystem.IsWindows() ? "cmd" : "/bin/bash";
       string shellArg = OperatingSystem.IsWindows() ? "/c" : "-c";
-      string checkCmd = OperatingSystem.IsWindows() ? $"where {bridgeCmd}" : $"which {bridgeCmd}";
+      string checkCmd = OperatingSystem.IsWindows()
+        ? $"where {QuoteShellArgument(bridgeCmd)}"
+        : $"command -v {QuoteShellArgument(bridgeCmd)}";
 
       BufferedCommandResult result = await Cli.Wrap(shell)
         .WithArguments([shellArg, checkCmd])
@@ -431,8 +490,8 @@ public partial class MainWindowViewModel : ViewModelBase
         string path = result.StandardOutput.Trim().Split('\n').First();
 
         // Try to get version
-        BufferedCommandResult versionResult = await Cli.Wrap(shell)
-          .WithArguments([shellArg, $"{bridgeCmd} --version"])
+        BufferedCommandResult versionResult = await Cli.Wrap(bridgeCmd)
+          .WithArguments(["--version"])
           .WithValidation(CommandResultValidation.None)
           .ExecuteBufferedAsync();
 
@@ -484,6 +543,14 @@ public partial class MainWindowViewModel : ViewModelBase
     if (_registry != null)
     {
       _registry.Settings.BridgeCommandStreamableHttp = value;
+    }
+  }
+
+  partial void OnBridgeHeaderArgumentTemplateChanged(string value)
+  {
+    if (_registry != null)
+    {
+      _registry.Settings.BridgeHeaderArgumentTemplate = value;
     }
   }
 
@@ -589,6 +656,100 @@ public partial class MainWindowViewModel : ViewModelBase
 
     OnPropertyChanged(nameof(ServerGroups));
     StatusMessage = "Server added - don't forget to Save!";
+  }
+
+  [RelayCommand]
+  private async Task PasteServerFromClipboardAsync()
+  {
+    if (_registry == null)
+    {
+      return;
+    }
+
+    IClipboard? clipboard = GetMainWindow()?.Clipboard;
+    if (clipboard == null)
+    {
+      StatusMessage = "Clipboard is not available";
+      return;
+    }
+
+    string? text = await clipboard.GetTextAsync();
+    if (string.IsNullOrWhiteSpace(text))
+    {
+      StatusMessage = "Clipboard is empty";
+      return;
+    }
+
+    ParsedCommand parsed = CommandLineParser.Parse(text);
+    if (string.IsNullOrEmpty(parsed.Command) &&
+        parsed.SuggestedTransport == McpTransportType.Stdio)
+    {
+      StatusMessage = "Clipboard does not contain a runnable command";
+      return;
+    }
+
+    string nameSeed = !string.IsNullOrEmpty(parsed.Command)
+      ? Path.GetFileNameWithoutExtension(parsed.Command)
+      : "pasted-server";
+
+    McpServer server = new()
+    {
+      Name = nameSeed,
+      DisplayName = nameSeed,
+      TransportType = McpTransportType.Stdio,
+    };
+
+    _registry.Servers.Add(server);
+    McpServerViewModel vm = new(server);
+    vm.PropertyChanged += OnServerPropertyChanged;
+    Servers.Add(vm);
+    SelectedServer = vm;
+
+    foreach (TargetFolder target in _registry.TargetFolders)
+    {
+      target.EnabledServers.Add(server.Id);
+    }
+    foreach (TargetFolderViewModel target in TargetFolders)
+    {
+      target.RefreshServers(_registry.Servers);
+    }
+
+    string summary = vm.ApplyParsed(parsed);
+    OnPropertyChanged(nameof(ServerGroups));
+    StatusMessage = $"{summary} - don't forget to Save!";
+  }
+
+  [RelayCommand]
+  private async Task PasteIntoSelectedServerAsync()
+  {
+    if (SelectedServer == null)
+    {
+      return;
+    }
+
+    IClipboard? clipboard = GetMainWindow()?.Clipboard;
+    if (clipboard == null)
+    {
+      StatusMessage = "Clipboard is not available";
+      return;
+    }
+
+    string? text = await clipboard.GetTextAsync();
+    if (string.IsNullOrWhiteSpace(text))
+    {
+      StatusMessage = "Clipboard is empty";
+      return;
+    }
+
+    ParsedCommand parsed = CommandLineParser.Parse(text);
+    if (string.IsNullOrEmpty(parsed.Command) &&
+        parsed.SuggestedTransport == McpTransportType.Stdio)
+    {
+      StatusMessage = "Clipboard does not contain a runnable command";
+      return;
+    }
+
+    StatusMessage = SelectedServer.ApplyParsed(parsed);
   }
 
   [RelayCommand]
@@ -878,7 +1039,8 @@ public partial class MainWindowViewModel : ViewModelBase
   [RelayCommand]
   private async Task FetchAllTargetToolsAsync()
   {
-    if (SelectedTarget == null || _registry == null)
+    TargetFolderViewModel? target = SelectedTarget;
+    if (target == null || _registry == null)
     {
       return;
     }
@@ -890,7 +1052,7 @@ public partial class MainWindowViewModel : ViewModelBase
     try
     {
       // Get enabled servers that don't have tools yet
-      List<ServerSelectionViewModel> serversToFetch = SelectedTarget.ServerSelections
+      List<ServerSelectionViewModel> serversToFetch = target.ServerSelections
         .Where(s => s.IsEnabled && !s.HasToolOverrides)
         .ToList();
 
@@ -909,6 +1071,8 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         StatusMessage = $"Fetching tools from {server.DisplayName}...";
+        selection.IsFetchingTools = true;
+        selection.ToolFetchStatus = "Fetching tools...";
 
         try
         {
@@ -924,15 +1088,23 @@ public partial class MainWindowViewModel : ViewModelBase
 
             totalFound += toolNames.Count;
           }
+
+          selection.ToolFetchStatus = toolNames.Count > 0
+            ? $"Found {toolNames.Count} tools."
+            : "No tools returned. Existing choices were kept.";
         }
-        catch
+        catch (Exception ex)
         {
-          // Skip servers that fail, continue with others
+          selection.ToolFetchStatus = $"Could not fetch tools: {ex.Message}";
+        }
+        finally
+        {
+          selection.IsFetchingTools = false;
         }
       }
 
       // Refresh target's tool overrides for all servers
-      SelectedTarget.RefreshServers(_registry.Servers);
+      target.RefreshServers(_registry.Servers);
 
       StatusMessage = totalFound > 0
         ? $"Discovered {totalFound} tools across {serversToFetch.Count} servers"
@@ -947,7 +1119,9 @@ public partial class MainWindowViewModel : ViewModelBase
   [RelayCommand]
   private async Task FetchToolsForServerAsync(ServerSelectionViewModel? selection)
   {
-    if (selection == null || _registry == null || SelectedTarget == null)
+    TargetFolderViewModel? target = SelectedTarget;
+    if (selection == null || !selection.IsEnabled || _registry == null || target == null ||
+        !target.ServerSelections.Contains(selection))
     {
       return;
     }
@@ -963,6 +1137,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     IsLoading = true;
     StatusMessage = $"Fetching tools from {server.DisplayName}...";
+    selection.IsFetchingTools = true;
+    selection.ToolFetchStatus = "Fetching tools...";
 
     try
     {
@@ -974,20 +1150,24 @@ public partial class MainWindowViewModel : ViewModelBase
         McpServerViewModel? serverVm = Servers.FirstOrDefault(s => s.Id == server.Id);
         serverVm?.SetAvailableTools(toolNames);
 
-        SelectedTarget.RefreshServers(_registry.Servers);
+        target.RefreshServers(_registry.Servers);
+        selection.ToolFetchStatus = $"Found {toolNames.Count} tools.";
         StatusMessage = $"Found {toolNames.Count} tools for {server.DisplayName}";
       }
       else
       {
+        selection.ToolFetchStatus = "No tools returned. Existing choices were kept.";
         StatusMessage = $"No tools found for {server.DisplayName}";
       }
     }
     catch (Exception ex)
     {
+      selection.ToolFetchStatus = $"Could not fetch tools: {ex.Message}";
       StatusMessage = $"Failed to fetch tools from {server.DisplayName}: {ex.Message}";
     }
     finally
     {
+      selection.IsFetchingTools = false;
       IsLoading = false;
     }
   }
@@ -1108,7 +1288,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
     if (SelectedServer.IsStdio)
     {
-      // For stdio, run the command directly
       if (string.IsNullOrWhiteSpace(SelectedServer.Command))
       {
         McpTestResult = "❌ No command configured";
@@ -1118,12 +1297,19 @@ public partial class MainWindowViewModel : ViewModelBase
       }
 
       StatusMessage = "Testing stdio command directly...";
-      string argsString = string.Join(" ", SelectedServer.Arguments.Select(a => a.Value.Contains(' ') ? $"\"{a.Value}\"" : a.Value));
-      string fullCmd = string.IsNullOrEmpty(argsString)
-        ? SelectedServer.Command
-        : $"{SelectedServer.Command} {argsString}";
+      McpServer? server = _registry?.Servers.FirstOrDefault(s => s.Id == SelectedServer.Id);
+      if (server == null)
+      {
+        McpTestResult = "❌ Server configuration not found";
+        StatusMessage = "Test failed: server configuration not found";
+        IsLoading = false;
+        return;
+      }
 
-      await TestViaCommandAsync(SelectedServer.Command, argsString, $"Direct stdio: {fullCmd}");
+      StdioMcpTestResult result = await _stdioMcpTester.TestInitializeAsync(server);
+      McpTestResult = result.ResultText;
+      StatusMessage = result.StatusMessage;
+      IsLoading = false;
     }
     else
     {
@@ -1180,55 +1366,35 @@ public partial class MainWindowViewModel : ViewModelBase
       _ => BridgeCommandSse,
     };
 
-    // Replace placeholders
-    string resolvedCommand = bridgeCommand
-      .Replace("{url}", SelectedServer.Url)
-      .Replace("{args}", "");
-
-    // Clean up multiple spaces
-    while (resolvedCommand.Contains("  "))
-    {
-      resolvedCommand = resolvedCommand.Replace("  ", " ");
-    }
-
-    resolvedCommand = resolvedCommand.Trim();
-
-    string[] parts = resolvedCommand.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-    string command = parts[0];
-    string args = parts.Length > 1 ? parts[1] : "";
+    McpServer? serverModel = _registry?.Servers.FirstOrDefault(s => s.Id == SelectedServer.Id);
+    IReadOnlyDictionary<string, string> headers = serverModel?.HttpHeaders
+      ?? new Dictionary<string, string>();
+    ResolvedCommand resolvedCommand = BridgeCommandResolver.Resolve(
+      bridgeCommand,
+      SelectedServer.Url,
+      null,
+      BridgeHeaderArgumentTemplate,
+      headers);
 
     StatusMessage = "Testing via bridge...";
-    await TestViaCommandAsync(command, args, $"Bridge: {resolvedCommand}");
+    await TestViaCommandAsync(resolvedCommand);
   }
 
-  private async Task TestViaCommandAsync(string command, string args, string description)
+  private async Task TestViaCommandAsync(ResolvedCommand resolvedCommand)
   {
     // Send MCP initialize request via stdin and read response
     string initRequest =
       """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"MCP Manager Test","version":"1.0.0"}}}""";
 
-    string fullCommand = string.IsNullOrEmpty(args) ? command : $"{command} {args}";
-
-    // Build environment variables from model (UpdateModel must be called before this)
-    McpServer? serverModel = _registry?.Servers.FirstOrDefault(s => s.Id == SelectedServer?.Id);
-    Dictionary<string, string> envVars = serverModel != null
-      ? new Dictionary<string, string>(serverModel.EnvironmentVariables)
-      : CollectEnvironmentVariables(SelectedServer);
-
-    // Build env prefix for shell
-    string envPrefix = "";
-    if (envVars.Count > 0)
-    {
-      IEnumerable<string> envParts = envVars.Select(kv => $"{kv.Key}='{kv.Value.Replace("'", "'\\''")}'");
-      envPrefix = string.Join(" ", envParts) + " ";
-    }
+    string fullCommand = FormatShellCommand(resolvedCommand, false);
+    string displayCommand = FormatShellCommand(resolvedCommand, true);
 
     // Build debug header
     StringBuilder debugInfo = new();
-    debugInfo.AppendLine($"🔧 {description}");
+    debugInfo.AppendLine("🔧 Bridge");
     debugInfo.AppendLine();
     debugInfo.AppendLine("📤 Command:");
-    debugInfo.AppendLine($"  {envPrefix}{fullCommand}");
+    debugInfo.AppendLine($"  {displayCommand}");
     debugInfo.AppendLine();
     debugInfo.AppendLine("📥 Stdin (MCP initialize):");
     debugInfo.AppendLine($"  {initRequest}");
@@ -1238,7 +1404,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
       string shell = OperatingSystem.IsWindows() ? "cmd" : "/bin/bash";
       string shellArg = OperatingSystem.IsWindows() ? "/c" : "-c";
-      string shellCommand = $"(echo '{initRequest.Replace("'", "'\\''")}'; sleep 5) | {envPrefix}{fullCommand}";
+      string shellCommand = $"(echo '{initRequest.Replace("'", "'\\''")}'; sleep 5) | {fullCommand}";
 
       ProcessStartInfo psi = new()
       {
@@ -1363,6 +1529,31 @@ public partial class MainWindowViewModel : ViewModelBase
     }
   }
 
+  private static string FormatShellCommand(ResolvedCommand command, bool redactHeaderValues)
+  {
+    List<string> parts = [QuoteShellArgument(command.Command)];
+
+    for (int i = 0; i < command.Arguments.Count; i++)
+    {
+      string argument = redactHeaderValues && command.SensitiveArgumentIndexes.Contains(i)
+        ? "***"
+        : command.Arguments[i];
+      parts.Add(QuoteShellArgument(argument));
+    }
+
+    return string.Join(" ", parts);
+  }
+
+  private static string QuoteShellArgument(string value)
+  {
+    if (OperatingSystem.IsWindows())
+    {
+      return $"\"{value.Replace("\"", "\"\"")}\"";
+    }
+
+    return $"'{value.Replace("'", "'\\''")}'";
+  }
+
   /// <summary>
   /// Test HTTP MCP server directly via HTTP POST (for servers that don't need mcp-proxy)
   /// </summary>
@@ -1413,7 +1604,8 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     _registry.TargetFolders.Add(result);
-    TargetFolderViewModel vm = new(result, _registry.Servers);
+    TargetFolderViewModel vm = new(result, _registry.Servers, _configExportService);
+    vm.PropertyChanged += OnTargetPropertyChanged;
     TargetFolders.Add(vm);
     SelectedTarget = vm;
   }
@@ -1443,6 +1635,7 @@ public partial class MainWindowViewModel : ViewModelBase
     if (target != null)
     {
       _registry.TargetFolders.Remove(target);
+      SelectedTarget.PropertyChanged -= OnTargetPropertyChanged;
       TargetFolders.Remove(SelectedTarget);
       SelectedTarget = null;
     }
@@ -1451,7 +1644,8 @@ public partial class MainWindowViewModel : ViewModelBase
   [RelayCommand]
   private async Task BrowseTargetPathAsync()
   {
-    if (SelectedTarget == null)
+    TargetFolderViewModel? target = SelectedTarget;
+    if (target == null)
     {
       return;
     }
@@ -1471,7 +1665,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     if (folders.Count > 0)
     {
-      SelectedTarget.Path = folders[0].Path.LocalPath;
+      target.Path = folders[0].Path.LocalPath;
+      await target.RefreshExistingServersAsync(_registry?.Settings);
     }
   }
 
@@ -1518,6 +1713,11 @@ public partial class MainWindowViewModel : ViewModelBase
       int addedCount = 0;
       foreach (McpServer server in importedServers)
       {
+        if (_registry.Servers.Any(s => s.Id == server.Id))
+        {
+          continue;
+        }
+
         // Check if server with same name exists
         if (_registry.Servers.Any(s => s.Name == server.Name))
         {
@@ -1705,7 +1905,7 @@ public partial class MainWindowViewModel : ViewModelBase
     foreach (McpServer server in importedServers)
     {
       // Check if server with same name exists
-      if (_registry.Servers.Any(s => s.Name == server.Name))
+      if (_registry.Servers.Any(s => s.Id == server.Id || s.Name == server.Name))
       {
         // Skip duplicates
         continue;
@@ -1752,6 +1952,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
       foreach (TargetFolderViewModel targetVm in TargetFolders)
       {
+        await targetVm.RefreshExistingServersAsync(_registry.Settings);
         targetVm.UpdateModel();
       }
 
@@ -1771,7 +1972,8 @@ public partial class MainWindowViewModel : ViewModelBase
   [RelayCommand]
   private async Task ExportSelectedTargetAsync()
   {
-    if (SelectedTarget == null || _registry == null)
+    TargetFolderViewModel? selectedTarget = SelectedTarget;
+    if (selectedTarget == null || _registry == null)
     {
       return;
     }
@@ -1782,15 +1984,24 @@ public partial class MainWindowViewModel : ViewModelBase
       serverVm.UpdateModel();
     }
 
-    SelectedTarget.UpdateModel();
-
     IsLoading = true;
 
     try
     {
-      TargetFolder? target = _registry.TargetFolders.FirstOrDefault(t => t.Id == SelectedTarget.Id);
+      await selectedTarget.RefreshExistingServersAsync(_registry.Settings);
+      selectedTarget.UpdateModel();
+      TargetFolder? target = _registry.TargetFolders.FirstOrDefault(t => t.Id == selectedTarget.Id);
       if (target == null)
       {
+        return;
+      }
+
+      StatusMessage = "Preparing export...";
+      Dictionary<string, string>? configs = await _configExportService.PrepareExportAsync(
+        [target], _registry.Servers, _registry.Settings, ResolveExportConflictAsync);
+      if (configs == null)
+      {
+        StatusMessage = "Export cancelled. No configuration files were changed.";
         return;
       }
 
@@ -1798,10 +2009,6 @@ public partial class MainWindowViewModel : ViewModelBase
       {
         // For clipboard targets, copy the config to clipboard
         StatusMessage = "Copying to clipboard...";
-        Dictionary<string, string> configs = _configExportService.PreviewConfigs(
-          target,
-          _registry.Servers,
-          _registry.Settings);
         string clipboardText = string.Join("\n\n", configs.Values);
 
         IClipboard? clipboard = GetMainWindow()?.Clipboard;
@@ -1813,9 +2020,10 @@ public partial class MainWindowViewModel : ViewModelBase
       }
       else
       {
-        StatusMessage = $"Exporting to {SelectedTarget.Path}...";
-        await _configExportService.ExportAsync(target, _registry.Servers, _registry.Settings);
-        StatusMessage = $"Exported configs to {SelectedTarget.Path}";
+        StatusMessage = $"Exporting to {selectedTarget.Path}...";
+        await _configExportService.WriteConfigsAsync(configs);
+        await selectedTarget.RefreshExistingServersAsync(_registry.Settings);
+        StatusMessage = $"Exported configs to {selectedTarget.Path}";
       }
     }
     catch (Exception ex)
@@ -1844,22 +2052,31 @@ public partial class MainWindowViewModel : ViewModelBase
 
     foreach (TargetFolderViewModel targetVm in TargetFolders)
     {
+      await targetVm.RefreshExistingServersAsync(_registry.Settings);
       targetVm.UpdateModel();
     }
 
     IsLoading = true;
-    int count = 0;
-
     try
     {
-      foreach (TargetFolder target in _registry.TargetFolders)
+      List<TargetFolder> targets = _registry.TargetFolders.Where(t => !t.IsClipboard).ToList();
+      StatusMessage = "Preparing exports...";
+      Dictionary<string, string>? configs = await _configExportService.PrepareExportAsync(
+        targets, _registry.Servers, _registry.Settings, ResolveExportConflictAsync);
+      if (configs == null)
       {
-        StatusMessage = $"Exporting to {target.Name}...";
-        await _configExportService.ExportAsync(target, _registry.Servers, _registry.Settings);
-        count++;
+        StatusMessage = "Export cancelled. No configuration files were changed.";
+        return;
       }
 
-      StatusMessage = $"Exported to {count} targets";
+      StatusMessage = "Writing configurations...";
+      await _configExportService.WriteConfigsAsync(configs);
+      foreach (TargetFolderViewModel targetVm in TargetFolders)
+      {
+        await targetVm.RefreshExistingServersAsync(_registry.Settings);
+      }
+
+      StatusMessage = $"Exported to {targets.Count} targets";
     }
     catch (Exception ex)
     {
@@ -1869,6 +2086,19 @@ public partial class MainWindowViewModel : ViewModelBase
     {
       IsLoading = false;
     }
+  }
+
+  private async Task<ExportConflictResolution?> ResolveExportConflictAsync(ExportConflict conflict)
+  {
+    Window? window = GetMainWindow();
+    if (window == null)
+    {
+      return null;
+    }
+
+    StatusMessage = $"Export paused: '{conflict.ServerName}' is not owned by MCP Manager.";
+    Views.ExportConflictDialog dialog = new() { DataContext = conflict };
+    return await dialog.ShowDialog<ExportConflictResolution?>(window);
   }
 
   #endregion

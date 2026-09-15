@@ -4,6 +4,8 @@ namespace McpManager.Core.Services;
 
 public interface IConfigImportService
 {
+  McpServer ImportServer(ExistingTargetServer source);
+
   /// <summary>
   /// Import MCP servers from a Claude Code .mcp.json file.
   /// </summary>
