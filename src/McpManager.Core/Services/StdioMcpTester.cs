@@ -1,6 +1,7 @@
 using System.Text;
 using McpManager.Core.Models;
 using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
 
 namespace McpManager.Core.Services;
 
@@ -16,7 +17,8 @@ public sealed record StdioMcpTestResult(
   string StatusMessage,
   string ResultText,
   string? ServerName = null,
-  string? ServerVersion = null);
+  string? ServerVersion = null,
+  string? ProtocolVersion = null);
 
 public sealed class StdioMcpTester : IStdioMcpTester
 {
@@ -45,18 +47,13 @@ public sealed class StdioMcpTester : IStdioMcpTester
         transport,
         cancellationToken: linkedCts.Token).ConfigureAwait(false);
 
-      string? serverName = client.ServerInfo?.Name;
-      string? serverVersion = client.ServerInfo?.Version;
-
-      if (!string.IsNullOrWhiteSpace(serverName))
-      {
-        string resultText = $"✅ MCP Server Connected! (SDK)\n\n📦 Server: {serverName}" +
-                            (string.IsNullOrEmpty(serverVersion) ? string.Empty : $" v{serverVersion}");
-
-        return new StdioMcpTestResult(true, $"MCP OK: {serverName}", resultText, serverName, serverVersion);
-      }
-
-      return new StdioMcpTestResult(false, "MCP test: no server info", "❓ Connected but no server info returned.");
+      Implementation? serverInfo = McpClientMetadata.ReadServerInfo(client);
+      string identity = serverInfo == null
+        ? "Server identity not provided."
+        : $"📦 Server: {serverInfo.Name} v{serverInfo.Version}";
+      string resultText = $"✅ MCP Server Connected! (SDK)\n\n{identity}\nMCP protocol: {client.NegotiatedProtocolVersion}";
+      return new StdioMcpTestResult(true, serverInfo == null ? "MCP OK" : $"MCP OK: {serverInfo.Name}",
+        resultText, serverInfo?.Name, serverInfo?.Version, client.NegotiatedProtocolVersion);
     }
     catch (OperationCanceledException)
     {

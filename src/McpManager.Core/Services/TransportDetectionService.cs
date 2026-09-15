@@ -1,6 +1,7 @@
 using System.Net.Http;
 using McpManager.Core.Models;
 using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
 
 namespace McpManager.Core.Services;
 
@@ -113,28 +114,17 @@ public class TransportDetectionService : ITransportDetectionService
       await using McpClient client = await McpClient.CreateAsync(
         transport, cancellationToken: linkedCts.Token);
 
-      string? serverName = client.ServerInfo?.Name;
-      string? serverVersion = client.ServerInfo?.Version;
+      Implementation? serverInfo = McpClientMetadata.ReadServerInfo(client);
+      results.Add("Connected successfully!");
+      results.Add(serverInfo == null ? "Server identity not provided." : $"Server: {serverInfo.Name} v{serverInfo.Version}");
+      results.Add($"MCP protocol: {client.NegotiatedProtocolVersion}");
+      results.Add("");
+      results.Add("=== Result ===");
+      results.Add($"{label} Transport detected!");
 
-      if (!string.IsNullOrWhiteSpace(serverName))
-      {
-        results.Add($"Connected successfully!");
-        results.Add($"Server: {serverName} v{serverVersion}");
-        results.Add("");
-        results.Add("=== Result ===");
-        results.Add($"{label} Transport detected!");
-
-        return new TransportDetectionResult(
-          true,
-          transportType,
-          $"{label} verified - {serverName} v{serverVersion}",
-          serverName,
-          serverVersion,
-          string.Join("\n", results)
-        );
-      }
-
-      results.Add("Connected but no server info returned");
+      return new TransportDetectionResult(
+        true, transportType, $"{label} verified", serverInfo?.Name, serverInfo?.Version,
+        string.Join("\n", results));
     }
     catch (OperationCanceledException)
     {

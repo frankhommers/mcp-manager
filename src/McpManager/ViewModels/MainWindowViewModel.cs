@@ -7,7 +7,6 @@ using System.Linq;
 using System.Net.Http;
 
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -956,9 +955,9 @@ public partial class MainWindowViewModel : ViewModelBase
     McpClient? client = null;
     try
     {
-      log?.Invoke("[INFO] Initializing MCP session...");
+      log?.Invoke("[INFO] Negotiating MCP protocol...");
       client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken);
-      log?.Invoke("[INFO] Session ready, requesting tools/list...");
+      log?.Invoke($"[INFO] MCP {client.NegotiatedProtocolVersion} connected; requesting tools/list...");
       IList<McpClientTool> tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
       return tools.Select(t => t.Name).ToList();
     }
@@ -1197,7 +1196,7 @@ public partial class MainWindowViewModel : ViewModelBase
     SelectedServer.UpdateModel();
     IsLoading = true;
     DetectResult = "";
-    StatusMessage = "Detecting transport type (sending MCP initialize)...";
+    StatusMessage = "Detecting MCP transport type...";
 
     try
     {
@@ -1382,146 +1381,24 @@ public partial class MainWindowViewModel : ViewModelBase
 
   private async Task TestViaCommandAsync(ResolvedCommand resolvedCommand)
   {
-    // Send MCP initialize request via stdin and read response
-    string initRequest =
-      """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"MCP Manager Test","version":"1.0.0"}}}""";
-
-    string fullCommand = FormatShellCommand(resolvedCommand, false);
-    string displayCommand = FormatShellCommand(resolvedCommand, true);
-
-    // Build debug header
-    StringBuilder debugInfo = new();
-    debugInfo.AppendLine("🔧 Bridge");
-    debugInfo.AppendLine();
-    debugInfo.AppendLine("📤 Command:");
-    debugInfo.AppendLine($"  {displayCommand}");
-    debugInfo.AppendLine();
-    debugInfo.AppendLine("📥 Stdin (MCP initialize):");
-    debugInfo.AppendLine($"  {initRequest}");
-    debugInfo.AppendLine();
-
+    string displayCommand = FormatCommandForDisplay(resolvedCommand);
     try
     {
-      string shell = OperatingSystem.IsWindows() ? "cmd" : "/bin/bash";
-      string shellArg = OperatingSystem.IsWindows() ? "/c" : "-c";
-      string shellCommand = $"(echo '{initRequest.Replace("'", "'\\''")}'; sleep 5) | {fullCommand}";
-
-      ProcessStartInfo psi = new()
+      McpServer bridge = new()
       {
-        FileName = shell,
-        RedirectStandardOutput = true,
-        RedirectStandardError = true,
-        RedirectStandardInput = false,
-        UseShellExecute = false,
-        CreateNoWindow = true,
+        Name = "bridge",
+        DisplayName = "MCP bridge",
+        Command = resolvedCommand.Command,
+        Args = resolvedCommand.Arguments.ToList(),
       };
-      psi.ArgumentList.Add(shellArg);
-      psi.ArgumentList.Add(shellCommand);
-
-      using Process? process = Process.Start(psi);
-      if (process is null)
-      {
-        debugInfo.AppendLine("❌ Failed to start shell process");
-        McpTestResult = debugInfo.ToString();
-        StatusMessage = "Test failed: could not start process";
-        return;
-      }
-
-      using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
-      Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync(cts.Token);
-      Task<string> stderrTask = process.StandardError.ReadToEndAsync(cts.Token);
-
-      try
-      {
-        await Task.WhenAll(stdoutTask, stderrTask);
-      }
-      catch (OperationCanceledException)
-      {
-      }
-
-      try
-      {
-        if (!process.HasExited)
-        {
-          process.Kill(true);
-        }
-      }
-      catch
-      {
-      }
-
-      string output = stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result.Trim() : "";
-      string error = stderrTask.IsCompletedSuccessfully ? stderrTask.Result.Trim() : "";
-
-
-
-      debugInfo.AppendLine("📤 Stdout:");
-      debugInfo.AppendLine(string.IsNullOrEmpty(output) ? "  (empty)" : $"  {output}");
-      debugInfo.AppendLine();
-      debugInfo.AppendLine("📤 Stderr:");
-      debugInfo.AppendLine(string.IsNullOrEmpty(error) ? "  (empty)" : $"  {error}");
-      debugInfo.AppendLine();
-
-      if (string.IsNullOrEmpty(output))
-      {
-        debugInfo.AppendLine("❌ No response received");
-        McpTestResult = debugInfo.ToString();
-        StatusMessage = "MCP test failed";
-      }
-      else if (output.Contains("\"result\"") && output.Contains("serverInfo"))
-      {
-        // Try to parse server info
-        string serverName = "Unknown";
-        string serverVersion = "";
-        try
-        {
-          Match match = System.Text.RegularExpressions.Regex.Match(output, @"""name""\s*:\s*""([^""]+)""");
-          if (match.Success)
-          {
-            serverName = match.Groups[1].Value;
-          }
-
-          match = System.Text.RegularExpressions.Regex.Match(output, @"""version""\s*:\s*""([^""]+)""");
-          if (match.Success)
-          {
-            serverVersion = match.Groups[1].Value;
-          }
-        }
-        catch
-        {
-        }
-
-        debugInfo.AppendLine($"✅ MCP Server Connected!");
-        debugInfo.AppendLine(
-          $"📦 Server: {serverName}" + (string.IsNullOrEmpty(serverVersion) ? "" : $" v{serverVersion}"));
-        McpTestResult = debugInfo.ToString();
-        StatusMessage = $"MCP OK: {serverName}";
-      }
-      else if (output.Contains("\"error\""))
-      {
-        debugInfo.AppendLine("⚠️ MCP Error Response");
-        McpTestResult = debugInfo.ToString();
-        StatusMessage = "MCP returned error";
-      }
-      else
-      {
-        debugInfo.AppendLine("❓ Unexpected response (no MCP serverInfo found)");
-        McpTestResult = debugInfo.ToString();
-        StatusMessage = "MCP test: unexpected response";
-      }
-    }
-    catch (OperationCanceledException)
-    {
-      debugInfo.AppendLine("❌ Connection timed out (10s)");
-      debugInfo.AppendLine("The server may not be running or the command may be incorrect.");
-      McpTestResult = debugInfo.ToString();
-      StatusMessage = "MCP test timed out";
+      StdioMcpTestResult result = await _stdioMcpTester.TestInitializeAsync(bridge);
+      McpTestResult = $"🔧 Bridge\n\n📤 Command:\n  {displayCommand}\n\n{result.ResultText}";
+      StatusMessage = result.StatusMessage;
     }
     catch (Exception ex)
     {
-      debugInfo.AppendLine($"❌ Error: {ex.Message}");
-      McpTestResult = debugInfo.ToString();
-      StatusMessage = $"MCP test error: {ex.Message}";
+      McpTestResult = $"❌ Bridge test failed: {ex.Message}";
+      StatusMessage = "Bridge test failed";
     }
     finally
     {
@@ -1529,13 +1406,13 @@ public partial class MainWindowViewModel : ViewModelBase
     }
   }
 
-  private static string FormatShellCommand(ResolvedCommand command, bool redactHeaderValues)
+  private static string FormatCommandForDisplay(ResolvedCommand command)
   {
     List<string> parts = [QuoteShellArgument(command.Command)];
 
     for (int i = 0; i < command.Arguments.Count; i++)
     {
-      string argument = redactHeaderValues && command.SensitiveArgumentIndexes.Contains(i)
+      string argument = command.SensitiveArgumentIndexes.Contains(i)
         ? "***"
         : command.Arguments[i];
       parts.Add(QuoteShellArgument(argument));

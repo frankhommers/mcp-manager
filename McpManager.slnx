@@ -4,6 +4,7 @@
     <Project Path="src/McpManager/McpManager.csproj"/>
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/McpManager.TestServer/McpManager.TestServer.csproj"/>
     <Project Path="tests/McpManager.Tests/McpManager.Tests.csproj"/>
   </Folder>
 </Solution>

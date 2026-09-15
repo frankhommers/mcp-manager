@@ -1,94 +1,47 @@
-using System.Net;
-using System.Text;
 using McpManager.Core.Models;
 using McpManager.Core.Services;
+using McpManager.TestServer;
 
 namespace McpManager.Tests;
 
 public sealed class HttpMcpTesterTests
 {
-  [Fact]
-  public async Task TestInitializeAsync_StreamableHttp_ReturnsServerInfo()
+  [Theory]
+  [InlineData("2026-07-28")]
+  [InlineData("2025-11-25")]
+  [InlineData("2024-11-05")]
+  public async Task Connection_negotiates_the_server_protocol_and_reports_identity(string version)
   {
-    using HttpListener listener = new();
-    int port = GetFreePort();
-    string url = $"http://127.0.0.1:{port}/mcp/";
-    listener.Prefixes.Add(url);
-    listener.Start();
+    await using McpHttpFixture fixture = new(version);
+    HttpMcpTestResult result = await new HttpMcpTester().TestInitializeAsync(
+      fixture.Url, McpTransportType.StreamableHttp,
+      new Dictionary<string, string> { ["Authorization"] = "Bearer fixture-token" });
 
-    string initResponse =
-      """{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"Test Server","version":"1.2.3"},"capabilities":{}}}""";
-
-    using CancellationTokenSource serverCts = new(TimeSpan.FromSeconds(10));
-
-    Task serverTask = Task.Run(async () =>
-    {
-      while (!serverCts.Token.IsCancellationRequested)
-      {
-        HttpListenerContext context;
-        try
-        {
-          context = await listener.GetContextAsync().WaitAsync(serverCts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-          break;
-        }
-
-        using StreamReader reader = new(context.Request.InputStream, Encoding.UTF8);
-        string body = await reader.ReadToEndAsync();
-
-        if (body.Contains("\"initialize\""))
-        {
-          context.Response.StatusCode = (int)HttpStatusCode.OK;
-          context.Response.ContentType = "application/json";
-          context.Response.Headers.Add("Mcp-Session-Id", "session-123");
-          byte[] responseBytes = Encoding.UTF8.GetBytes(initResponse);
-          await context.Response.OutputStream.WriteAsync(responseBytes);
-          context.Response.Close();
-        }
-        else if (body.Contains("notifications/initialized"))
-        {
-          context.Response.StatusCode = (int)HttpStatusCode.OK;
-          context.Response.ContentType = "application/json";
-          context.Response.Headers.Add("Mcp-Session-Id", "session-123");
-          context.Response.Close();
-        }
-        else
-        {
-          context.Response.StatusCode = (int)HttpStatusCode.OK;
-          context.Response.ContentType = "application/json";
-          context.Response.Headers.Add("Mcp-Session-Id", "session-123");
-          byte[] emptyResponse = Encoding.UTF8.GetBytes("""{"jsonrpc":"2.0","id":2,"result":{}}""");
-          await context.Response.OutputStream.WriteAsync(emptyResponse);
-          context.Response.Close();
-        }
-      }
-    }, serverCts.Token);
-
-    try
-    {
-      HttpMcpTester tester = new();
-      HttpMcpTestResult result = await tester.TestInitializeAsync(url, McpTransportType.StreamableHttp);
-
-      Assert.True(result.Success, $"Expected success but got: {result.StatusMessage} - {result.ResultText}");
-      Assert.Equal("Test Server", result.ServerName);
-      Assert.Equal("1.2.3", result.ServerVersion);
-    }
-    finally
-    {
-      await serverCts.CancelAsync();
-      listener.Stop();
-    }
+    Assert.True(result.Success, result.ResultText);
+    Assert.Equal("Protocol fixture", result.ServerName);
+    Assert.Equal("1.2.3", result.ServerVersion);
+    Assert.Equal(version, result.ProtocolVersion);
+    Assert.Contains(version, result.ResultText);
+    Assert.Equal("server/discover", fixture.Requests.First()["method"]!.GetValue<string>());
+    Assert.Equal(version != ProtocolFixture.LatestVersion,
+      fixture.Requests.Any(r => r["method"]!.GetValue<string>() == "initialize"));
+    Assert.All(fixture.AuthHeaders, header => Assert.Equal("Bearer fixture-token", header));
   }
 
-  private static int GetFreePort()
+  [Fact]
+  public async Task Discovery_without_optional_identity_is_a_successful_connection()
   {
-    using System.Net.Sockets.TcpListener tcpListener = new(IPAddress.Loopback, 0);
-    tcpListener.Start();
-    int port = ((IPEndPoint)tcpListener.LocalEndpoint).Port;
-    tcpListener.Stop();
-    return port;
+    await using McpHttpFixture fixture = new(ProtocolFixture.LatestVersion, includeIdentity: false);
+    HttpMcpTestResult result = await new HttpMcpTester().TestInitializeAsync(
+      fixture.Url, McpTransportType.StreamableHttp);
+    Assert.True(result.Success, result.ResultText);
+    Assert.Null(result.ServerName);
+    Assert.Equal(ProtocolFixture.LatestVersion, result.ProtocolVersion);
+
+    TransportDetectionResult detection = await new TransportDetectionService().DetectTransportTypeAsync(fixture.Url);
+    Assert.True(detection.Success, detection.RawResponse);
+    Assert.Equal(McpTransportType.StreamableHttp, detection.DetectedType);
+    Assert.Contains(ProtocolFixture.LatestVersion, detection.RawResponse);
   }
 }
 

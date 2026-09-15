@@ -81,6 +81,17 @@ dotnet test McpManager.slnx
 
 ## Usage
 
+### MCP Protocol Support
+
+Connection tests, transport detection, and tool discovery use the official MCP C# SDK 2.2.0.
+They prefer MCP **2026-07-28** using `server/discover` and per-request protocol metadata. The SDK
+negotiates an older supported revision when required by the server. Connection results show the actual
+negotiated protocol version; servers that omit optional identity metadata are accepted.
+
+**Test Bridge** uses the same SDK connection over stdio, passing the configured bridge command and
+arguments directly. The configured bridge (for example, `mcp-proxy`) controls its own connection to the
+remote server. Exporting a configuration does not upgrade the destination client's protocol support.
+
 ### Finding and Selecting Servers
 
 The sidebar sorts servers A–Z by display name. Clipboard and Quick Export stay at the top of the target list,
