@@ -1023,3 +1023,7 @@ FodyWeavers.xsd
 # Additional files built by Visual Studio
 *.tlog
 .agent-session-logs/
+
+# Local agent/tool state
+.opencode/
+.claude/settings.local.json

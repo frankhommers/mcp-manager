@@ -1,9 +1,10 @@
 ---
 # AI Agent Instructor Metadata
-generated: 2026-03-18T08:27:45Z
+generated: 2026-09-15T11:16:16Z
 languages: ['csharp']
 directions: []
 general: ['general']
+project: []
 template_order: ['general.md', 'technologies/git.md', 'languages/csharp.md']
 deployed_files: ['CODEX.md', 'GEMINI.md', 'CLAUDE.md', '.github/copilot-instructions.md']
 tool_version: 1.0.0
@@ -26,8 +27,9 @@ onsider other possibilities to achieve the result, do not be limited by the prom
 - **No Hallucinations:** Do not invent APIs, methods, or properties that do not exist. If you are unsure about a specific API, state that you cannot provide a definitive answer. Do not generate code that is likely to be incorrect or based on outdated information. Make sure to fetch docs when unsure.
 - **Performance:** Be mindful of performance. Use efficient algorithms and data structures. Avoid unnecessary allocations, especially in performance-critical code.
 - **Hardcoding:** Judge what you hardcode, that is usually a bad pattern, avoid it if possible.
-- **UI:** If the application is a UI application, you can not run it to test it, so ask the user to test for you.
 - **Secrets:** Keep them out of the code and out of source control at ALL times!
+- **Backward compatibility:** Don't assume that the code needs to be backward compatible, ask the user.
+- **Generated Code:** Never manually edit generated code or files (e.g., code from scaffolding tools, ORM migrations, API client generators, or build outputs). If generated code contains issues, fix them in the generation process, templates, or configuration — not in the output. If you are unsure whether a file is generated, check for auto-generation headers or ask the user.
 
 ## Development Best Practices
 - Follow the project's existing conventions and patterns
@@ -44,19 +46,25 @@ onsider other possibilities to achieve the result, do not be limited by the prom
 - Separate concerns appropriately
 - Group related functionality together
 
+## i18n
+- Use English by Default if it's not clear from the project
+- Maintain all languages if there are i18n functionalities
+- Use the ISO8601 format for displaying date/times everywhere
+
 # Git Guidelines
 
 ## Ignored files
 
-Make sure you run `git ignore --list -u` first to generate a fresh .gitignore file
+- Make sure you run `git ignore --list -u` first to generate a fresh .gitignore file
 
 ## Worktrees
-- Use **git worktrees** for parallel feature work and isolation from the main workspace.
+- Use **git worktrees** for isolation from other agents, if parallel session need another worktree use it.
 - Store all worktrees in a `.worktrees/` directory at the repository root.
 - The `.worktrees/` directory must be in `.gitignore`.
 - Name worktrees after the branch: `.worktrees/<branch-name>`.
 - Create worktrees with: `git worktree add .worktrees/<branch-name> -b <branch-name>`
-- Remove finished worktrees with: `git worktree remove .worktrees/<branch-name>`
+- Remove finished worktrees with: `git worktree remove .worktrees/<branch-name>`.
+- Periodically ask the user if we need to merge the worktree with main and clean up.
 - Run `git worktree prune` periodically to clean up stale references.
 
 ## Branching
@@ -66,6 +74,7 @@ Make sure you run `git ignore --list -u` first to generate a fresh .gitignore fi
 
 ## Commits
 - Write concise commit messages that explain **why**, not what.
+- Never add Co-Authored-By or AI attribution to git commits. No modelname, no tooling name. 
 - Use conventional commit prefixes: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`.
 - Keep commits atomic — one logical change per commit.
 - Do not commit secrets, credentials, or environment files.
