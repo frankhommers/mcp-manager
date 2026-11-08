@@ -134,6 +134,10 @@ public partial class McpServerViewModel : ViewModelBase
     _startupCommand = model.StartupCommand;
     _startupWorkingDirectory = model.StartupWorkingDirectory;
 
+    ObserveEdits(Arguments);
+    ObserveEdits(EnvironmentVariables);
+    ObserveEdits(HttpHeaders);
+    ObserveEdits(ToolSelections);
     // Populate arguments list
     foreach (string arg in model.Args)
     {
@@ -242,6 +246,17 @@ public partial class McpServerViewModel : ViewModelBase
   partial void OnStartupCommandChanged(string? value)
   {
     OnPropertyChanged(nameof(HasStartupCommand));
+  }
+
+  private void ObserveEdits<T>(ObservableCollection<T> items) where T : System.ComponentModel.INotifyPropertyChanged
+  {
+    System.ComponentModel.PropertyChangedEventHandler changed = (_, _) => OnPropertyChanged("Configuration");
+    items.CollectionChanged += (_, e) =>
+    {
+      if (e.OldItems != null) foreach (T item in e.OldItems) item.PropertyChanged -= changed;
+      if (e.NewItems != null) foreach (T item in e.NewItems) item.PropertyChanged += changed;
+      OnPropertyChanged("Configuration");
+    };
   }
 
   public void UpdateModel()

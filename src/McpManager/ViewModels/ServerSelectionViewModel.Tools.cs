@@ -76,6 +76,7 @@ public partial class ServerSelectionViewModel
     if (e.PropertyName == nameof(ToolOverrideViewModel.IsAllowed))
     {
       OnPropertyChanged(nameof(ToolSelectionSummary));
+      ToolsEdited?.Invoke(this, EventArgs.Empty);
     }
     else if (e.PropertyName == nameof(ToolOverrideViewModel.ToolName))
     {

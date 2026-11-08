@@ -28,7 +28,7 @@
       <RadioButton x:Name="RbOpenCode" GroupName="TargetType" Content="OpenCode"
                    Tag="OpenCode" />
       <Separator Margin="0,4" />
-      <RadioButton x:Name="RbFolder" GroupName="TargetType" Content="Project Folder (Claude Code, OpenCode, Codex)"
+      <RadioButton x:Name="RbFolder" GroupName="TargetType" Content="Project client (choose client in target settings)"
                    Tag="Folder" />
     </StackPanel>
 

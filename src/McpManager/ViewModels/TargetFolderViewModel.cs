@@ -13,9 +13,118 @@ namespace McpManager.ViewModels;
 public partial class TargetFolderViewModel : ViewModelBase
 {
   private readonly TargetFolder _model;
+  public TargetFolder Model => _model;
+  private List<McpServer> _allServers;
+  public event EventHandler? ConfigurationChanged;
+  [ObservableProperty] private ProfileViewModel? _selectedProfile;
+  [ObservableProperty] private bool _isSelectedForBulk;
+  [ObservableProperty] private string _changeSummary = "Check targets to preview changes.";
+  [ObservableProperty] private string _syncStatus = "Not checked";
+  [ObservableProperty] private bool _hasExternalChanges;
+  [ObservableProperty] private bool _needsUpdate = true;
+  [ObservableProperty] private TargetClientFlags _selectedClient;
+  public TargetClientFlags[] ProjectClients { get; } = [TargetClientFlags.ClaudeCode, TargetClientFlags.Codex,
+    TargetClientFlags.OpenCode, TargetClientFlags.Cursor, TargetClientFlags.VsCode];
+  public bool IsProjectTarget => !IsGlobal && IsManagedTarget;
+  partial void OnSelectedClientChanged(TargetClientFlags value)
+  {
+    OnPropertyChanged(nameof(ClientName));
+    OnPropertyChanged(nameof(ConfigFilePath));
+    OnPropertyChanged(nameof(PermissionSupport));
+    ConfigurationChanged?.Invoke(this, EventArgs.Empty);
+  }
+  public bool IsManagedTarget => !IsClipboard && !IsQuickExport;
+  public string Scope => IsGlobal ? "Global" : Path;
+  public string ClientName => GetEnabledClients() switch
+  {
+    TargetClientFlags.ClaudeCode or TargetClientFlags.ClaudeCodeGlobal => "Claude Code",
+    TargetClientFlags.ClaudeDesktop => "Claude Desktop",
+    TargetClientFlags.OpenCode => "OpenCode",
+    TargetClientFlags.VsCode => "VS Code",
+    TargetClientFlags.Codex => "Codex",
+    TargetClientFlags.Cursor => "Cursor",
+    TargetClientFlags.Windsurf => "Windsurf",
+    _ => "Quick export",
+  };
+  public string PermissionSupport => GetEnabledClients() is TargetClientFlags.Codex or TargetClientFlags.ClaudeCode
+      or TargetClientFlags.ClaudeCodeGlobal or TargetClientFlags.ClaudeDesktop or TargetClientFlags.Windsurf
+    ? "Tool preferences are exported. Approval and tool availability behavior depends on the client."
+    : "This export does not write tool preferences. Server selection still applies.";
+
+  partial void OnSelectedProfileChanged(ProfileViewModel? value)
+  {
+    _model.ProfileId = value?.Id;
+    ApplyInheritance();
+    ConfigurationChanged?.Invoke(this, EventArgs.Empty);
+  }
+
+  public void ApplyInheritance()
+  {
+    _applyingExistingSelections = true;
+    try
+    {
+      foreach (ServerSelectionViewModel selection in ServerSelections)
+      {
+        selection.IsEnabled = _selectionOverrides.TryGetValue(selection.ServerId, out bool enabled)
+          ? enabled : SelectedProfile?.Profile.EnabledServers.Contains(selection.ServerId) == true;
+        selection.IsDisabled = _selectionOverrides.TryGetValue(selection.ServerId, out bool own) && !own;
+        bool ownTools = _model.ServerToolOverrides.ContainsKey(selection.ServerId);
+        selection.SourceLabel = _selectionOverrides.ContainsKey(selection.ServerId) || ownTools
+          ? "Own settings" : SelectedProfile == null ? "Server defaults" : $"Inherited · {SelectedProfile.Name}";
+        selection.CanReset = _selectionOverrides.ContainsKey(selection.ServerId) || ownTools;
+        McpServer? server = _allServers.Find(s => s.Id == selection.ServerId);
+        if (server == null) continue;
+        Dictionary<Guid, List<string>> tools = ownTools ? _model.ServerToolOverrides
+          : SelectedProfile?.Profile.ServerToolOverrides ?? [];
+        HashSet<string> allowed = new(tools.TryGetValue(server.Id, out List<string>? chosen) ? chosen : server.AlwaysAllow);
+        HashSet<string> names = new(server.KnownTools.Concat(server.AlwaysAllow).Concat(allowed));
+        foreach (ToolOverrideViewModel stale in selection.ToolOverrides.Where(t => !names.Contains(t.ToolName)).ToList())
+          selection.ToolOverrides.Remove(stale);
+        foreach (string name in names.OrderBy(n => n))
+        {
+          ToolOverrideViewModel? tool = selection.ToolOverrides.FirstOrDefault(t => t.ToolName == name);
+          if (tool == null) selection.ToolOverrides.Add(new ToolOverrideViewModel { ToolName = name, IsAllowed = allowed.Contains(name) });
+          else tool.IsAllowed = allowed.Contains(name);
+        }
+      }
+    }
+    finally { _applyingExistingSelections = false; }
+  }
+
+  public void ResetServer(ServerSelectionViewModel selection)
+  {
+    _selectionOverrides.Remove(selection.ServerId);
+    _model.ServerToolOverrides.Remove(selection.ServerId);
+    ApplyInheritance();
+    ConfigurationChanged?.Invoke(this, EventArgs.Empty);
+  }
+
+  [CommunityToolkit.Mvvm.Input.RelayCommand]
+  private void ResetOverrides()
+  {
+    _selectionOverrides.Clear();
+    _model.ServerToolOverrides.Clear();
+    ApplyInheritance();
+    ConfigurationChanged?.Invoke(this, EventArgs.Empty);
+  }
+
+  private void TrackSelection(ServerSelectionViewModel selection)
+  {
+    selection.ResetAction = () => ResetServer(selection);
+    selection.ToolsEdited += (_, _) =>
+    {
+      if (_applyingExistingSelections) return;
+      _model.ServerToolOverrides[selection.ServerId] = selection.ToolOverrides
+        .Where(t => t.IsAllowed).Select(t => t.ToolName).ToList();
+      selection.SourceLabel = "Own settings";
+      selection.CanReset = true;
+      ConfigurationChanged?.Invoke(this, EventArgs.Empty);
+    };
+    selection.PropertyChanged += OnServerSelectionChanged;
+  }
+
   private readonly TargetConfigSelectionService _configSelectionService;
   private readonly Dictionary<Guid, bool> _selectionOverrides = [];
-  private HashSet<Guid> _existingEnabledServerIds = [];
   private bool _applyingExistingSelections;
   private int _selectionVersion;
 
@@ -133,6 +242,7 @@ public partial class TargetFolderViewModel : ViewModelBase
     TargetFolder model, List<McpServer> allServers, IConfigExportService? exportService = null)
   {
     _model = model;
+    _allServers = allServers;
     _configSelectionService = new TargetConfigSelectionService(exportService ?? new ConfigExportService());
     foreach (Guid id in model.EnabledServers)
     {
@@ -144,6 +254,7 @@ public partial class TargetFolderViewModel : ViewModelBase
       _selectionOverrides[id] = false;
     }
 
+    _selectedClient = model.EnabledClients;
     _name = model.Name;
     _path = model.Path;
     _isGlobal = model.IsGlobal;
@@ -171,9 +282,10 @@ public partial class TargetFolderViewModel : ViewModelBase
       };
 
       BuildToolOverrides(selection, server, model.ServerToolOverrides);
-      selection.PropertyChanged += OnServerSelectionChanged;
+      TrackSelection(selection);
       ServerSelections.Add(selection);
     }
+    ApplyInheritance();
   }
 
   public async Task<ExistingTargetServers?> RefreshExistingServersAsync(GlobalSettings? settings = null, bool debounce = false)
@@ -238,16 +350,7 @@ public partial class TargetFolderViewModel : ViewModelBase
     _existingServers = existing.Servers;
     RefreshFoundServers();
 
-    if (existing.UnreadableFiles.Count > 0)
-    {
-      _existingEnabledServerIds.UnionWith(existing.EnabledServerIds);
-    }
-    else
-    {
-      _existingEnabledServerIds = existing.EnabledServerIds;
-    }
-
-    ApplyExistingSelections();
+    ApplyInheritance();
     List<string> messages = [];
     if (existing.ConfigFileCount > 0)
     {
@@ -282,24 +385,6 @@ public partial class TargetFolderViewModel : ViewModelBase
     return existing;
   }
 
-  private void ApplyExistingSelections()
-  {
-    _applyingExistingSelections = true;
-    try
-    {
-      foreach (ServerSelectionViewModel selection in ServerSelections)
-      {
-        selection.IsEnabled = _selectionOverrides.TryGetValue(selection.ServerId, out bool enabled)
-          ? enabled
-          : _existingEnabledServerIds.Contains(selection.ServerId);
-      }
-    }
-    finally
-    {
-      _applyingExistingSelections = false;
-    }
-  }
-
   private void OnServerSelectionChanged(object? sender, PropertyChangedEventArgs e)
   {
     if (!_applyingExistingSelections && e.PropertyName == nameof(ServerSelectionViewModel.IsEnabled) &&
@@ -307,6 +392,9 @@ public partial class TargetFolderViewModel : ViewModelBase
     {
       _selectionOverrides[selection.ServerId] = selection.IsEnabled;
       selection.IsDisabled = !selection.IsEnabled;
+      selection.SourceLabel = "Own settings";
+      selection.CanReset = true;
+      ConfigurationChanged?.Invoke(this, EventArgs.Empty);
     }
 
     if (e.PropertyName == nameof(ServerSelectionViewModel.IsEnabled))
@@ -327,6 +415,7 @@ public partial class TargetFolderViewModel : ViewModelBase
       return _model.EnabledClients;
     }
 
+    if (IsManagedTarget) return SelectedClient;
     TargetClientFlags clients = TargetClientFlags.None;
     if (EnableClaudeCode) clients |= TargetClientFlags.ClaudeCode;
     if (EnableClaudeDesktop) clients |= TargetClientFlags.ClaudeDesktop;
@@ -337,6 +426,7 @@ public partial class TargetFolderViewModel : ViewModelBase
 
   public void RefreshServers(List<McpServer> allServers)
   {
+    _allServers = allServers;
     // Add new servers (check model's EnabledServers for enabled state)
     foreach (McpServer server in allServers)
     {
@@ -359,7 +449,7 @@ public partial class TargetFolderViewModel : ViewModelBase
         };
 
         BuildToolOverrides(selection, server, _model.ServerToolOverrides);
-        selection.PropertyChanged += OnServerSelectionChanged;
+        TrackSelection(selection);
         ServerSelections.Add(selection);
       }
     }
@@ -387,7 +477,7 @@ public partial class TargetFolderViewModel : ViewModelBase
       ServerSelections.Remove(item);
     }
 
-    ApplyExistingSelections();
+    ApplyInheritance();
   }
 
   public void UpdateModel()
@@ -403,26 +493,13 @@ public partial class TargetFolderViewModel : ViewModelBase
 
     _model.EnabledServers.Clear();
     _model.DisabledServers.Clear();
-    _model.ServerToolOverrides.Clear();
 
     foreach (ServerSelectionViewModel selection in ServerSelections)
     {
-      if (selection.IsEnabled)
+      if (_selectionOverrides.TryGetValue(selection.ServerId, out bool enabled))
       {
-        _model.EnabledServers.Add(selection.ServerId);
-      }
-      else if (selection.IsDisabled)
-      {
-        _model.DisabledServers.Add(selection.ServerId);
-      }
-
-      if (selection.HasToolOverrides)
-      {
-        List<string> allowedTools = selection.ToolOverrides
-          .Where(t => t.IsAllowed)
-          .Select(t => t.ToolName)
-          .ToList();
-        _model.ServerToolOverrides[selection.ServerId] = allowedTools;
+        if (enabled) _model.EnabledServers.Add(selection.ServerId);
+        else _model.DisabledServers.Add(selection.ServerId);
       }
     }
   }
@@ -437,10 +514,8 @@ public partial class TargetFolderViewModel : ViewModelBase
       allToolNames.Add(tool);
     }
 
-    if (allToolNames.Count == 0)
-    {
-      return;
-    }
+    if (serverToolOverrides.TryGetValue(server.Id, out List<string>? savedTools)) allToolNames.UnionWith(savedTools);
+    if (allToolNames.Count == 0) return;
 
     // Determine which tools are allowed: use override if present, else server default
     HashSet<string> allowedSet;
@@ -519,6 +594,13 @@ public partial class TargetFolderViewModel : ViewModelBase
 
 public partial class ServerSelectionViewModel : ViewModelBase
 {
+  public Action? ResetAction { get; set; }
+  public event EventHandler? ToolsEdited;
+  [ObservableProperty] private string _sourceLabel = "Own settings";
+  [ObservableProperty] private bool _canReset;
+  [CommunityToolkit.Mvvm.Input.RelayCommand]
+  private void ResetToInherited() => ResetAction?.Invoke();
+
   public Guid ServerId { get; set; }
 
   [ObservableProperty] private string _serverName = string.Empty;

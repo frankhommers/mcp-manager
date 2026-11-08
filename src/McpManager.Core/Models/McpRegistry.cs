@@ -5,6 +5,8 @@ namespace McpManager.Core.Models;
 /// </summary>
 public class McpRegistry
 {
+  public int FormatVersion { get; set; } = 2;
+  public List<McpProfile> Profiles { get; set; } = [];
   public List<McpServer> Servers { get; set; } = [];
   public List<TargetFolder> TargetFolders { get; set; } = [];
   public GlobalSettings Settings { get; set; } = new();
@@ -15,6 +17,10 @@ public class McpRegistry
 /// </summary>
 public class TargetFolder
 {
+  public Guid? ProfileId { get; set; }
+  public Dictionary<string, string> AppliedFileHashes { get; set; } = [];
+  public DateTimeOffset? LastAppliedAt { get; set; }
+
   public Guid Id { get; set; } = Guid.NewGuid();
   public string Name { get; set; } = string.Empty;
   public string Path { get; set; } = string.Empty;
@@ -88,7 +94,6 @@ public class GlobalSettings
   public string? ClaudeDesktopConfigPath { get; set; }
   public string? CodexConfigPath { get; set; }
   public string? DefaultProjectsRoot { get; set; }
-  public bool AutoSyncOnChange { get; set; }
 
   /// <summary>
   /// Bridge command for wrapping HTTP servers for Claude Desktop.

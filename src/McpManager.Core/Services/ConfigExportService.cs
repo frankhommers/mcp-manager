@@ -7,6 +7,8 @@ namespace McpManager.Core.Services;
 
 public class ConfigExportService : IConfigExportService
 {
+  private const string BackupSuffix = ".mcp-manager.bak";
+  private const string OriginalBackupSuffix = ".mcp-manager.orig.bak";
   private readonly ClaudeCodeConfigGenerator _claudeCodeGen = new();
   private readonly ClaudeCodeGlobalConfigGenerator _claudeCodeGlobalGen = new();
   private readonly ClaudeDesktopConfigGenerator _claudeDesktopGen = new();
@@ -76,7 +78,9 @@ public class ConfigExportService : IConfigExportService
         {
           foreach ((string path, string content) in PreviewConfigs(target, serverList, settings, resolutions))
           {
-            configs[path] = content;
+            string fullPath = Path.GetFullPath(path);
+            if (!configs.TryAdd(fullPath, content))
+              throw new InvalidOperationException($"Multiple targets write to {fullPath}. Keep one target per tool and location.");
           }
         }
 
@@ -97,31 +101,61 @@ public class ConfigExportService : IConfigExportService
 
   public async Task WriteConfigsAsync(IReadOnlyDictionary<string, string> configs)
   {
-    foreach ((string filePath, string content) in configs)
+    Dictionary<string, byte[]?> originals = new();
+    Dictionary<string, string> staged = new();
+    List<string> written = [];
+    try
     {
-      string? directory = Path.GetDirectoryName(filePath);
-      if (!string.IsNullOrEmpty(directory))
+      foreach ((string filePath, string content) in configs)
       {
-        Directory.CreateDirectory(directory);
+        string fullPath = Path.GetFullPath(filePath);
+        FileInfo file = new(fullPath);
+        string path = (file.Exists ? file.ResolveLinkTarget(true)?.FullName : null) ?? fullPath;
+        if (TargetSyncService.FileHash(path) == TargetSyncService.ContentHash(content)) continue;
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        originals[path] = File.Exists(path) ? await File.ReadAllBytesAsync(path) : null;
+        string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        staged[path] = temporary;
+        await File.WriteAllTextAsync(temporary, content);
+        if (!OperatingSystem.IsWindows())
+          File.SetUnixFileMode(temporary, originals[path] == null
+            ? UnixFileMode.UserRead | UnixFileMode.UserWrite : File.GetUnixFileMode(path));
       }
-
-      await File.WriteAllTextAsync(filePath, content);
+      foreach ((string path, string temporary) in staged)
+      {
+        byte[]? original = originals[path];
+        if (original != null)
+        {
+          if (!File.Exists(path) || !(await File.ReadAllBytesAsync(path)).SequenceEqual(original))
+            throw new IOException($"Configuration changed while updating: {path}");
+          if (!File.Exists(path + OriginalBackupSuffix)) File.Copy(path, path + OriginalBackupSuffix);
+          File.Copy(path, path + BackupSuffix, true);
+        }
+        else if (File.Exists(path)) throw new IOException($"Configuration appeared while updating: {path}");
+        File.Move(temporary, path, true);
+        written.Add(path);
+      }
     }
-  }
-
-  public IEnumerable<McpServer> GetEffectiveServers(
-    TargetFolder target,
-    IEnumerable<McpServer> allServers,
-    IEnumerable<TargetFolder> allTargets)
-  {
-    // Start with explicitly enabled servers
-    HashSet<Guid> enabledIds = new(target.EnabledServers);
-
-    // For now, simple implementation - just return enabled minus disabled
-    // TODO: Add inheritance from global targets
-    HashSet<Guid> disabledIds = target.DisabledServers;
-
-    return allServers.Where(s => enabledIds.Contains(s.Id) && !disabledIds.Contains(s.Id));
+    catch (Exception writeError)
+    {
+      List<Exception> failures = [writeError];
+      foreach (string path in written.AsEnumerable().Reverse())
+      {
+        try
+        {
+          if (originals[path] is byte[] original) await File.WriteAllBytesAsync(path, original);
+          else File.Delete(path);
+        }
+        catch (Exception restoreError) { failures.Add(restoreError); }
+      }
+      if (failures.Count > 1) throw new AggregateException("Update and recovery failed. Restore the .mcp-manager.bak files.", failures);
+      throw;
+    }
+    finally
+    {
+      foreach (string temporary in staged.Values)
+        if (File.Exists(temporary)) File.Delete(temporary);
+    }
   }
 
   public Dictionary<string, string> PreviewConfigs(
@@ -327,7 +361,7 @@ public class ConfigExportService : IConfigExportService
           allowArray.Add(permissionEntry);
         }
       }
-      else
+      else if (toolOverrides?.ContainsKey(server.Id) != true)
       {
         string permissionEntry = $"mcp__{server.Name}__*";
         allowArray.Add(permissionEntry);

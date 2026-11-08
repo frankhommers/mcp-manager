@@ -61,6 +61,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
   public NavigationPage CurrentPage =>
     ShowSettings ? NavigationPage.Settings :
+    SelectedProfile != null ? NavigationPage.Profiles :
     SelectedTarget != null ? NavigationPage.Targets :
     SelectedServer != null ? NavigationPage.Servers :
     NavigationPage.Overview;
@@ -80,6 +81,7 @@ public partial class MainWindowViewModel : ViewModelBase
   {
     if (value != null)
     {
+      SelectedProfile = null;
       SelectedTarget = null;
       ShowSettings = false;
     }
@@ -89,6 +91,7 @@ public partial class MainWindowViewModel : ViewModelBase
     OnPropertyChanged(nameof(IsServerListActive));
     OnPropertyChanged(nameof(IsTargetListActive));
 
+    OnPropertyChanged(nameof(ServerUsage));
     McpTestResult = ""; // Clear test result when switching servers
     DetectResult = ""; // Clear detect result when switching servers
     FetchToolsResult = ""; // Clear fetch tools result when switching servers
@@ -99,6 +102,7 @@ public partial class MainWindowViewModel : ViewModelBase
   {
     if (value != null)
     {
+      SelectedProfile = null;
       SelectedServer = null;
       ShowSettings = false;
       _ = value.RefreshExistingServersAsync(_registry?.Settings);
@@ -139,39 +143,6 @@ public partial class MainWindowViewModel : ViewModelBase
   public ObservableCollection<string> ThemeModes { get; } = ["Follow system", "Dark", "Light"];
 
   public IEnumerable<McpTransportType> TransportTypes => Enum.GetValues<McpTransportType>();
-
-  /// <summary>
-  /// Migrates mcp-proxy commands to include the supported placeholders.
-  /// </summary>
-  private static string MigrateBridgeCommand(string command)
-  {
-    if (string.IsNullOrWhiteSpace(command))
-    {
-      return command;
-    }
-
-    string migrated = command.Replace("{headers}", "{headerArgs}");
-    if (!migrated.Contains("{args}"))
-    {
-      int urlIndex = migrated.IndexOf("{url}", StringComparison.Ordinal);
-      migrated = urlIndex >= 0
-        ? migrated.Insert(urlIndex, "{args} ")
-        : $"{migrated} {{args}}";
-    }
-
-    ParsedCommand parsed = CommandLineParser.Parse(migrated);
-    string executableName = Path.GetFileNameWithoutExtension(parsed.Command);
-    if (executableName.Equals("mcp-proxy", StringComparison.OrdinalIgnoreCase) &&
-        !migrated.Contains("{headerArgs}"))
-    {
-      int urlIndex = migrated.IndexOf("{url}", StringComparison.Ordinal);
-      migrated = urlIndex >= 0
-        ? migrated.Insert(urlIndex, "{headerArgs} ")
-        : $"{migrated} {{headerArgs}}";
-    }
-
-    return migrated;
-  }
 
   public MainWindowViewModel()
   {
@@ -218,38 +189,17 @@ public partial class MainWindowViewModel : ViewModelBase
       _registry = await _registryService.LoadAsync();
       RefreshFromRegistry();
 
-      // Load settings and migrate old bridge commands to the current placeholders
-      string migratedHttpCommand = MigrateBridgeCommand(_registry.Settings.BridgeCommandHttp);
-      string migratedSseCommand = MigrateBridgeCommand(_registry.Settings.BridgeCommandSse);
-      string migratedStreamableCommand = MigrateBridgeCommand(
-        _registry.Settings.BridgeCommandStreamableHttp);
-      bool bridgeSettingsMigrated = migratedHttpCommand != _registry.Settings.BridgeCommandHttp ||
-                                    migratedSseCommand != _registry.Settings.BridgeCommandSse ||
-                                    migratedStreamableCommand != _registry.Settings.BridgeCommandStreamableHttp;
-
-      BridgeCommandHttp = migratedHttpCommand;
-      BridgeCommandSse = migratedSseCommand;
-      BridgeCommandStreamableHttp = migratedStreamableCommand;
+      BridgeCommandHttp = _registry.Settings.BridgeCommandHttp;
+      BridgeCommandSse = _registry.Settings.BridgeCommandSse;
+      BridgeCommandStreamableHttp = _registry.Settings.BridgeCommandStreamableHttp;
       BridgeHeaderArgumentTemplate = _registry.Settings.BridgeHeaderArgumentTemplate;
-
-      if (!string.IsNullOrEmpty(_registry.Settings.ThemeMode))
-      {
-        SelectedThemeMode = _registry.Settings.ThemeMode;
-      }
-
-      // Save if migrated
-      if (bridgeSettingsMigrated)
-      {
-        _registry.Settings.BridgeCommandHttp = BridgeCommandHttp;
-        _registry.Settings.BridgeCommandSse = BridgeCommandSse;
-        _registry.Settings.BridgeCommandStreamableHttp = BridgeCommandStreamableHttp;
-        await _registryService.SaveAsync(_registry);
-      }
-
+      SelectedThemeMode = _registry.Settings.ThemeMode;
+      InitializeManagement();
       StatusMessage = "";
     }
     catch (Exception ex)
     {
+      _registry = null;
       StatusMessage = $"Error loading: {ex.Message}";
     }
     finally
@@ -268,7 +218,6 @@ public partial class MainWindowViewModel : ViewModelBase
     // Ensure singleton targets exist
     EnsureClipboardTarget();
     EnsureQuickExportTarget();
-    EnsureCodexTarget();
 
     // Unsubscribe from old servers
     foreach (McpServerViewModel server in Servers)
@@ -302,6 +251,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
   private void OnTargetPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
   {
+    if (e.PropertyName is nameof(TargetFolderViewModel.Name) or nameof(TargetFolderViewModel.Path)
+        or nameof(TargetFolderViewModel.BridgeArgs)) ScheduleCheck();
     if (sender is TargetFolderViewModel target &&
         e.PropertyName is nameof(TargetFolderViewModel.Path) or nameof(TargetFolderViewModel.EnableClaudeCode)
           or nameof(TargetFolderViewModel.EnableClaudeDesktop) or nameof(TargetFolderViewModel.EnableOpenCode)
@@ -314,7 +265,7 @@ public partial class MainWindowViewModel : ViewModelBase
   [RelayCommand]
   private async Task RefreshTargetConfigAsync()
   {
-    TargetFolderViewModel? target = SelectedTarget;
+    TargetFolderViewModel? target = SelectedTarget ?? SelectedProfile;
     if (target?.CanReadConfig == true)
     {
       await target.RefreshExistingServersAsync(_registry?.Settings);
@@ -323,6 +274,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
   private void OnServerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
   {
+    ScheduleCheck();
     // Refresh tree when display-relevant properties change
     if (e.PropertyName is nameof(McpServerViewModel.DisplayName) or nameof(McpServerViewModel.Group)
         or nameof(McpServerViewModel.Name) or nameof(McpServerViewModel.TransportType))
@@ -392,30 +344,6 @@ public partial class MainWindowViewModel : ViewModelBase
     }
   }
 
-  private void EnsureCodexTarget()
-  {
-    if (_registry == null)
-    {
-      return;
-    }
-
-    // Check if Codex global target already exists
-    if (!_registry.TargetFolders.Any(t => t.IsGlobal && t.EnabledClients.HasFlag(TargetClientFlags.Codex)))
-    {
-      string codexConfigPath = _registry.Settings.CodexConfigPath
-                               ?? GetDefaultCodexConfigPath();
-      string codexPath = Path.GetDirectoryName(codexConfigPath) ?? string.Empty;
-      TargetFolder codexTarget = new()
-      {
-        Name = "Codex CLI",
-        Path = codexPath,
-        IsGlobal = true,
-        EnabledClients = TargetClientFlags.Codex,
-      };
-      _registry.TargetFolders.Add(codexTarget);
-    }
-  }
-
   private static string GetDefaultCodexConfigPath()
   {
     string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -437,6 +365,8 @@ public partial class MainWindowViewModel : ViewModelBase
   [RelayCommand]
   private void ClearSelection()
   {
+    SelectedProfile = null;
+    CheckTargets();
     SelectedServer = null;
     SelectedTarget = null;
     ShowSettings = false;
@@ -451,6 +381,7 @@ public partial class MainWindowViewModel : ViewModelBase
   [RelayCommand]
   private void OpenSettings()
   {
+    SelectedProfile = null;
     SelectedServer = null;
     SelectedTarget = null;
     ShowSettings = true;
@@ -1038,7 +969,7 @@ public partial class MainWindowViewModel : ViewModelBase
   [RelayCommand]
   private async Task FetchAllTargetToolsAsync()
   {
-    TargetFolderViewModel? target = SelectedTarget;
+    TargetFolderViewModel? target = SelectedTarget ?? SelectedProfile;
     if (target == null || _registry == null)
     {
       return;
@@ -1118,7 +1049,7 @@ public partial class MainWindowViewModel : ViewModelBase
   [RelayCommand]
   private async Task FetchToolsForServerAsync(ServerSelectionViewModel? selection)
   {
-    TargetFolderViewModel? target = SelectedTarget;
+    TargetFolderViewModel? target = SelectedTarget ?? SelectedProfile;
     if (selection == null || !selection.IsEnabled || _registry == null || target == null ||
         !target.ServerSelections.Contains(selection))
     {
@@ -1484,6 +1415,7 @@ public partial class MainWindowViewModel : ViewModelBase
     TargetFolderViewModel vm = new(result, _registry.Servers, _configExportService);
     vm.PropertyChanged += OnTargetPropertyChanged;
     TargetFolders.Add(vm);
+    AttachTarget(vm);
     SelectedTarget = vm;
   }
 
@@ -1515,13 +1447,14 @@ public partial class MainWindowViewModel : ViewModelBase
       SelectedTarget.PropertyChanged -= OnTargetPropertyChanged;
       TargetFolders.Remove(SelectedTarget);
       SelectedTarget = null;
+      CheckTargets();
     }
   }
 
   [RelayCommand]
   private async Task BrowseTargetPathAsync()
   {
-    TargetFolderViewModel? target = SelectedTarget;
+    TargetFolderViewModel? target = SelectedTarget ?? SelectedProfile;
     if (target == null)
     {
       return;
@@ -1821,18 +1754,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     try
     {
-      // Update registry from view models
-      foreach (McpServerViewModel serverVm in Servers)
-      {
-        serverVm.UpdateModel();
-      }
-
-      foreach (TargetFolderViewModel targetVm in TargetFolders)
-      {
-        await targetVm.RefreshExistingServersAsync(_registry.Settings);
-        targetVm.UpdateModel();
-      }
-
+      SyncModels();
       await _registryService.SaveAsync(_registry);
       StatusMessage = "Saved successfully";
     }
@@ -1855,6 +1777,12 @@ public partial class MainWindowViewModel : ViewModelBase
       return;
     }
 
+    if (selectedTarget.IsManagedTarget)
+    {
+      await UpdateTargetsAsync([selectedTarget]);
+      return;
+    }
+    SyncModels();
     // First save to sync view models
     foreach (McpServerViewModel serverVm in Servers)
     {
@@ -1875,7 +1803,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
       StatusMessage = "Preparing export...";
       Dictionary<string, string>? configs = await _configExportService.PrepareExportAsync(
-        [target], _registry.Servers, _registry.Settings, ResolveExportConflictAsync);
+        [ProfileResolver.Resolve(target, _registry.Profiles)], _registry.Servers, _registry.Settings, ResolveExportConflictAsync);
       if (configs == null)
       {
         StatusMessage = "Export cancelled. No configuration files were changed.";
@@ -1914,56 +1842,7 @@ public partial class MainWindowViewModel : ViewModelBase
   }
 
   [RelayCommand]
-  private async Task ExportAllTargetsAsync()
-  {
-    if (_registry == null)
-    {
-      return;
-    }
-
-    // First save to sync view models
-    foreach (McpServerViewModel serverVm in Servers)
-    {
-      serverVm.UpdateModel();
-    }
-
-    foreach (TargetFolderViewModel targetVm in TargetFolders)
-    {
-      await targetVm.RefreshExistingServersAsync(_registry.Settings);
-      targetVm.UpdateModel();
-    }
-
-    IsLoading = true;
-    try
-    {
-      List<TargetFolder> targets = _registry.TargetFolders.Where(t => !t.IsClipboard).ToList();
-      StatusMessage = "Preparing exports...";
-      Dictionary<string, string>? configs = await _configExportService.PrepareExportAsync(
-        targets, _registry.Servers, _registry.Settings, ResolveExportConflictAsync);
-      if (configs == null)
-      {
-        StatusMessage = "Export cancelled. No configuration files were changed.";
-        return;
-      }
-
-      StatusMessage = "Writing configurations...";
-      await _configExportService.WriteConfigsAsync(configs);
-      foreach (TargetFolderViewModel targetVm in TargetFolders)
-      {
-        await targetVm.RefreshExistingServersAsync(_registry.Settings);
-      }
-
-      StatusMessage = $"Exported to {targets.Count} targets";
-    }
-    catch (Exception ex)
-    {
-      StatusMessage = $"Error exporting: {ex.Message}";
-    }
-    finally
-    {
-      IsLoading = false;
-    }
-  }
+  private Task ExportAllTargetsAsync() => UpdateTargetsAsync(ManagedTargets.ToList());
 
   private async Task<ExportConflictResolution?> ResolveExportConflictAsync(ExportConflict conflict)
   {

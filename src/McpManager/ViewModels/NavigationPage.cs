@@ -5,5 +5,6 @@ public enum NavigationPage
   Overview,
   Servers,
   Targets,
+  Profiles,
   Settings,
 }

@@ -59,7 +59,7 @@ public class ServerToolListTests
     Assert.True(Assert.Single(selection.VisibleTools).IsAllowed);
     target.UpdateModel();
     Assert.Contains(server.Id, model.DisabledServers);
-    Assert.Equal(["beta"], model.ServerToolOverrides[server.Id]);
+    Assert.False(model.ServerToolOverrides.ContainsKey(server.Id));
 
     selection.IsEnabled = true;
     selection.AreToolsExpanded = true;
@@ -105,7 +105,7 @@ public class ServerToolListTests
     second.UpdateModel();
 
     Assert.Equal(3, firstModel.ServerToolOverrides[server.Id].Count);
-    Assert.Equal(["beta"], secondModel.ServerToolOverrides[server.Id]);
+    Assert.False(secondModel.ServerToolOverrides.ContainsKey(server.Id));
     Assert.Equal(["beta"], server.AlwaysAllow);
   }
 

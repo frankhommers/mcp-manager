@@ -74,7 +74,7 @@ public class ServerListTests : IDisposable
   }
 
   [Fact]
-  public async Task Existing_config_updates_the_total_count_even_when_selected_server_is_hidden_by_search()
+  public async Task Existing_config_does_not_change_central_choices_when_search_is_active()
   {
     McpServer alpha = CreateServer("alpha", "Alpha");
     McpServer tmux = CreateServer("tmux", "Tmux");
@@ -87,8 +87,8 @@ public class ServerListTests : IDisposable
 
     await vm.RefreshExistingServersAsync();
 
-    Assert.Equal("1 of 2 selected · 1 shown", vm.ServerSelectionSummary);
-    Assert.Contains(nameof(TargetFolderViewModel.ServerSelectionSummary), changed);
+    Assert.Equal("0 of 2 selected · 1 shown", vm.ServerSelectionSummary);
+    Assert.DoesNotContain(nameof(TargetFolderViewModel.ServerSelectionSummary), changed);
     Assert.False(Assert.Single(vm.VisibleServerSelections).IsEnabled);
     Assert.Equal([alpha.Id, tmux.Id], vm.SortedServerSelections.Select(s => s.ServerId));
   }

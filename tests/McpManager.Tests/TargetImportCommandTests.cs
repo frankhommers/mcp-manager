@@ -19,9 +19,9 @@ public class TargetImportCommandTests : IDisposable
     const string codexConfig = "[mcp_servers.tmux]\ncommand = 'from-codex'\n";
     await File.WriteAllTextAsync(codexPath, codexConfig);
     (MainWindowViewModel vm, RegistryService registryService, TargetFolderViewModel target) = await CreateViewModelAsync();
-    target.EnableCodex = true;
+    target.SelectedClient = TargetClientFlags.Codex;
     await target.RefreshExistingServersAsync();
-    Assert.Equal(2, target.FoundServers.Count);
+    Assert.Single(target.FoundServers);
     FoundTargetServerViewModel found = target.FoundServers.Single(s => s.Source.Client == TargetClientFlags.Codex);
     target.ServerSearchText = "no matches";
 

@@ -83,7 +83,7 @@ public class TargetDiscoveryTests : IDisposable
     Assert.Contains("Not owned by MCP Manager", vm.FoundServers[1].Status);
     Assert.Contains("Disabled", vm.FoundServers[1].Status);
     Assert.False(vm.ServerSelections.Single(s => s.ServerId == knownByName.Id).IsEnabled);
-    Assert.True(vm.ServerSelections.Single(s => s.ServerId == knownById.Id).IsEnabled);
+    Assert.False(vm.ServerSelections.Single(s => s.ServerId == knownById.Id).IsEnabled);
 
     McpServer imported = new ConfigImportService().ImportServer(vm.FoundServers[1].Source);
     vm.RefreshServers([knownByName, knownById, imported]);

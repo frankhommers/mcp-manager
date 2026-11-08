@@ -11,6 +11,9 @@ public class RegistryService : IRegistryService
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
   };
 
+  private const int CurrentFormatVersion = 2;
+  private const string LegacyRegistryFileName = "mcp-registry.json";
+
   public string RegistryFilePath { get; }
 
   public RegistryService(string? customPath = null)
@@ -22,19 +25,17 @@ public class RegistryService : IRegistryService
   {
     if (!File.Exists(RegistryFilePath))
     {
-      return CreateDefaultRegistry();
+      return await MigrateLegacyRegistryAsync().ConfigureAwait(false) ?? CreateDefaultRegistry();
     }
 
-    try
+    string json = await File.ReadAllTextAsync(RegistryFilePath);
+    using JsonDocument document = JsonDocument.Parse(json);
+    if (!document.RootElement.TryGetProperty("formatVersion", out JsonElement version) || version.GetInt32() != CurrentFormatVersion)
     {
-      string json = await File.ReadAllTextAsync(RegistryFilePath);
-      return JsonSerializer.Deserialize<McpRegistry>(json, JsonOptions) ?? CreateDefaultRegistry();
+      throw new InvalidDataException("Unsupported registry format. Configure a new workspace.");
     }
-    catch (JsonException)
-    {
-      // If the file is corrupted, return a fresh registry
-      return CreateDefaultRegistry();
-    }
+    return JsonSerializer.Deserialize<McpRegistry>(json, JsonOptions)
+      ?? throw new InvalidDataException("The registry is empty.");
   }
 
   public async Task SaveAsync(McpRegistry registry)
@@ -46,13 +47,34 @@ public class RegistryService : IRegistryService
     }
 
     string json = JsonSerializer.Serialize(registry, JsonOptions);
-    await File.WriteAllTextAsync(RegistryFilePath, json);
+    string temporaryPath = RegistryFilePath + ".tmp";
+    await File.WriteAllTextAsync(temporaryPath, json);
+    if (!OperatingSystem.IsWindows())
+      File.SetUnixFileMode(temporaryPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    File.Move(temporaryPath, RegistryFilePath, true);
+  }
+
+  private async Task<McpRegistry?> MigrateLegacyRegistryAsync()
+  {
+    string legacyPath = Path.Combine(Path.GetDirectoryName(RegistryFilePath) ?? string.Empty, LegacyRegistryFileName);
+    if (!File.Exists(legacyPath))
+    {
+      return null;
+    }
+
+    string json = await File.ReadAllTextAsync(legacyPath).ConfigureAwait(false);
+    McpRegistry registry = JsonSerializer.Deserialize<McpRegistry>(json, JsonOptions)
+      ?? throw new InvalidDataException("The legacy registry is empty.");
+    registry.FormatVersion = CurrentFormatVersion;
+    BridgeCommandMigration.Apply(registry.Settings);
+    await SaveAsync(registry).ConfigureAwait(false);
+    return registry;
   }
 
   private static string GetDefaultRegistryPath()
   {
     string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-    return Path.Combine(appData, "McpManager", "mcp-registry.json");
+    return Path.Combine(appData, "McpManager", "workspace.json");
   }
 
   private static McpRegistry CreateDefaultRegistry()

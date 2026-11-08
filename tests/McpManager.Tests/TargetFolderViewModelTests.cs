@@ -9,7 +9,7 @@ public class TargetFolderViewModelTests : IDisposable
   private readonly string _directory = Directory.CreateTempSubdirectory("mcp-target-viewmodel-").FullName;
 
   [Fact]
-  public async Task Existing_ids_match_renamed_servers_and_manual_deselection_survives_reload_and_save()
+  public async Task Existing_config_does_not_enable_servers_and_manual_deselection_survives_reload_and_save()
   {
     McpServer server = CreateServer("old-name");
     await WriteClaudeConfigAsync([server]);
@@ -18,8 +18,9 @@ public class TargetFolderViewModelTests : IDisposable
     TargetFolderViewModel vm = new(model, [server]);
     await vm.RefreshExistingServersAsync();
     ServerSelectionViewModel selection = Assert.Single(vm.ServerSelections);
-    Assert.True(selection.IsEnabled);
+    Assert.False(selection.IsEnabled);
 
+    selection.IsEnabled = true;
     selection.IsEnabled = false;
     await vm.RefreshExistingServersAsync();
     Assert.False(selection.IsEnabled);
@@ -33,7 +34,7 @@ public class TargetFolderViewModelTests : IDisposable
   }
 
   [Fact]
-  public async Task Changing_formats_recomputes_union_and_preserves_manual_additions()
+  public async Task Changing_client_preserves_central_choices_without_importing_config_selections()
   {
     McpServer claude = CreateServer("claude");
     McpServer codex = CreateServer("codex");
@@ -46,14 +47,14 @@ public class TargetFolderViewModelTests : IDisposable
     TargetFolderViewModel vm = new(model, [claude, codex, manual]);
     vm.ServerSelections.Single(s => s.ServerId == manual.Id).IsEnabled = true;
     await vm.RefreshExistingServersAsync();
-    Assert.True(EnabledIds(vm).SetEquals([claude.Id, manual.Id]));
+    Assert.True(EnabledIds(vm).SetEquals([manual.Id]));
 
-    vm.EnableCodex = true;
+    vm.SelectedClient = TargetClientFlags.Codex;
     await vm.RefreshExistingServersAsync();
-    Assert.True(EnabledIds(vm).SetEquals([claude.Id, codex.Id, manual.Id]));
-    vm.EnableClaudeCode = false;
+    Assert.True(EnabledIds(vm).SetEquals([manual.Id]));
+    vm.SelectedClient = TargetClientFlags.Codex;
     await vm.RefreshExistingServersAsync();
-    Assert.True(EnabledIds(vm).SetEquals([codex.Id, manual.Id]));
+    Assert.True(EnabledIds(vm).SetEquals([manual.Id]));
     vm.UpdateModel();
     Assert.Equal(TargetClientFlags.Codex, model.EnabledClients);
     Assert.Equal(Path.Combine(_directory, ".codex", "config.toml"), vm.ConfigFilePath);
@@ -61,7 +62,7 @@ public class TargetFolderViewModelTests : IDisposable
   }
 
   [Fact]
-  public async Task Changing_quick_export_folder_drops_old_auto_selections_without_stale_refresh()
+  public async Task Changing_quick_export_folder_keeps_explicit_choices_without_stale_refresh()
   {
     McpServer first = CreateServer("first");
     McpServer second = CreateServer("second");
@@ -73,20 +74,22 @@ public class TargetFolderViewModelTests : IDisposable
     model.IsQuickExport = true;
     TargetFolderViewModel vm = new(model, [first, second]);
     await vm.RefreshExistingServersAsync();
-    Assert.Equal(first.Id, Assert.Single(EnabledIds(vm)));
+    Assert.Empty(EnabledIds(vm));
+    vm.ServerSelections.Single(s => s.ServerId == first.Id).IsEnabled = true;
     Task oldRefresh = vm.RefreshExistingServersAsync(debounce: true);
     vm.Path = other;
     await vm.RefreshExistingServersAsync();
     await oldRefresh;
-    Assert.Equal(second.Id, Assert.Single(EnabledIds(vm)));
+    Assert.Equal(first.Id, Assert.Single(EnabledIds(vm)));
   }
 
   [Fact]
-  public async Task Unreadable_config_does_not_clear_preselected_servers()
+  public async Task Unreadable_config_does_not_clear_explicit_choices()
   {
     McpServer server = CreateServer("existing");
     await WriteClaudeConfigAsync([server]);
     TargetFolderViewModel vm = new(CreateTarget(), [server]);
+    vm.ServerSelections[0].IsEnabled = true;
     await vm.RefreshExistingServersAsync();
     await File.WriteAllTextAsync(Path.Combine(_directory, ".mcp.json"), "{");
     await vm.RefreshExistingServersAsync();
@@ -106,9 +109,9 @@ public class TargetFolderViewModelTests : IDisposable
     McpServer added = CreateServer("added");
     model.EnabledServers.Add(added.Id);
     vm.RefreshServers([existing, added]);
-    Assert.True(EnabledIds(vm).SetEquals([existing.Id, added.Id]));
+    Assert.True(EnabledIds(vm).SetEquals([added.Id]));
     await vm.RefreshExistingServersAsync();
-    Assert.True(EnabledIds(vm).SetEquals([existing.Id, added.Id]));
+    Assert.True(EnabledIds(vm).SetEquals([added.Id]));
     Assert.DoesNotContain("missing from the library", vm.ExistingServersStatus);
   }
 
@@ -168,7 +171,7 @@ public class TargetFolderViewModelTests : IDisposable
 
     await vm.RefreshExistingServersAsync();
 
-    Assert.True(EnabledIds(vm).SetEquals([existing.Id, saved.Id]));
+    Assert.True(EnabledIds(vm).SetEquals([saved.Id]));
     ServerSelectionViewModel selection = vm.ServerSelections.Single(s => s.ServerId == existing.Id);
     Assert.True(selection.ToolOverrides.Single(t => t.ToolName == "read").IsAllowed);
     Assert.False(selection.ToolOverrides.Single(t => t.ToolName == "write").IsAllowed);

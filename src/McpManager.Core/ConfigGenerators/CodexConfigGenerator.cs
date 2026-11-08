@@ -103,7 +103,7 @@ public class CodexConfigGenerator : IConfigGenerator
 
       // Tool allow/deny lists
       List<string> allowedTools = GetEffectiveToolList(server, toolOverrides);
-      if (allowedTools.Count > 0)
+      if (allowedTools.Count > 0 || toolOverrides?.ContainsKey(server.Id) == true)
       {
         TomlArray enabledTools = [];
         foreach (string tool in allowedTools)
