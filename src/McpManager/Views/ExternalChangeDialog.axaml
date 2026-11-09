@@ -11,15 +11,19 @@
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="12">
         <TextBlock Text="Files changed outside MCP Manager" FontSize="20" FontWeight="SemiBold" />
-        <TextBlock Text="Overwrite writes MCP Manager's version and saves a backup beside each file. Keep file leaves the files as they are and accepts them as the new deployed state."
+        <TextBlock Text="Overwrite writes MCP Manager's version and saves a backup beside each file. Keep file leaves the files as they are."
                    Opacity="0.75" TextWrapping="Wrap" />
         <views:DiffView x:Name="DiffHost" />
       </StackPanel>
     </ScrollViewer>
-    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
-      <Button Content="Close" IsCancel="True" Click="CloseButton_OnClick" />
-      <Button Content="Keep file" Click="KeepButton_OnClick" />
-      <Button Content="Overwrite with MCP Manager" Classes="primaryButton" Click="OverwriteButton_OnClick" />
+    <StackPanel Grid.Row="1" Spacing="12">
+      <TextBlock Text="Keep file leaves this file as it is. MCP Manager will still list this place as not deployed; deploying later replaces the file (a backup is kept)."
+                 Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+        <Button Content="Close" IsCancel="True" Click="CloseButton_OnClick" />
+        <Button Content="Keep file" Click="KeepButton_OnClick" />
+        <Button Content="Overwrite with MCP Manager" Classes="primaryButton" Click="OverwriteButton_OnClick" />
+      </StackPanel>
     </StackPanel>
   </Grid>
 </Window>

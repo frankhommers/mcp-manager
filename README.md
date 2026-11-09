@@ -157,7 +157,11 @@ When a deployed file was changed outside MCP Manager, deploying that place is bl
 marker. Open the place and choose **Compare** to see the file on disk next to what MCP Manager will write, then:
 
 - **Overwrite with MCP Manager** deploys the place over the external change (a backup is kept), or
-- **Keep file** leaves the files untouched and accepts their current state as deployed. This is saved right away.
+- **Keep file** leaves the files untouched and stops treating them as changed outside MCP Manager. This is saved
+  right away.
+
+After Keep file, MCP Manager still lists the place as not deployed; deploying it later replaces the file (a backup
+is kept).
 
 ### Deploy safety
 
