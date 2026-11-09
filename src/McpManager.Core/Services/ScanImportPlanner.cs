@@ -15,12 +15,7 @@ public class ScanImportPlanner(IConfigImportService importService, IConfigExport
 
     foreach (ScannedFolder folder in folders)
     {
-      IEnumerable<ExistingTargetServer> distinct = folder.Servers
-        .OrderBy(s => (int)s.Client)
-        .GroupBy(s => s.Name, StringComparer.Ordinal)
-        .Select(g => g.First());
-
-      foreach (ExistingTargetServer found in distinct)
+      foreach (ExistingTargetServer found in folder.Servers.OrderBy(s => (int)s.Client))
       {
         McpServer imported;
         try

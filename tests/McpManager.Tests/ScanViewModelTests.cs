@@ -261,6 +261,22 @@ public class ScanViewModelTests : IDisposable
     Assert.Equal("api · Global/claude_desktop_config.json", scan.Walkthrough.Current!.ServerName);
   }
 
+  [Fact]
+  public async Task Same_name_differing_between_harness_files_is_walked_through_per_file()
+  {
+    Write("app/.mcp.json", ClaudeJson("tool", "run"));
+    Write("app/opencode.json", """{"mcp":{"tool":{"type":"local","command":["other"]}}}""");
+    McpRegistry registry = Registry(new McpServer { Name = "tool", Command = "run" });
+    ScanViewModel scan = CreateScan(registry);
+    await scan.ScanCommand.ExecuteAsync(null);
+    Assert.Equal("1 differs", Folder(scan, "app").Summary);
+
+    scan.AddSelectedCommand.Execute(null);
+
+    Assert.Equal("tool · app/opencode.json", scan.Walkthrough!.Current!.ServerName);
+    Assert.False(scan.Walkthrough.HasMultipleItems);
+  }
+
   private static ScannedFolderViewModel Folder(ScanViewModel scan, string name) =>
     scan.Folders.Single(f => Path.GetFileName(f.Path) == name);
 

@@ -68,9 +68,15 @@ public partial class ScannedFolderViewModel : ViewModelBase
     ScannedFolder folder, IReadOnlyList<ScanServerMatch> matches, IReadOnlyList<string> skipped)
   {
     List<string> parts = [];
-    AddCount(parts, matches.Count(m => m.Kind == ScanMatchKind.Known), "recognized");
-    AddCount(parts, matches.Count(m => m.Kind == ScanMatchKind.Differs), "differs");
-    AddCount(parts, matches.Count(m => m.Kind == ScanMatchKind.Unknown), "unknown");
+    List<ScanMatchKind> kinds = matches
+      .GroupBy(m => m.Found.Name, StringComparer.Ordinal)
+      .Select(g => g.Any(m => m.Kind == ScanMatchKind.Differs) ? ScanMatchKind.Differs
+        : g.Any(m => m.Kind == ScanMatchKind.Unknown) ? ScanMatchKind.Unknown
+        : ScanMatchKind.Known)
+      .ToList();
+    AddCount(parts, kinds.Count(k => k == ScanMatchKind.Known), "recognized");
+    AddCount(parts, kinds.Count(k => k == ScanMatchKind.Differs), "differs");
+    AddCount(parts, kinds.Count(k => k == ScanMatchKind.Unknown), "unknown");
     if (parts.Count == 0 && skipped.Count == 0)
     {
       parts.Add("No servers");

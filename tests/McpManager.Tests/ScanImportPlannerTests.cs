@@ -155,6 +155,44 @@ public class ScanImportPlannerTests
   }
 
   [Fact]
+  public void Every_harness_entry_of_a_name_is_compared()
+  {
+    McpServer library = Library("tool", "run", "A");
+    McpRegistry registry = new() { Servers = [library] };
+    ScannedFolder folder = Folder("/p/a", TargetClientFlags.ClaudeCode | TargetClientFlags.OpenCode, false,
+      Deployed(TargetClientFlags.ClaudeCode, Library("tool", "run", "A")),
+      Deployed(TargetClientFlags.OpenCode, Library("tool", "run", "B")));
+
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry);
+
+    Assert.Equal([ScanMatchKind.Known, ScanMatchKind.Differs], matches.Select(m => m.Kind));
+    Assert.EndsWith("opencode.json", matches[1].Found.FilePath);
+    Assert.Throws<ArgumentException>(() =>
+      _planner.Apply(registry, [folder], matches, new Dictionary<ScanServerMatch, ScanChoice>()));
+    ArgumentException conflict = Assert.Throws<ArgumentException>(() => _planner.Apply(registry, [folder], matches,
+      new Dictionary<ScanServerMatch, ScanChoice> { [matches[1]] = ScanChoice.UseFoundVersion }));
+    Assert.Contains(".mcp.json", conflict.Message);
+    Assert.Empty(registry.TargetFolders);
+
+    _planner.Apply(registry, [folder], matches,
+      new Dictionary<ScanServerMatch, ScanChoice> { [matches[1]] = ScanChoice.KeepLibrary });
+    Assert.Equal("A", library.EnvironmentVariables["TOKEN"]);
+    Assert.Contains(library.Id, Assert.Single(registry.TargetFolders).EnabledServers);
+  }
+
+  [Fact]
+  public void Second_harness_entry_of_an_unknown_name_is_compared_with_the_first()
+  {
+    ScannedFolder folder = Folder("/p/a", TargetClientFlags.ClaudeCode | TargetClientFlags.OpenCode, false,
+      Deployed(TargetClientFlags.ClaudeCode, Library("tool", "run", "A")),
+      Deployed(TargetClientFlags.OpenCode, Library("tool", "run", "B")));
+
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], new McpRegistry());
+
+    Assert.Equal([ScanMatchKind.Unknown, ScanMatchKind.Differs], matches.Select(m => m.Kind));
+  }
+
+  [Fact]
   public void Unknown_server_is_imported_once_across_folders()
   {
     ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "A"));
@@ -302,7 +340,8 @@ public class ScanImportPlannerTests
     McpRegistry registry = new();
 
     IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry);
-    Assert.Equal(3, matches.Count);
+    Assert.Equal(4, matches.Count);
+    Assert.Equal(ScanMatchKind.Known, matches.Single(m => m.Found.Client == TargetClientFlags.Codex && m.Found.Name == "one").Kind);
     _planner.Apply(registry, [folder], matches, new Dictionary<ScanServerMatch, ScanChoice>());
 
     TargetFolder place = Assert.Single(registry.TargetFolders);

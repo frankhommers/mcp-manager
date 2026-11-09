@@ -81,7 +81,7 @@ public class ScanRoundTripTests : IDisposable
       .Match(folders, registry);
 
     Assert.Equal(3, folders.Count);
-    Assert.Equal(4 + 4 + 4, matches.Count);
+    Assert.Equal(4 * 3 + 4 + 4, matches.Count);
     Assert.All(matches, m => Assert.True(m.Kind == ScanMatchKind.Known,
       $"{m.Found.Name} in {m.Found.FilePath}: " +
       string.Join(", ", m.Diff?.Fields.Where(f => f.Kind != DiffKind.Same).Select(f => f.Field) ?? [])));
