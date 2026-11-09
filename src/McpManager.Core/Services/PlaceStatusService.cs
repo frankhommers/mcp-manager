@@ -8,14 +8,14 @@ public class PlaceStatusService(IConfigExportService exportService)
 {
   public PlaceStatus GetStatus(TargetFolder target, McpRegistry registry)
   {
-    if (TargetSyncService.HasExternalChanges(target))
-    {
-      return PlaceStatus.ExternallyChanged;
-    }
-
     bool neverDeployed = target.LastAppliedAt == null;
     try
     {
+      if (TargetSyncService.HasExternalChanges(target))
+      {
+        return PlaceStatus.ExternallyChanged;
+      }
+
       TargetFolder effective = ProfileResolver.Resolve(target, registry.Profiles);
       Dictionary<string, string> preview = exportService.PreviewConfigs(effective, registry.Servers, registry.Settings);
       if (neverDeployed)
@@ -43,24 +43,47 @@ public class PlaceStatusService(IConfigExportService exportService)
     int count = 0;
     foreach (TargetFolder target in current.TargetFolders.Where(t => !t.IsClipboard && !t.IsQuickExport))
     {
-      Dictionary<string, string>? after = TryPreview(target, current);
-      if (after == null)
+      try
       {
-        count += exportService.GetConfigFilePaths(target, current.Settings).Count;
-        continue;
+        count += CountChangedFiles(target, saved, current);
       }
-
-      TargetFolder? savedTarget = saved.TargetFolders.FirstOrDefault(t => t.Id == target.Id);
-      Dictionary<string, string>? before = savedTarget == null ? null : TryPreview(savedTarget, saved);
-      if (before != null && !PreviewsDiffer(before, after))
+      catch (Exception ex) when (IsPreviewFailure(ex))
       {
-        continue;
+        count += CountAllFiles(target, current);
       }
-
-      count += after.Count(pair => TargetSyncService.FileHash(pair.Key) != TargetSyncService.ContentHash(pair.Value));
     }
 
     return count;
+  }
+
+  private int CountChangedFiles(TargetFolder target, McpRegistry saved, McpRegistry current)
+  {
+    Dictionary<string, string>? after = TryPreview(target, current);
+    if (after == null)
+    {
+      return CountAllFiles(target, current);
+    }
+
+    TargetFolder? savedTarget = saved.TargetFolders.FirstOrDefault(t => t.Id == target.Id);
+    Dictionary<string, string>? before = savedTarget == null ? null : TryPreview(savedTarget, saved);
+    if (before != null && !PreviewsDiffer(before, after))
+    {
+      return 0;
+    }
+
+    return after.Count(pair => TargetSyncService.FileHash(pair.Key) != TargetSyncService.ContentHash(pair.Value));
+  }
+
+  private int CountAllFiles(TargetFolder target, McpRegistry registry)
+  {
+    try
+    {
+      return exportService.GetConfigFilePaths(target, registry.Settings).Count;
+    }
+    catch (Exception ex) when (IsPreviewFailure(ex))
+    {
+      return 1;
+    }
   }
 
   private Dictionary<string, string>? TryPreview(TargetFolder target, McpRegistry registry)
@@ -82,5 +105,6 @@ public class PlaceStatusService(IConfigExportService exportService)
       || !string.Equals(content, pair.Value, StringComparison.Ordinal));
 
   private static bool IsPreviewFailure(Exception ex) =>
-    ex is InvalidDataException or JsonException or TomlException or InvalidOperationException or IOException;
+    ex is InvalidDataException or JsonException or TomlException or InvalidOperationException or IOException
+      or UnauthorizedAccessException or ArgumentException or NotSupportedException;
 }

@@ -99,6 +99,57 @@ public class PlaceStatusServiceTests : IDisposable
     Assert.Equal(0, new PlaceStatusService(_export).CountChangedFiles(saved, current));
   }
 
+  [Fact]
+  public void Count_includes_all_files_when_preview_hits_unmanaged_conflict()
+  {
+    (McpRegistry current, _) = CreateRegistry(_directory);
+    McpRegistry saved = JsonSerializer.Deserialize<McpRegistry>(JsonSerializer.Serialize(current))!;
+    File.WriteAllText(
+      Path.Combine(_directory, ".mcp.json"), """{"mcpServers":{"managed":{"url":"https://manual.test/mcp"}}}""");
+    Assert.Equal(2, new PlaceStatusService(_export).CountChangedFiles(saved, current));
+  }
+
+  [Fact]
+  public void Count_includes_all_files_when_preview_fails_on_invalid_file()
+  {
+    (McpRegistry current, _) = CreateRegistry(_directory);
+    McpRegistry saved = JsonSerializer.Deserialize<McpRegistry>(JsonSerializer.Serialize(current))!;
+    File.WriteAllText(Path.Combine(_directory, ".mcp.json"), "{ not json");
+    Assert.Equal(2, new PlaceStatusService(_export).CountChangedFiles(saved, current));
+  }
+
+  [Fact]
+  public void Count_includes_all_files_of_place_missing_from_saved()
+  {
+    (McpRegistry current, _) = CreateRegistry(_directory);
+    Assert.Equal(2, new PlaceStatusService(_export).CountChangedFiles(new McpRegistry(), current));
+  }
+
+  [Fact]
+  public async Task Unreadable_file_never_throws()
+  {
+    if (OperatingSystem.IsWindows())
+    {
+      return;
+    }
+
+    (McpRegistry current, TargetFolder target) = CreateRegistry(_directory);
+    await new TargetDeployService(_export).DeployAsync([target], current, NoResolution);
+    McpRegistry saved = JsonSerializer.Deserialize<McpRegistry>(JsonSerializer.Serialize(current))!;
+    string path = Path.Combine(_directory, ".mcp.json");
+    File.SetUnixFileMode(path, UnixFileMode.None);
+    try
+    {
+      PlaceStatusService service = new(_export);
+      Assert.Equal(PlaceStatus.NeedsAttention, service.GetStatus(target, current));
+      Assert.True(service.CountChangedFiles(saved, current) >= 0);
+    }
+    finally
+    {
+      File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    }
+  }
+
   private static (McpRegistry Registry, TargetFolder Target) CreateRegistry(string directory)
   {
     McpServer server = new()
