@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:McpManager.Views"
+        x:Class="McpManager.Views.ExternalChangeDialog"
+        Title="Changed outside MCP Manager"
+        Width="860" MinWidth="640" MaxHeight="760"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        SizeToContent="Height">
+  <Grid Margin="24" RowDefinitions="*,Auto" RowSpacing="20">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="12">
+        <TextBlock Text="Files changed outside MCP Manager" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Text="Overwrite writes MCP Manager's version and saves a backup beside each file. Keep file leaves the files as they are and accepts them as the new deployed state."
+                   Opacity="0.75" TextWrapping="Wrap" />
+        <views:DiffView x:Name="DiffHost" />
+      </StackPanel>
+    </ScrollViewer>
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+      <Button Content="Close" IsCancel="True" Click="CloseButton_OnClick" />
+      <Button Content="Keep file" Click="KeepButton_OnClick" />
+      <Button Content="Overwrite with MCP Manager" Classes="primaryButton" Click="OverwriteButton_OnClick" />
+    </StackPanel>
+  </Grid>
+</Window>

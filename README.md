@@ -5,10 +5,13 @@ A cross-platform desktop application for managing Model Context Protocol (MCP) s
 ## Features
 
 - **Multi-Server Management**: Configure stdio, HTTP, SSE, and Streamable HTTP MCP servers in one place
-- **Multi-Target Export**: Export configurations to Claude Code, Claude Desktop, OpenCode, and Codex (global or project-local)
-- **Shared Profiles**: Reuse server selections and tool preferences across clients, with explicit target overrides
-- **Update Overview**: Preview affected files, apply changes together and detect external changes
-- **Per-Target Tool Permissions**: Control which tools are always-allowed per server per target
+- **Servers × Places Overview**: One matrix of servers and places; one checkbox includes a server in a place
+- **Places**: Deploy to global harnesses (Claude Code, Claude Desktop, OpenCode, Codex, Cursor, VS Code, Windsurf)
+  or to project folders with one or more harnesses
+- **Scan**: Turn existing project configs into places without touching the files
+- **Save and Deploy**: Store changes in MCP Manager, then deploy them to the harness config files when you choose
+- **Diff Screen**: Field-level comparison with masked secrets for reviews, conflicts and external changes
+- **Per-Place Tool Permissions**: Control which tools are always-allowed per server per place
 - **Transport Detection**: Automatically detect the transport type of HTTP-based MCP servers
 - **Server Testing**: Test MCP server connectivity directly or via bridge
 - **Tool Discovery**: Fetch and manage available tools from each server
@@ -93,44 +96,83 @@ negotiated protocol version; servers that omit optional identity metadata are ac
 arguments directly. The configured bridge (for example, `mcp-proxy`) controls its own connection to the
 remote server. Exporting a configuration does not upgrade the destination client's protocol support.
 
-### Central management
+### Overview
 
-MCP Manager uses a central server library, reusable profiles, and one target per client and location.
-The **Overview** lists managed targets by scope with their update status and a file change preview.
-Clipboard and Quick Export are one-time destinations and are excluded from **Update all**.
+The **Overview** is a matrix: servers are rows (A–Z, with search), places are columns, grouped into **Global**
+(one column per global harness) and **Projects** (one column per folder, with harness chips such as CC, OC, CX).
+Checking a cell includes the server in every harness of that place. Click a server name to open the server
+editor; click a column header (or a place in the sidebar) to open the place editor. A marker on a column shows
+that the place is behind, not deployed yet, or changed outside MCP Manager.
 
-1. Add servers under **Servers**. Connection testing, transport detection and tool discovery are available here.
-   **Used by** shows the targets that currently include a server.
-2. Create a **Profile**, name it, and select shared servers and tool preferences.
-3. Add a **Target**, choose its client and location, and link a profile. Multiple clients in the same project
-   are separate targets. Select several targets in Overview to assign a profile or update them together.
-4. Review **Preview changes**, then choose **Update all**, **Update selected**, or update an individual target.
-   Updating also saves the central workspace. **Save all** saves only the workspace.
+- **Server**: an entry in your library.
+- **Place**: a destination — a global harness, or a project folder with one or more harnesses.
+- **Save**: stores your changes in MCP Manager (`workspace.json`).
+- **Deploy**: writes the stored configuration into the harness config files.
 
-Targets inherit server inclusion and tool preferences from their profile, with server defaults as the fallback
-for tool preferences. Editing a target choice creates an explicit override, including an empty tool list or an
-excluded server. Inherited values are never copied into the target's saved overrides. **Reset server overrides**
-restores both server inclusion and tool preferences; **Reset all overrides** resets every server in the target.
-Changing or detaching a profile keeps explicit overrides. A profile cannot be deleted while targets use it.
-Client exports differ in which tool preferences they write; the target editor describes this limitation.
+Clipboard and Quick Export are one-time destinations under the **Export…** menu; they are not places.
+
+### Places with several harnesses
+
+A project place can cover several harnesses in the same folder (Claude Code, OpenCode, Codex, Cursor, VS Code).
+Tick them in the place editor. Every harness of a place gets the same servers; each config file is deployed and
+checked for external changes on its own. The place editor lists every config file it writes.
+
+For OpenCode, `<folder>/.opencode/opencode.json` is used when it exists, for both scan and deploy. Otherwise
+`opencode.jsonc` or `opencode.json` in the folder root is used.
+
+### Scan
+
+**Scan** on the Overview searches the scan roots (set them in **Preferences**; default `~/Repos`) up to four levels
+deep for harness config files and lists one row per folder with its harnesses and servers. Folders that are not
+places yet are pre-selected; folders that look like test data are not. **Add selected** creates places with the
+servers found. Unknown servers are imported into the library. Servers whose definition differs from the library
+are shown one by one in the diff screen, where you choose **Keep library**, **Put this version in the library**
+or **Import as separate server**. Scanning never writes to config files; adding is a Save.
+
+### Save and Deploy
+
+Any edit — in the matrix, a server or a place — shows **● Unsaved changes** with **Cancel**, **Also deploy** and
+**Save**. Save validates first (for example, a stdio server needs a command) and stores the workspace. With
+**Also deploy (N files)** checked, it then deploys the places affected by the change; N counts the config files
+that would actually change. The checkbox is unchecked every time new changes start. Cancel returns to the last
+saved state, and leaving a page with unsaved changes asks to save, discard or stay.
+
+A place is **behind** when it was deployed before and its stored configuration no longer matches what was
+deployed. When places are behind, a bar shows *"N places not deployed"* with **Review** and **Deploy now**.
+Review opens the diff screen for every server that would change; Deploy now deploys all behind places at once.
+A place that was never deployed is only written when you deploy it yourself: **Deploy** in the place editor, or
+Save with Also deploy on a change that affects it. Deploys are refused while there are unsaved changes.
+
+### Diff screen
+
+Reviews, scan differences, conflicts and external changes all use the same diff screen. Each server is compared
+field by field (command, args, URL, type, every environment variable and header, tool permissions); equal fields
+are dimmed, additions are green and removals are red. Values that look like secrets (keys containing TOKEN, KEY,
+SECRET, PASSWORD or AUTH, and Authorization headers) are masked with their last four characters; click **Show**
+to reveal one value. With several servers, use Previous/Next.
+
+### External changes
+
+When a deployed file was changed outside MCP Manager, deploying that place is blocked and its column shows a
+marker. Open the place and choose **Compare** to see the file on disk next to what MCP Manager will write, then:
+
+- **Overwrite with MCP Manager** deploys the place over the external change (a backup is kept), or
+- **Keep file** leaves the files untouched and accepts their current state as deployed. This is saved right away.
+
+### Deploy safety
+
+- Unmanaged server entries and unrelated harness settings are preserved by the existing JSON/TOML merge.
+- Same-name unmanaged entries require a choice: replace, keep existing, or cancel the batch. Servers adopted by
+  a scan replace their same-name entries without asking, because the scan already asked.
+- Existing managed servers missing from the library must be imported before a place's first deploy.
+- Multiple places writing the same file are rejected before writing.
 
 Server lists and tool lists support search, A–Z ordering and actions on the visible results. **Fetch tools**
-discovers tool names. Reading a destination config does not change central server choices or import tool
-permissions. Unrecognized servers can be explicitly imported from the target's existing configuration panel.
+discovers tool names. Reading a destination config does not change your server choices or import tool
+permissions. Unrecognized servers can be imported explicitly from the place editor.
 
-### Updating and conflicts
-
-**Check targets** compares the generated configuration with the current destination files. Edits in the app
-refresh the overview after a short delay. External file changes are checked on demand and before updating;
-there is no background file watcher or automatic write-on-save mode.
-
-- A shared server or profile edit affects all linked targets except their explicit overrides.
-- Unmanaged server entries and unrelated client settings are preserved by the existing JSON/TOML merge.
-- Same-name unmanaged entries require a choice: replace, keep existing, or cancel the batch.
-- Files changed since the last successful update block the batch. Open the affected target, inspect its file,
-  and explicitly choose **Reapply central settings over external changes** if the central configuration should win.
-- Existing managed servers missing from the new library must be imported before a target's first update.
-- Multiple targets writing the same destination are rejected before writing.
+Profiles from earlier versions are kept in the workspace and still apply to the places linked to them, but they
+are no longer edited in the UI.
 
 All configurations are prepared before writing. Changed files are staged alongside their destinations and
 existing files receive a `.mcp-manager.bak` backup. A failure restores files already written in that batch;
@@ -138,7 +180,7 @@ if restoration itself fails, the error directs you to those backups. Unchanged f
 This provides recovery from write errors, not a filesystem-wide atomic transaction or power-loss guarantee.
 Client JSON/TOML formatting and comments may change during serialization.
 
-Targets record hashes and timestamps of applied files, not copies of their secrets. The central workspace
+Places record hashes and timestamps of deployed files, not copies of their secrets. The central workspace
 can contain configured credentials and should be treated as private. Restart or reload clients when needed;
 MCP Manager updates their files, not their running connections.
 
@@ -149,12 +191,12 @@ There is **no migration, legacy mode, or reader for the previous `mcp-registry.j
 workspace. The old file is not read or modified. Unsupported or corrupt workspace files produce a load error
 instead of silently resetting data. Client configuration files retain their normal native formats.
 
-Project-local Codex targets write `<project>/.codex/config.toml`; global Codex writes `~/.codex/config.toml`
+Project-local Codex places write `<project>/.codex/config.toml`; global Codex writes `~/.codex/config.toml`
 or the configured global path. Project-local settings do not modify global settings. Codex only loads project
 config for trusted projects.
 
 Managed entries use stable IDs (`MCP_MANAGER_ID` in stdio environments or `X-MCP-Manager-Id` in HTTP headers).
-Renaming a server replaces its previous managed entry; deselecting it removes that managed entry on update.
+Renaming a server replaces its previous managed entry; deselecting it removes that managed entry on deploy.
 These markers indicate ownership and are not credentials.
 
 ### Bridge Configuration
@@ -162,7 +204,7 @@ These markers indicate ownership and are not credentials.
 HTTP-based MCP servers need an stdio wrapper (mcp-proxy) for Claude Desktop. Configure bridge commands in **Preferences**:
 
 - `{url}` — replaced with the server URL
-- `{args}` — replaced with per-target bridge arguments
+- `{args}` — replaced with per-place bridge arguments
 - `{headerArgs}` — standalone placeholder replaced with the configured header argument pattern, repeated for every HTTP header
 
 The header argument pattern defaults to `--headers {key} {value}` for `mcp-proxy`. Change it for bridges

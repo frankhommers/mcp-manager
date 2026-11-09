@@ -102,6 +102,13 @@ public partial class NewTargetDialog : Window
       return;
     }
 
+    TargetClientFlags projectClients = GetProjectClients();
+    if (tag == "Folder" && projectClients == TargetClientFlags.None)
+    {
+      HarnessError.IsVisible = true;
+      return;
+    }
+
     Result = tag switch
     {
       "ClaudeCodeGlobal" => new TargetFolder
@@ -157,12 +164,31 @@ public partial class NewTargetDialog : Window
       {
         Name = "New Project",
         Path = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        EnabledClients = TargetClientFlags.ClaudeCode,
+        EnabledClients = projectClients,
       },
       _ => null,
     };
 
     Close(Result);
+  }
+
+  private TargetClientFlags GetProjectClients()
+  {
+    TargetClientFlags clients = TargetClientFlags.None;
+    foreach ((CheckBox box, TargetClientFlags client) in new[]
+             {
+               (CbClaudeCode, TargetClientFlags.ClaudeCode), (CbOpenCode, TargetClientFlags.OpenCode),
+               (CbCodex, TargetClientFlags.Codex), (CbCursor, TargetClientFlags.Cursor),
+               (CbVsCode, TargetClientFlags.VsCode),
+             })
+    {
+      if (box.IsChecked == true)
+      {
+        clients |= client;
+      }
+    }
+
+    return clients;
   }
 
   private void CancelButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

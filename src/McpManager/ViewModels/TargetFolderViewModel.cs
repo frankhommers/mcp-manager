@@ -18,22 +18,29 @@ public partial class TargetFolderViewModel : ViewModelBase
   public event EventHandler? ConfigurationChanged;
   [ObservableProperty] private ProfileViewModel? _selectedProfile;
   [ObservableProperty] private bool _isSelectedForBulk;
-  [ObservableProperty] private string _changeSummary = "Check targets to preview changes.";
+  [ObservableProperty] private string _changeSummary = "Check places to preview changes.";
   [ObservableProperty] private string _syncStatus = "Not checked";
   [ObservableProperty] private bool _hasExternalChanges;
   [ObservableProperty] private bool _needsUpdate = true;
   [ObservableProperty] private TargetClientFlags _selectedClient;
-  public TargetClientFlags[] ProjectClients { get; } = [TargetClientFlags.ClaudeCode, TargetClientFlags.Codex,
-    TargetClientFlags.OpenCode, TargetClientFlags.Cursor, TargetClientFlags.VsCode];
   public bool IsProjectTarget => !IsGlobal && IsManagedTarget;
   partial void OnSelectedClientChanged(TargetClientFlags value)
   {
-    EnableClaudeCode = value.HasFlag(TargetClientFlags.ClaudeCode);
-    EnableClaudeDesktop = value.HasFlag(TargetClientFlags.ClaudeDesktop);
-    EnableOpenCode = value.HasFlag(TargetClientFlags.OpenCode);
-    EnableCodex = value.HasFlag(TargetClientFlags.Codex);
-    EnableCursor = value.HasFlag(TargetClientFlags.Cursor);
-    EnableVsCode = value.HasFlag(TargetClientFlags.VsCode);
+    _syncingClients = true;
+    try
+    {
+      EnableClaudeCode = value.HasFlag(TargetClientFlags.ClaudeCode);
+      EnableClaudeDesktop = value.HasFlag(TargetClientFlags.ClaudeDesktop);
+      EnableOpenCode = value.HasFlag(TargetClientFlags.OpenCode);
+      EnableCodex = value.HasFlag(TargetClientFlags.Codex);
+      EnableCursor = value.HasFlag(TargetClientFlags.Cursor);
+      EnableVsCode = value.HasFlag(TargetClientFlags.VsCode);
+    }
+    finally
+    {
+      _syncingClients = false;
+    }
+
     OnPropertyChanged(nameof(ClientName));
     OnPropertyChanged(nameof(ConfigFilePath));
     OnPropertyChanged(nameof(PermissionSupport));
@@ -41,20 +48,30 @@ public partial class TargetFolderViewModel : ViewModelBase
   }
   public bool IsManagedTarget => !IsClipboard && !IsQuickExport;
   public string Scope => IsGlobal ? "Global" : Path;
-  public string ClientName => GetEnabledClients() switch
+  private static readonly (TargetClientFlags Flag, string Name)[] ClientNames =
+  [
+    (TargetClientFlags.ClaudeCode | TargetClientFlags.ClaudeCodeGlobal, "Claude Code"),
+    (TargetClientFlags.ClaudeDesktop, "Claude Desktop"),
+    (TargetClientFlags.OpenCode, "OpenCode"),
+    (TargetClientFlags.Codex, "Codex"),
+    (TargetClientFlags.Cursor, "Cursor"),
+    (TargetClientFlags.VsCode, "VS Code"),
+    (TargetClientFlags.Windsurf, "Windsurf"),
+  ];
+  private const TargetClientFlags PermissionClients = TargetClientFlags.Codex | TargetClientFlags.ClaudeCode
+    | TargetClientFlags.ClaudeCodeGlobal | TargetClientFlags.ClaudeDesktop | TargetClientFlags.Windsurf;
+  public string ClientName
   {
-    TargetClientFlags.ClaudeCode or TargetClientFlags.ClaudeCodeGlobal => "Claude Code",
-    TargetClientFlags.ClaudeDesktop => "Claude Desktop",
-    TargetClientFlags.OpenCode => "OpenCode",
-    TargetClientFlags.VsCode => "VS Code",
-    TargetClientFlags.Codex => "Codex",
-    TargetClientFlags.Cursor => "Cursor",
-    TargetClientFlags.Windsurf => "Windsurf",
-    _ => "Quick export",
-  };
-  public string PermissionSupport => GetEnabledClients() is TargetClientFlags.Codex or TargetClientFlags.ClaudeCode
-      or TargetClientFlags.ClaudeCodeGlobal or TargetClientFlags.ClaudeDesktop or TargetClientFlags.Windsurf
-    ? "Tool preferences are exported. Approval and tool availability behavior depends on the client."
+    get
+    {
+      TargetClientFlags clients = GetEnabledClients();
+      List<string> names = ClientNames.Where(c => (clients & c.Flag) != TargetClientFlags.None)
+        .Select(c => c.Name).ToList();
+      return names.Count == 0 ? "No harness" : string.Join(" + ", names);
+    }
+  }
+  public string PermissionSupport => (GetEnabledClients() & PermissionClients) != TargetClientFlags.None
+    ? "Tool preferences are exported. Approval and tool availability behavior depends on the harness."
     : "This export does not write tool preferences. Server selection still applies.";
 
   partial void OnSelectedProfileChanged(ProfileViewModel? value)
@@ -129,7 +146,10 @@ public partial class TargetFolderViewModel : ViewModelBase
     selection.PropertyChanged += OnServerSelectionChanged;
   }
 
+  private readonly IConfigExportService _exportService;
+  private readonly GlobalSettings? _settings;
   private readonly TargetConfigSelectionService _configSelectionService;
+  private bool _syncingClients;
   private readonly Dictionary<Guid, bool> _selectionOverrides = [];
   private bool _applyingExistingSelections;
   private int _selectionVersion;
@@ -140,6 +160,7 @@ public partial class TargetFolderViewModel : ViewModelBase
 
   [ObservableProperty]
   [NotifyPropertyChangedFor(nameof(CanReadConfig))]
+  [NotifyPropertyChangedFor(nameof(ConfigFilePath))]
   private string _path;
 
   [ObservableProperty] private bool _isGlobal;
@@ -161,6 +182,26 @@ public partial class TargetFolderViewModel : ViewModelBase
   [ObservableProperty] private bool _enableCursor;
 
   [ObservableProperty] private bool _enableVsCode;
+
+  partial void OnEnableClaudeCodeChanged(bool value) => SyncSelectedClient();
+
+  partial void OnEnableClaudeDesktopChanged(bool value) => SyncSelectedClient();
+
+  partial void OnEnableOpenCodeChanged(bool value) => SyncSelectedClient();
+
+  partial void OnEnableCodexChanged(bool value) => SyncSelectedClient();
+
+  partial void OnEnableCursorChanged(bool value) => SyncSelectedClient();
+
+  partial void OnEnableVsCodeChanged(bool value) => SyncSelectedClient();
+
+  private void SyncSelectedClient()
+  {
+    if (!_syncingClients && !IsGlobal)
+    {
+      SelectedClient = GetEnabledClients();
+    }
+  }
 
   [ObservableProperty] private string _existingServersStatus = string.Empty;
 
@@ -216,44 +257,32 @@ public partial class TargetFolderViewModel : ViewModelBase
     }
   }
 
-  /// <summary>
-  /// Full path to the config file for display purposes.
-  /// </summary>
   public string ConfigFilePath
   {
     get
     {
-      TargetClientFlags clients = GetEnabledClients();
-      if (clients.HasFlag(TargetClientFlags.Codex))
-        return IsGlobal
-          ? System.IO.Path.Combine(Path, "config.toml")
-          : System.IO.Path.Combine(Path, ".codex", "config.toml");
-      if (clients.HasFlag(TargetClientFlags.ClaudeDesktop))
-        return System.IO.Path.Combine(Path, "claude_desktop_config.json");
-      if (clients.HasFlag(TargetClientFlags.ClaudeCodeGlobal))
-        return System.IO.Path.Combine(Path, ".claude.json");
-      if (clients.HasFlag(TargetClientFlags.ClaudeCode))
-        return System.IO.Path.Combine(Path, ".mcp.json");
-      if (clients.HasFlag(TargetClientFlags.Cursor))
-        return System.IO.Path.Combine(Path, ".cursor", "mcp.json");
-      if (clients.HasFlag(TargetClientFlags.Windsurf))
-        return System.IO.Path.Combine(Path, "mcp_config.json");
-      if (clients.HasFlag(TargetClientFlags.VsCode))
-        return System.IO.Path.Combine(Path, ".vscode", "mcp.json");
-      if (clients.HasFlag(TargetClientFlags.OpenCode))
-        return System.IO.Path.Combine(Path, "opencode.jsonc");
-      return Path;
+      if (!IsManagedTarget)
+      {
+        return Path;
+      }
+
+      TargetFolder target = new() { Path = Path, IsGlobal = IsGlobal, EnabledClients = GetEnabledClients() };
+      Dictionary<TargetClientFlags, string> paths = _exportService.GetConfigFilePaths(target, _settings);
+      return paths.Count == 0 ? Path : string.Join(Environment.NewLine, paths.Values);
     }
   }
 
   [ObservableProperty] private ObservableCollection<ServerSelectionViewModel> _serverSelections = [];
 
   public TargetFolderViewModel(
-    TargetFolder model, List<McpServer> allServers, IConfigExportService? exportService = null)
+    TargetFolder model, List<McpServer> allServers, IConfigExportService? exportService = null,
+    GlobalSettings? settings = null)
   {
     _model = model;
     _allServers = allServers;
-    _configSelectionService = new TargetConfigSelectionService(exportService ?? new ConfigExportService());
+    _exportService = exportService ?? new ConfigExportService();
+    _settings = settings;
+    _configSelectionService = new TargetConfigSelectionService(_exportService);
     foreach (Guid id in model.EnabledServers)
     {
       _selectionOverrides[id] = true;
@@ -389,7 +418,7 @@ public partial class TargetFolderViewModel : ViewModelBase
 
     if (existing.ConfigFileCount == 0 && existing.UnreadableFiles.Count == 0 && !IsClipboard)
     {
-      messages.Add("No configuration files found for this target.");
+      messages.Add("No configuration files found for this place.");
     }
 
     ExistingServersStatus = string.Join(" ", messages);

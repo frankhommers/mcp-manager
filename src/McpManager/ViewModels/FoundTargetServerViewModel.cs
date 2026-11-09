@@ -21,5 +21,5 @@ public sealed record FoundTargetServerViewModel(ExistingTargetServer Source)
 
   public string Status =>
     (Source.ManagedId.HasValue ? "Missing from library" : "Not owned by MCP Manager") +
-    (Source.IsEnabled ? string.Empty : " · Disabled in this target");
+    (Source.IsEnabled ? string.Empty : " · Disabled in this place");
 }

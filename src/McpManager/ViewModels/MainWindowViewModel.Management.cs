@@ -191,12 +191,6 @@ public partial class MainWindowViewModel
     finally { _checking = false; }
   }
 
-  [RelayCommand]
-  private async Task ReapplyTargetAsync()
-  {
-    if (SelectedTarget?.IsManagedTarget == true) await UpdateTargetsAsync([SelectedTarget], true);
-  }
-
   private async Task<bool> UpdateTargetsAsync(List<TargetFolderViewModel> targets, bool overwriteExternal = false)
   {
     if (_registry == null) return false;
@@ -212,7 +206,7 @@ public partial class MainWindowViewModel
       if (targets.Count == 0) { StatusMessage = "No places to deploy."; return false; }
       if (!overwriteExternal && targets.Any(t => t.HasExternalChanges))
       {
-        StatusMessage = "External changes detected. Open the affected place and inspect its config before deploying.";
+        StatusMessage = "External changes detected. Open the place and use Compare before deploying.";
         return false;
       }
       DeployResult result;

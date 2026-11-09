@@ -305,34 +305,34 @@ public partial class MainWindowViewModel
     .Where(t => _placeStatuses.GetValueOrDefault(t.Id) == PlaceStatus.Behind)
     .ToList();
 
-  internal List<ServerDiff> BuildDeployReview()
+  internal List<ServerDiff> BuildDeployReview() => BehindPlaces()
+    .SelectMany(place => BuildPlaceDiff(place, string.IsNullOrWhiteSpace(place.Name) ? place.Path : place.Name))
+    .ToList();
+
+  private List<ServerDiff> BuildPlaceDiff(TargetFolderViewModel place, string? placeName)
   {
     ConfigFileDiffService diffService = new(_configImportService);
-    List<ServerDiff> items = [];
-    foreach (TargetFolderViewModel place in BehindPlaces())
+    TargetFolder effective = ProfileResolver.Resolve(place.Model, _registry!.Profiles);
+    Dictionary<string, TargetClientFlags> clients = [];
+    foreach ((TargetClientFlags client, string path) in _configExportService.GetConfigFilePaths(effective, _registry.Settings))
     {
-      string placeName = string.IsNullOrWhiteSpace(place.Name) ? place.Path : place.Name;
-      TargetFolder effective = ProfileResolver.Resolve(place.Model, _registry!.Profiles);
-      Dictionary<string, TargetClientFlags> clients = [];
-      foreach ((TargetClientFlags client, string path) in _configExportService.GetConfigFilePaths(effective, _registry.Settings))
+      clients[Path.GetFullPath(path)] = client;
+    }
+
+    List<ServerDiff> items = [];
+    foreach ((string path, string content) in _configExportService.PreviewConfigs(
+               effective, _registry.Servers, _registry.Settings))
+    {
+      if (!clients.TryGetValue(Path.GetFullPath(path), out TargetClientFlags client))
       {
-        clients[Path.GetFullPath(path)] = client;
+        continue;
       }
 
-      foreach ((string path, string content) in _configExportService.PreviewConfigs(
-                 effective, _registry.Servers, _registry.Settings))
-      {
-        if (!clients.TryGetValue(Path.GetFullPath(path), out TargetClientFlags client))
-        {
-          continue;
-        }
-
-        string? onDisk = File.Exists(path) ? File.ReadAllText(path) : null;
-        string fileName = Path.GetFileName(path);
-        items.AddRange(diffService.Compare(path, client, onDisk, content).Servers
-          .Where(s => s.Kind != DiffKind.Same)
-          .Select(s => s.Details with { ServerName = $"{s.ServerName} · {placeName} · {fileName}" }));
-      }
+      string? onDisk = File.Exists(path) ? File.ReadAllText(path) : null;
+      string location = placeName == null ? Path.GetFileName(path) : $"{placeName} · {Path.GetFileName(path)}";
+      items.AddRange(diffService.Compare(path, client, onDisk, content).Servers
+        .Where(s => s.Kind != DiffKind.Same)
+        .Select(s => s.Details with { ServerName = $"{s.ServerName} · {location}" }));
     }
 
     return items;

@@ -99,6 +99,7 @@ public partial class MainWindowViewModel : ViewModelBase
   partial void OnSelectedTargetChanged(TargetFolderViewModel? oldValue, TargetFolderViewModel? newValue) =>
     Navigate(new NavigationSnapshot(SelectedServer, oldValue, ShowSettings, ShowScan), () =>
     {
+      OnPropertyChanged(nameof(SidebarSelectedTarget));
       if (newValue != null)
       {
         SelectedProfile = null;
@@ -244,7 +245,7 @@ public partial class MainWindowViewModel : ViewModelBase
     TargetFolders.Clear();
     foreach (TargetFolder target in _registry.TargetFolders)
     {
-      TargetFolderViewModel vm = new(target, _registry.Servers, _configExportService);
+      TargetFolderViewModel vm = new(target, _registry.Servers, _configExportService, _registry.Settings);
       vm.PropertyChanged += OnTargetPropertyChanged;
       TargetFolders.Add(vm);
     }
@@ -262,7 +263,8 @@ public partial class MainWindowViewModel : ViewModelBase
     if (sender is TargetFolderViewModel target &&
         e.PropertyName is nameof(TargetFolderViewModel.Path) or nameof(TargetFolderViewModel.EnableClaudeCode)
           or nameof(TargetFolderViewModel.EnableClaudeDesktop) or nameof(TargetFolderViewModel.EnableOpenCode)
-          or nameof(TargetFolderViewModel.EnableCodex))
+          or nameof(TargetFolderViewModel.EnableCodex) or nameof(TargetFolderViewModel.EnableCursor)
+          or nameof(TargetFolderViewModel.EnableVsCode))
     {
       _ = target.RefreshExistingServersAsync(_registry?.Settings, debounce: true);
     }
@@ -993,7 +995,7 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     IsLoading = true;
-    StatusMessage = "Fetching tools for target servers...";
+    StatusMessage = "Fetching tools for the servers of this place...";
     int totalFound = 0;
 
     try
@@ -1429,7 +1431,7 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     _registry.TargetFolders.Add(result);
-    TargetFolderViewModel vm = new(result, _registry.Servers, _configExportService);
+    TargetFolderViewModel vm = new(result, _registry.Servers, _configExportService, _registry.Settings);
     vm.PropertyChanged += OnTargetPropertyChanged;
     TargetFolders.Add(vm);
     AttachTarget(vm);
@@ -1490,7 +1492,7 @@ public partial class MainWindowViewModel : ViewModelBase
     IReadOnlyList<IStorageFolder> folders = await window.StorageProvider.OpenFolderPickerAsync(
       new FolderPickerOpenOptions
       {
-        Title = "Select Target Folder",
+        Title = "Select Place Folder",
         AllowMultiple = false,
       });
 

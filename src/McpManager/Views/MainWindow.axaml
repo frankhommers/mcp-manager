@@ -482,7 +482,7 @@
                         <Border Grid.Row="0" Padding="16,16,16,8">
                             <Grid RowDefinitions="Auto,Auto">
                                 <TextBlock Grid.Row="0" Text="MCP Manager" FontSize="16" FontWeight="SemiBold" />
-                                <TextBlock Grid.Row="1" Text="Servers and targets"
+                                <TextBlock Grid.Row="1" Text="Servers and places"
                                            FontSize="12" Opacity="0.75" Margin="0,2,0,0" />
                             </Grid>
                         </Border>
@@ -579,14 +579,14 @@
                                            Opacity="0.65"
                                            TextWrapping="Wrap" />
 
-                                <!-- Targets Section -->
+                                <!-- Places Section -->
                                 <Grid ColumnDefinitions="*,Auto" Margin="4,8,4,0">
-                                    <TextBlock Text="TARGETS" FontSize="11" FontWeight="SemiBold"
+                                    <TextBlock Text="PLACES" FontSize="11" FontWeight="SemiBold"
                                                Opacity="0.75" VerticalAlignment="Center" />
                                     <Button Grid.Column="1"
                                             Content="+"
                                             Command="{Binding AddTargetFolderCommand}"
-                                            ToolTip.Tip="Add client target"
+                                            ToolTip.Tip="Add place"
                                             Padding="8,2"
                                             Width="30"
                                             FontSize="16"
@@ -594,7 +594,7 @@
                                 </Grid>
 
                                 <ListBox ItemsSource="{Binding SidebarTargets}"
-                                         SelectedItem="{Binding SelectedTarget}"
+                                         SelectedItem="{Binding SidebarSelectedTarget}"
                                          Classes.sidebar-inactive="{Binding !IsTargetListActive}"
                                          Background="Transparent"
                                          BorderThickness="0"
@@ -618,9 +618,9 @@
                                     </ListBox.ItemTemplate>
                                 </ListBox>
 
-                                <!-- Empty state for targets -->
-                                <TextBlock Text="No targets yet"
-                                           IsVisible="{Binding !TargetFolders.Count}"
+                                <!-- Empty state for places -->
+                                <TextBlock Text="No places yet"
+                                           IsVisible="{Binding !SidebarTargets.Count}"
                                            Margin="8,0,8,2"
                                            FontSize="11"
                                            Opacity="0.65"
@@ -825,7 +825,7 @@
                                             <StackPanel Spacing="4">
                                                 <TextBlock Text="Placeholders" Classes="cardEyebrow" />
                                                 <TextBlock
-                                                           Text="{}{url} is the server URL. {args} contains target-specific arguments. Add {headerArgs} as a separate item where the configured header arguments should be inserted."
+                                                           Text="{}{url} is the server URL. {args} contains place-specific arguments. Add {headerArgs} as a separate item where the configured header arguments should be inserted."
                                                            Opacity="0.75"
                                                            FontSize="11"
                                                            TextWrapping="Wrap" />
@@ -906,11 +906,20 @@
                             </StackPanel>
 
                             <StackPanel IsVisible="{Binding ShowOverview}" Spacing="16">
-                              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                              <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
                                 <TextBlock Text="Overview" FontSize="24" FontWeight="SemiBold" />
                                 <Button Grid.Column="1" Content="Scan" Command="{Binding OpenScanCommand}"
                                         ToolTip.Tip="Find project folders with MCP configs that are not places yet" />
                                 <Button Grid.Column="2" Content="Add place" Command="{Binding AddTargetFolderCommand}" />
+                                <Button Grid.Column="3" Content="Export…"
+                                        ToolTip.Tip="Copy configurations to the clipboard or export them to a folder">
+                                  <Button.Flyout>
+                                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                      <MenuItem Header="Copy to clipboard" Command="{Binding OpenClipboardExportCommand}" />
+                                      <MenuItem Header="Quick export" Command="{Binding OpenQuickExportCommand}" />
+                                    </MenuFlyout>
+                                  </Button.Flyout>
+                                </Button>
                               </Grid>
                               <views:MatrixView DataContext="{Binding Matrix}" />
                             </StackPanel>
@@ -1261,26 +1270,35 @@
                                 </Border>
                             </StackPanel>
 
-                            <!-- Target Detail View -->
+                            <!-- Place Detail View -->
                             <StackPanel
                                 IsVisible="{Binding CurrentPage, Converter={x:Static vm:NavigationPageEqualsConverter.Instance}, ConverterParameter=Targets}"
                                 Spacing="20">
                                 <Grid ColumnDefinitions="*,Auto">
                                   <TextBlock Text="{Binding SelectedTarget.Name}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                  <Button Grid.Column="1" Content="Delete target" Command="{Binding DeleteTargetFolderCommand}" IsVisible="{Binding SelectedTarget.IsManagedTarget}" />
+                                  <Button Grid.Column="1" Content="Delete place" Command="{Binding DeleteTargetFolderCommand}" IsVisible="{Binding SelectedTarget.IsManagedTarget}" />
                                 </Grid>
                                 <Border Classes="detailCard">
                                   <StackPanel Spacing="10">
                                     <TextBlock Text="Destination" FontWeight="SemiBold" />
-                                    <TextBox Text="{Binding SelectedTarget.Name}" Watermark="Target name" />
-                                    <ComboBox IsVisible="{Binding SelectedTarget.IsProjectTarget}" ItemsSource="{Binding SelectedTarget.ProjectClients}" SelectedItem="{Binding SelectedTarget.SelectedClient}" />
+                                    <TextBox Text="{Binding SelectedTarget.Name}" Watermark="Place name" />
+                                    <StackPanel Spacing="6" IsVisible="{Binding SelectedTarget.IsProjectTarget}">
+                                      <TextBlock Text="Harnesses" FontSize="12" Opacity="0.75" />
+                                      <WrapPanel ItemSpacing="12" LineSpacing="6">
+                                        <CheckBox Content="Claude Code" IsChecked="{Binding SelectedTarget.EnableClaudeCode}" />
+                                        <CheckBox Content="OpenCode" IsChecked="{Binding SelectedTarget.EnableOpenCode}" />
+                                        <CheckBox Content="Codex" IsChecked="{Binding SelectedTarget.EnableCodex}" />
+                                        <CheckBox Content="Cursor" IsChecked="{Binding SelectedTarget.EnableCursor}" />
+                                        <CheckBox Content="VS Code" IsChecked="{Binding SelectedTarget.EnableVsCode}" />
+                                      </WrapPanel>
+                                    </StackPanel>
                                     <TextBlock Text="{Binding SelectedTarget.ClientName}" IsVisible="{Binding SelectedTarget.IsGlobal}" />
                                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding !SelectedTarget.IsClipboard}">
                                       <TextBox Text="{Binding SelectedTarget.Path}" IsReadOnly="{Binding SelectedTarget.IsGlobal}" />
                                       <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseTargetPathCommand}" IsVisible="{Binding !SelectedTarget.IsGlobal}" />
                                     </Grid>
                                     <TextBlock Text="{Binding SelectedTarget.ConfigFilePath}" IsVisible="{Binding SelectedTarget.IsManagedTarget}" FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
-                                    <TextBlock Text="One target is one client at one location." IsVisible="{Binding SelectedTarget.IsProjectTarget}" FontSize="12" Opacity="0.75" />
+                                    <TextBlock Text="Every checked harness gets the same servers." IsVisible="{Binding SelectedTarget.IsProjectTarget}" FontSize="12" Opacity="0.75" />
                                     <TextBox Text="{Binding SelectedTarget.BridgeArgs}" Watermark="Extra bridge arguments (optional)" IsVisible="{Binding SelectedTarget.IsClaudeDesktopGlobal}" />
                                     <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding SelectedTarget.IsQuickExport}">
                                       <CheckBox Content="Claude Code" IsChecked="{Binding SelectedTarget.EnableClaudeCode}" />
@@ -1298,10 +1316,11 @@
                                     <Expander Header="Preview changes" IsVisible="{Binding SelectedTarget.IsManagedTarget}" HorizontalAlignment="Stretch">
                                       <TextBlock Text="{Binding SelectedTarget.ChangeSummary}" TextWrapping="Wrap" FontSize="12" />
                                     </Expander>
-                                    <TextBlock Text="External changes detected. Inspect the destination file before reapplying. A backup will preserve its current contents."
+                                    <TextBlock Text="Files of this place changed outside MCP Manager. Compare them before deploying."
                                                IsVisible="{Binding SelectedTarget.HasExternalChanges}" TextWrapping="Wrap" />
-                                    <Button Content="Reapply central settings over external changes" Command="{Binding ReapplyTargetCommand}"
-                                            IsVisible="{Binding SelectedTarget.HasExternalChanges}" />
+                                    <Button Content="Compare" Command="{Binding CompareExternalChangesCommand}"
+                                            IsVisible="{Binding SelectedTarget.HasExternalChanges}"
+                                            ToolTip.Tip="Show the file on disk next to what MCP Manager would write" />
                                   </StackPanel>
                                 </Border>
                                 <Border Classes="detailCard">
@@ -1330,7 +1349,7 @@
                                                         FontSize="12" Padding="10,5"
                                                         Command="{Binding RefreshTargetConfigCommand}"
                                                         IsEnabled="{Binding SelectedTarget.CanReadConfig}"
-                                                        ToolTip.Tip="Check the target files again. Saved and current server choices take priority; tool choices are kept." />
+                                                        ToolTip.Tip="Check the place files again. Saved and current server choices take priority; tool choices are kept." />
                                             </Grid>
                                             <ProgressBar IsIndeterminate="True" Height="3"
                                                          IsVisible="{Binding SelectedTarget.IsReadingConfig}" />
@@ -1346,9 +1365,9 @@
                                 <Border Classes="detailCard" IsVisible="{Binding SelectedTarget.HasFoundServers}">
                                     <StackPanel Spacing="16">
                                         <StackPanel Spacing="4">
-                                            <TextBlock Text="Found in this target" FontWeight="SemiBold"
+                                            <TextBlock Text="Found in this place" FontWeight="SemiBold"
                                                        Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
-                                            <TextBlock Text="These servers are in the target configuration and missing from your library. Import a server to add it to MCP Manager and select it for this target."
+                                            <TextBlock Text="These servers are in the configuration of this place and missing from your library. Import a server to add it to MCP Manager and select it for this place."
                                                        Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
                                             <TextBlock Text="Save keeps your library changes. Deploy writes them into the config files."
                                                        Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
@@ -1405,7 +1424,7 @@
                                    FontSize="12"
                                    Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                    VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding TargetFolders.Count, StringFormat='Targets: {0}'}"
+                        <TextBlock Text="{Binding SidebarTargets.Count, StringFormat='Places: {0}'}"
                                    FontSize="12"
                                    Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                                    VerticalAlignment="Center" />

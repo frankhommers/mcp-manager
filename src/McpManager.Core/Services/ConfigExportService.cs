@@ -80,7 +80,7 @@ public class ConfigExportService : IConfigExportService
           {
             string fullPath = Path.GetFullPath(path);
             if (!configs.TryAdd(fullPath, content))
-              throw new InvalidOperationException($"Multiple targets write to {fullPath}. Keep one target per tool and location.");
+              throw new InvalidOperationException($"Multiple places write to {fullPath}. Keep one place per harness and location.");
           }
         }
 

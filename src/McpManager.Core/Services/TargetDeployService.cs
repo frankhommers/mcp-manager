@@ -16,7 +16,7 @@ public class TargetDeployService(IConfigExportService exportService)
     if (!overwriteExternal && targets.Any(TargetSyncService.HasExternalChanges))
     {
       throw new InvalidOperationException(
-        "External changes detected. Inspect the target, then explicitly reapply central settings.");
+        "External changes detected. Compare the files of the place, then choose Overwrite or Keep file.");
     }
 
     TargetConfigSelectionService selectionService = new(exportService);
@@ -71,7 +71,7 @@ public class TargetDeployService(IConfigExportService exportService)
 
     if (before.Any(p => TargetSyncService.FileHash(p.Key) != p.Value))
     {
-      throw new InvalidOperationException("A configuration changed during preparation. Check targets and try again.");
+      throw new InvalidOperationException("A configuration changed during preparation. Check places and try again.");
     }
 
     await exportService.WriteConfigsAsync(configs).ConfigureAwait(false);

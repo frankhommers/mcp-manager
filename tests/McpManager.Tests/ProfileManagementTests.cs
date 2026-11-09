@@ -84,7 +84,7 @@ public class ProfileManagementTests : IDisposable
     Assert.Equal(edited, await File.ReadAllTextAsync(claude));
     Assert.Contains("second-command", await File.ReadAllTextAsync(codex));
     vm.SelectedTarget = vm.TargetFolders.Single(t => t.Id == first.Id);
-    await vm.ReapplyTargetCommand.ExecuteAsync(null);
+    await vm.OverwriteExternalChangesCommand.ExecuteAsync(null);
     Assert.Contains("third-command", await File.ReadAllTextAsync(claude));
     Assert.Equal(edited, await File.ReadAllTextAsync(claude + ".mcp-manager.bak"));
   }

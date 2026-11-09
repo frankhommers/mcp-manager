@@ -34,7 +34,7 @@ public class SidebarOrderingTests
   }
 
   [Fact]
-  public void Targets_pin_clipboard_and_quick_export_then_sort_global_and_project_targets()
+  public void Places_list_hides_export_destinations_and_sorts_global_then_project_places()
   {
     MainWindowViewModel vm = new();
     TargetFolderViewModel projectZulu = new(new TargetFolder { Name = "Zulu" }, []);
@@ -45,10 +45,10 @@ public class SidebarOrderingTests
     TargetFolderViewModel quick = new(new TargetFolder { Name = "Quick Export", IsQuickExport = true }, []);
     vm.TargetFolders = [projectZulu, globalZulu, projectAlpha, globalAlpha, quick, clipboard];
 
-    Assert.Equal([clipboard, quick, globalAlpha, globalZulu, projectAlpha, projectZulu], vm.SidebarTargets);
+    Assert.Equal([globalAlpha, globalZulu, projectAlpha, projectZulu], vm.SidebarTargets);
     projectZulu.Name = "Aardvark";
-    Assert.Equal([clipboard, quick, globalAlpha, globalZulu, projectZulu, projectAlpha], vm.SidebarTargets);
-    vm.TargetFolders.Remove(quick);
-    Assert.DoesNotContain(quick, vm.SidebarTargets);
+    Assert.Equal([globalAlpha, globalZulu, projectZulu, projectAlpha], vm.SidebarTargets);
+    vm.TargetFolders.Remove(projectAlpha);
+    Assert.DoesNotContain(projectAlpha, vm.SidebarTargets);
   }
 }

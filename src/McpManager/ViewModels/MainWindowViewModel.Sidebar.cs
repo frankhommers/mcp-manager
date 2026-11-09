@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
+using CommunityToolkit.Mvvm.Input;
 
 namespace McpManager.ViewModels;
 
@@ -10,6 +11,24 @@ public partial class MainWindowViewModel
 {
   public ObservableCollection<McpServerViewModel> SidebarServers { get; } = [];
   public ObservableCollection<TargetFolderViewModel> SidebarTargets { get; } = [];
+
+  public TargetFolderViewModel? SidebarSelectedTarget
+  {
+    get => SelectedTarget?.IsManagedTarget == true ? SelectedTarget : null;
+    set
+    {
+      if (value != null)
+      {
+        SelectedTarget = value;
+      }
+    }
+  }
+
+  [RelayCommand]
+  private void OpenClipboardExport() => SelectedTarget = TargetFolders.FirstOrDefault(t => t.IsClipboard);
+
+  [RelayCommand]
+  private void OpenQuickExport() => SelectedTarget = TargetFolders.FirstOrDefault(t => t.IsQuickExport);
 
   private void InitializeSidebar()
   {
@@ -105,7 +124,8 @@ public partial class MainWindowViewModel
     }
 
     CollectionViewUpdater.Update(SidebarTargets, TargetFolders
-      .OrderBy(t => t.IsClipboard ? 0 : t.IsQuickExport ? 1 : t.IsGlobal ? 2 : 3)
+      .Where(t => t.IsManagedTarget)
+      .OrderBy(t => t.IsGlobal ? 0 : 1)
       .ThenBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase)
       .ThenBy(t => t.Id));
   }

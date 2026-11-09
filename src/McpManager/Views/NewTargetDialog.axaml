@@ -1,15 +1,15 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="McpManager.Views.NewTargetDialog"
-        Title="Add Target"
+        Title="New place"
         Width="420"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         SizeToContent="Height">
   <StackPanel Margin="24" Spacing="16">
-    <TextBlock Text="Choose a target type" FontSize="18" FontWeight="SemiBold" />
-    <TextBlock Text="Select the client you want to export MCP configs to."
+    <TextBlock Text="New place" FontSize="18" FontWeight="SemiBold" />
+    <TextBlock Text="Choose a global harness, or a project folder with one or more harnesses."
                Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
 
     <StackPanel Spacing="6" x:Name="RadioPanel">
@@ -28,9 +28,19 @@
       <RadioButton x:Name="RbOpenCode" GroupName="TargetType" Content="OpenCode"
                    Tag="OpenCode" />
       <Separator Margin="0,4" />
-      <RadioButton x:Name="RbFolder" GroupName="TargetType" Content="Project client (choose client in target settings)"
+      <RadioButton x:Name="RbFolder" GroupName="TargetType" Content="Project folder (choose the folder in the place editor)"
                    Tag="Folder" />
+      <WrapPanel x:Name="ProjectHarnesses" Margin="28,2,0,0" ItemSpacing="12" LineSpacing="6"
+                 IsEnabled="{Binding #RbFolder.IsChecked}">
+        <CheckBox x:Name="CbClaudeCode" Content="Claude Code" IsChecked="True" />
+        <CheckBox x:Name="CbOpenCode" Content="OpenCode" />
+        <CheckBox x:Name="CbCodex" Content="Codex" />
+        <CheckBox x:Name="CbCursor" Content="Cursor" />
+        <CheckBox x:Name="CbVsCode" Content="VS Code" />
+      </WrapPanel>
     </StackPanel>
+    <TextBlock x:Name="HarnessError" Text="Choose at least one harness for the project folder."
+               Foreground="{DynamicResource SystemFillColorCriticalBrush}" FontSize="12" IsVisible="False" />
 
     <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,8,0,0">
       <Button Content="Cancel" Click="CancelButton_OnClick"

@@ -58,7 +58,7 @@ public class SaveFlowTests : IDisposable
   }
 
   [Fact]
-  public async Task Reapply_while_dirty_writes_nothing()
+  public async Task Overwrite_while_dirty_writes_nothing()
   {
     MainWindowViewModel vm = await CreateAsync();
     await vm.DeployPlaceCommand.ExecuteAsync(Place(vm, "A"));
@@ -69,7 +69,7 @@ public class SaveFlowTests : IDisposable
     vm.SelectedTarget = Place(vm, "A");
     vm.Servers.Single(s => s.Id == _alpha.Id).Command = "";
 
-    await vm.ReapplyTargetCommand.ExecuteAsync(null);
+    await vm.OverwriteExternalChangesCommand.ExecuteAsync(null);
     await vm.ExportAllTargetsCommand.ExecuteAsync(null);
 
     Assert.Equal("Save or cancel your changes before deploying.", vm.StatusMessage);
