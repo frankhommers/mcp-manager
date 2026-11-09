@@ -196,14 +196,16 @@ public class ConfigExportService : IConfigExportService
     {
       string path = paths[TargetClientFlags.ClaudeCode];
       result[path] = GenerateMergedConfig(
-        path, _claudeCodeGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
+        path, _claudeCodeGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions,
+        TargetClientFlags.ClaudeCode, target.AdoptedServerNames);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.ClaudeDesktop))
     {
       string path = paths[TargetClientFlags.ClaudeDesktop];
       result[path] = GenerateMergedConfig(
-        path, _claudeDesktopGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
+        path, _claudeDesktopGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions,
+        TargetClientFlags.ClaudeDesktop, target.AdoptedServerNames);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.OpenCode))
@@ -211,7 +213,8 @@ public class ConfigExportService : IConfigExportService
       string path = paths[TargetClientFlags.OpenCode];
       _openCodeGen.ExistingConfigPath = path;
       result[path] = GenerateMergedConfig(
-        path, _openCodeGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
+        path, _openCodeGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions,
+        TargetClientFlags.OpenCode, target.AdoptedServerNames);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.Codex))
@@ -219,28 +222,32 @@ public class ConfigExportService : IConfigExportService
       string codexConfigPath = paths[TargetClientFlags.Codex];
       _codexGen.ExistingConfigPath = codexConfigPath;
       result[codexConfigPath] = GenerateMergedConfig(
-        codexConfigPath, _codexGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
+        codexConfigPath, _codexGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions,
+        TargetClientFlags.Codex, target.AdoptedServerNames);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.Cursor))
     {
       string path = paths[TargetClientFlags.Cursor];
       result[path] = GenerateMergedConfig(
-        path, _cursorGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
+        path, _cursorGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions,
+        TargetClientFlags.Cursor, target.AdoptedServerNames);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.Windsurf))
     {
       string path = paths[TargetClientFlags.Windsurf];
       result[path] = GenerateMergedConfig(
-        path, _windsurfGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
+        path, _windsurfGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions,
+        TargetClientFlags.Windsurf, target.AdoptedServerNames);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.VsCode))
     {
       string path = paths[TargetClientFlags.VsCode];
       result[path] = GenerateMergedConfig(
-        path, _vsCodeGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
+        path, _vsCodeGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions,
+        TargetClientFlags.VsCode, target.AdoptedServerNames);
     }
 
     if (target.EnabledClients.HasFlag(TargetClientFlags.ClaudeCodeGlobal))
@@ -248,7 +255,8 @@ public class ConfigExportService : IConfigExportService
       string claudeCodeGlobalPath = paths[TargetClientFlags.ClaudeCodeGlobal];
       _claudeCodeGlobalGen.ExistingConfigPath = claudeCodeGlobalPath;
       result[claudeCodeGlobalPath] = GenerateMergedConfig(
-        claudeCodeGlobalPath, _claudeCodeGlobalGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions);
+        claudeCodeGlobalPath, _claudeCodeGlobalGen, serverList, envOverrides, toolOverrides, bridgeArgs, resolutions,
+        TargetClientFlags.ClaudeCodeGlobal, target.AdoptedServerNames);
 
       string settingsPath = GetClaudeCodeSettingsPath();
       JsonNode exportedServers = JsonNode.Parse(result[claudeCodeGlobalPath])!["mcpServers"]!;
@@ -266,10 +274,12 @@ public class ConfigExportService : IConfigExportService
     Dictionary<Guid, Dictionary<string, string>>? envOverrides,
     Dictionary<Guid, List<string>>? toolOverrides,
     string? bridgeArgs,
-    IReadOnlyDictionary<ExportConflict, ExportConflictResolution>? resolutions)
+    IReadOnlyDictionary<ExportConflict, ExportConflictResolution>? resolutions,
+    TargetClientFlags client,
+    IReadOnlySet<string> adoptedNames)
   {
     string generated = generator.GenerateConfig(servers, envOverrides, toolOverrides, bridgeArgs);
-    return ManagedConfigMerger.Merge(filePath, generator, generated, resolutions);
+    return ManagedConfigMerger.Merge(filePath, generator, generated, client, resolutions, adoptedNames);
   }
 
   private static string GetConfigFilePath(string basePath, IConfigGenerator generator)

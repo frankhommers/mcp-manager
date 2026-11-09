@@ -15,7 +15,9 @@ public static class ManagedConfigMerger
     string filePath,
     IConfigGenerator generator,
     string generated,
-    IReadOnlyDictionary<ExportConflict, ExportConflictResolution>? resolutions = null)
+    TargetClientFlags client,
+    IReadOnlyDictionary<ExportConflict, ExportConflictResolution>? resolutions = null,
+    IReadOnlySet<string>? adoptedNames = null)
   {
     if (!File.Exists(filePath))
     {
@@ -25,7 +27,7 @@ public static class ManagedConfigMerger
     string existing = File.ReadAllText(filePath);
     if (generator is CodexConfigGenerator)
     {
-      return MergeToml(existing, generated, filePath, resolutions);
+      return MergeToml(existing, generated, filePath, client, resolutions, adoptedNames);
     }
 
     string section = generator switch
@@ -34,7 +36,7 @@ public static class ManagedConfigMerger
       VsCodeConfigGenerator => "servers",
       _ => "mcpServers",
     };
-    return MergeJson(existing, generated, section, filePath, resolutions);
+    return MergeJson(existing, generated, section, filePath, client, resolutions, adoptedNames);
   }
 
   public static string MergeJson(
@@ -42,7 +44,9 @@ public static class ManagedConfigMerger
     string generated,
     string section,
     string filePath,
-    IReadOnlyDictionary<ExportConflict, ExportConflictResolution>? resolutions = null)
+    TargetClientFlags client,
+    IReadOnlyDictionary<ExportConflict, ExportConflictResolution>? resolutions = null,
+    IReadOnlySet<string>? adoptedNames = null)
   {
     JsonDocumentOptions options = new()
     {
@@ -57,7 +61,7 @@ public static class ManagedConfigMerger
 
     HashSet<string> keepExisting = ResolveNames(
       current, desired, ManagedServerIdentity.Read,
-      node => node?.ToJsonString(WriteOptions) ?? "null", filePath, resolutions);
+      node => node?.ToJsonString(WriteOptions) ?? "null", filePath, client, resolutions, adoptedNames);
 
     foreach (string name in current.Where(s => ManagedServerIdentity.Read(s.Value) != null)
                .Select(s => s.Key).ToList())
@@ -81,7 +85,9 @@ public static class ManagedConfigMerger
     string existing,
     string generated,
     string filePath,
-    IReadOnlyDictionary<ExportConflict, ExportConflictResolution>? resolutions = null)
+    TargetClientFlags client,
+    IReadOnlyDictionary<ExportConflict, ExportConflictResolution>? resolutions = null,
+    IReadOnlySet<string>? adoptedNames = null)
   {
     TomlTable root = TomlSerializer.Deserialize<TomlTable>(existing)
                      ?? throw new InvalidDataException($"Expected a configuration table in '{filePath}'.");
@@ -91,7 +97,7 @@ public static class ManagedConfigMerger
 
     HashSet<string> keepExisting = ResolveNames(
       current, desired, ManagedServerIdentity.Read,
-      server => TomlSerializer.Serialize(new TomlTable { ["server"] = server }), filePath, resolutions);
+      server => TomlSerializer.Serialize(new TomlTable { ["server"] = server }), filePath, client, resolutions, adoptedNames);
 
     foreach (string name in current.Where(s => ManagedServerIdentity.Read(s.Value) != null)
                .Select(s => s.Key).ToList())
@@ -136,14 +142,16 @@ public static class ManagedConfigMerger
     Func<T, Guid?> readId,
     Func<T, string> serialize,
     string filePath,
-    IReadOnlyDictionary<ExportConflict, ExportConflictResolution>? resolutions)
+    TargetClientFlags client,
+    IReadOnlyDictionary<ExportConflict, ExportConflictResolution>? resolutions,
+    IReadOnlySet<string>? adoptedNames)
   {
     HashSet<string> keepExisting = new(StringComparer.Ordinal);
     foreach ((string name, T proposed) in desired)
     {
-      if (current.TryGetValue(name, out T? existing) && readId(existing) == null)
+      if (current.TryGetValue(name, out T? existing) && readId(existing) == null && adoptedNames?.Contains(name) != true)
       {
-        ExportConflict conflict = new(filePath, name, serialize(existing), serialize(proposed));
+        ExportConflict conflict = new(filePath, name, serialize(existing), serialize(proposed), client);
         if (resolutions == null || !resolutions.TryGetValue(conflict, out ExportConflictResolution resolution))
         {
           throw new ExportConflictException(conflict);

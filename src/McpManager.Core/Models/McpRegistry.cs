@@ -20,6 +20,7 @@ public class TargetFolder
   public Guid? ProfileId { get; set; }
   public Dictionary<string, string> AppliedFileHashes { get; set; } = [];
   public DateTimeOffset? LastAppliedAt { get; set; }
+  public HashSet<string> AdoptedServerNames { get; set; } = [];
 
   public Guid Id { get; set; } = Guid.NewGuid();
   public string Name { get; set; } = string.Empty;

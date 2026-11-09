@@ -162,7 +162,7 @@ public class ManagedExportTests : IDisposable
 
     server.TransportType = McpTransportType.StreamableHttp;
     server.HttpHeaders["x-mcp-manager-id"] = Guid.NewGuid().ToString();
-    string merged = ManagedConfigMerger.MergeJson(before, generator.GenerateConfig([server]), "mcpServers", "test");
+    string merged = ManagedConfigMerger.MergeJson(before, generator.GenerateConfig([server]), "mcpServers", "test", TargetClientFlags.ClaudeCode);
     JsonNode config = JsonNode.Parse(merged)!["mcpServers"]![server.Name]!;
     Assert.Null(config["command"]);
     Assert.Null(config["env"]);
@@ -205,13 +205,27 @@ public class ManagedExportTests : IDisposable
   }
 
   [Fact]
+  public void Adopted_name_replaces_unmanaged_entry_without_conflict()
+  {
+    McpServer server = CreateServer();
+    server.Name = "atlassian-argaleo";
+    const string existing = """{"mcpServers":{"atlassian-argaleo":{"command":"manual"}}}""";
+    string generated = new ClaudeCodeConfigGenerator().GenerateConfig([server]);
+
+    string result = ManagedConfigMerger.MergeJson(
+      existing, generated, "mcpServers", "test", TargetClientFlags.ClaudeCode, null, new HashSet<string> { server.Name });
+
+    Assert.Equal(server.Id, ManagedServerIdentity.Read(JsonNode.Parse(result)!["mcpServers"]![server.Name]));
+  }
+
+  [Fact]
   public void Invalid_marker_does_not_claim_ownership()
   {
     const string existing = """
       {"mcpServers":{"manual":{"command":"manual","env":{"MCP_MANAGER_ID":"not-an-id"}}}}
       """;
     string generated = new ClaudeCodeConfigGenerator().GenerateConfig([]);
-    string result = ManagedConfigMerger.MergeJson(existing, generated, "mcpServers", "test");
+    string result = ManagedConfigMerger.MergeJson(existing, generated, "mcpServers", "test", TargetClientFlags.ClaudeCode);
 
     Assert.True(JsonNode.DeepEquals(JsonNode.Parse(existing), JsonNode.Parse(result)));
   }
@@ -227,7 +241,7 @@ public class ManagedExportTests : IDisposable
     await File.WriteAllTextAsync(path, existing);
     McpServer server = CreateServer();
     ClaudeCodeGlobalConfigGenerator generator = new() { ExistingConfigPath = path };
-    string merged = ManagedConfigMerger.Merge(path, generator, generator.GenerateConfig([server]));
+    string merged = ManagedConfigMerger.Merge(path, generator, generator.GenerateConfig([server]), TargetClientFlags.ClaudeCode);
     JsonNode before = JsonNode.Parse(existing)!;
     JsonNode after = JsonNode.Parse(merged)!;
 

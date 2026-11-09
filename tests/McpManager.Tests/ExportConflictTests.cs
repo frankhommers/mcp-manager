@@ -91,6 +91,20 @@ public class ExportConflictTests : IDisposable
   }
 
   [Fact]
+  public async Task Conflict_reports_client()
+  {
+    string path = Path.Combine(_directory, "opencode.jsonc");
+    await WriteExistingAsync(path, "mcp");
+    McpServer tmux = CreateServer("tmux");
+    TargetFolder target = CreateTarget(TargetClientFlags.OpenCode, [tmux]);
+
+    ExportConflictException ex = await Assert.ThrowsAsync<ExportConflictException>(
+      () => _service.ExportAsync(target, [tmux]));
+
+    Assert.Equal(TargetClientFlags.OpenCode, ex.Conflict.Client);
+  }
+
+  [Fact]
   public async Task Choices_are_independent_for_each_server_in_the_same_file()
   {
     string path = Path.Combine(_directory, ".mcp.json");

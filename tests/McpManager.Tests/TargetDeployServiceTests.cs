@@ -25,6 +25,28 @@ public class TargetDeployServiceTests : IDisposable
   }
 
   [Fact]
+  public async Task Successful_deploy_clears_adopted_names()
+  {
+    (McpRegistry registry, TargetFolder target) = CreateRegistry();
+    target.AdoptedServerNames = ["managed"];
+    await new TargetDeployService(new ConfigExportService()).DeployAsync([target], registry, NoResolution);
+    Assert.Empty(target.AdoptedServerNames);
+  }
+
+  [Fact]
+  public async Task Cancelled_deploy_keeps_adopted_names()
+  {
+    (McpRegistry registry, TargetFolder target) = CreateRegistry();
+    await File.WriteAllTextAsync(
+      Path.Combine(_directory, ".mcp.json"), """{"mcpServers":{"managed":{"url":"https://manual.test/mcp"}}}""");
+    target.AdoptedServerNames = ["other"];
+    DeployResult result = await new TargetDeployService(new ConfigExportService())
+      .DeployAsync([target], registry, NoResolution);
+    Assert.True(result.Cancelled);
+    Assert.Contains("other", target.AdoptedServerNames);
+  }
+
+  [Fact]
   public async Task External_change_blocks_deploy_unless_overwrite()
   {
     (McpRegistry registry, TargetFolder target) = CreateRegistry();

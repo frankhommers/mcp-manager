@@ -4,4 +4,5 @@ public sealed record ExportConflict(
   string FilePath,
   string ServerName,
   string ExistingConfiguration,
-  string ProposedConfiguration);
+  string ProposedConfiguration,
+  TargetClientFlags Client);

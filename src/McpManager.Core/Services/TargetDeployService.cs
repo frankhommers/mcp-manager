@@ -86,6 +86,7 @@ public class TargetDeployService(IConfigExportService exportService)
 
       TargetSyncService.RecordApplied(target, configs.Where(p => paths.Contains(p.Key))
         .ToDictionary(p => p.Key, p => p.Value));
+      target.AdoptedServerNames.Clear();
     }
 
     return new DeployResult(false, configs.Keys.ToList());
