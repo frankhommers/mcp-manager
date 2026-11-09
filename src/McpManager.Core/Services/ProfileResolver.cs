@@ -10,7 +10,7 @@ public static class ProfileResolver
     TargetFolder effective = JsonSerializer.Deserialize<TargetFolder>(JsonSerializer.Serialize(target))!;
     if (target.ProfileId is not Guid profileId) return effective;
     McpProfile profile = profiles.SingleOrDefault(p => p.Id == profileId)
-      ?? throw new InvalidOperationException($"Profile for '{target.Name}' no longer exists.");
+      ?? throw new InvalidOperationException($"The shared settings for place '{target.Name}' are missing.");
     effective.EnabledServers.UnionWith(profile.EnabledServers);
     effective.EnabledServers.ExceptWith(target.DisabledServers);
     foreach ((Guid serverId, List<string> tools) in profile.ServerToolOverrides)

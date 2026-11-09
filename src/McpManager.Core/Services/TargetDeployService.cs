@@ -26,7 +26,8 @@ public class TargetDeployService(IConfigExportService exportService)
       if (existing.Servers.Any(s => s.ManagedId is Guid id && registry.Servers.All(server => server.Id != id)))
       {
         throw new InvalidOperationException(
-          $"Import the existing managed servers from '{target.Name}' before its first update.");
+          $"Place '{target.Name}' has servers deployed by MCP Manager that are not in your library. " +
+          "Scan or import them before the first deploy.");
       }
 
       HashSet<Guid> inherited = ProfileResolver.Resolve(target, registry.Profiles).EnabledServers;
@@ -44,7 +45,7 @@ public class TargetDeployService(IConfigExportService exportService)
     {
       if (target.EnabledClients == TargetClientFlags.None || !Path.IsPathFullyQualified(target.Path))
       {
-        throw new InvalidOperationException($"'{target.Name}' needs a client and an absolute destination path.");
+        throw new InvalidOperationException($"Place '{target.Name}' needs at least one harness and an absolute folder path.");
       }
     }
 

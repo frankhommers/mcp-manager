@@ -187,7 +187,7 @@ public class ProfileManagementTests : IDisposable
     await File.WriteAllTextAsync(path, config);
     (MainWindowViewModel vm, _) = await CreateAsync([], [], [new() { Path = _directory }]);
     await vm.ExportAllTargetsCommand.ExecuteAsync(null);
-    Assert.Contains("Import the existing managed servers", vm.StatusMessage);
+    Assert.Contains("not in your library", vm.StatusMessage);
     Assert.Equal(config, await File.ReadAllTextAsync(path));
   }
 

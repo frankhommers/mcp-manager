@@ -94,7 +94,7 @@ public partial class MainWindowViewModel
   private void AttachTarget(TargetFolderViewModel target)
   {
     if (target.Model.ProfileId is Guid id && Profiles.All(p => p.Id != id))
-      throw new InvalidOperationException($"Profile for '{target.Name}' no longer exists.");
+      throw new InvalidOperationException($"The shared settings for place '{target.Name}' are missing.");
     target.SelectedProfile = Profiles.FirstOrDefault(p => p.Id == target.Model.ProfileId);
     target.ConfigurationChanged += (_, _) => ScheduleCheck();
     target.ApplyInheritance();

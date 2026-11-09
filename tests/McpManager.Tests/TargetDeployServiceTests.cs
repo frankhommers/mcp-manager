@@ -81,8 +81,34 @@ public class TargetDeployServiceTests : IDisposable
   {
     (McpRegistry registry, TargetFolder target) = CreateRegistry();
     target.EnabledClients = TargetClientFlags.None;
-    await Assert.ThrowsAsync<InvalidOperationException>(() =>
+    InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
       new TargetDeployService(new ConfigExportService()).DeployAsync([target], registry, NoResolution));
+    Assert.Equal("Place 'Place' needs at least one harness and an absolute folder path.", ex.Message);
+  }
+
+  [Fact]
+  public async Task First_deploy_with_servers_from_another_library_is_rejected()
+  {
+    (McpRegistry registry, TargetFolder target) = CreateRegistry();
+    await File.WriteAllTextAsync(Path.Combine(_directory, ".mcp.json"),
+      """{"mcpServers":{"other":{"command":"x","env":{"MCP_MANAGER_ID":"@id"}}}}""".Replace("@id", Guid.NewGuid().ToString()));
+
+    InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+      new TargetDeployService(new ConfigExportService()).DeployAsync([target], registry, NoResolution));
+
+    Assert.Equal(
+      "Place 'Place' has servers deployed by MCP Manager that are not in your library. " +
+      "Scan or import them before the first deploy.", ex.Message);
+  }
+
+  [Fact]
+  public void Missing_shared_settings_are_named_for_the_place()
+  {
+    TargetFolder target = new() { Name = "Place", ProfileId = Guid.NewGuid() };
+
+    InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => ProfileResolver.Resolve(target, []));
+
+    Assert.Equal("The shared settings for place 'Place' are missing.", ex.Message);
   }
 
   private (McpRegistry Registry, TargetFolder Target) CreateRegistry()
