@@ -58,6 +58,38 @@ public class DiffViewModelTests
   }
 
   [Fact]
+  public void Whole_value_secrets_containing_equals_are_fully_masked()
+  {
+    FieldDiffViewModel env = new(Field(
+      "env:API_KEY", DiffKind.Changed, true, [new DiffToken("abc123xyz==", DiffKind.Changed, true)], []));
+    FieldDiffViewModel header = new(Field(
+      "header:Authorization", DiffKind.Changed, true, [new DiffToken("sk-ab=cdef1234", DiffKind.Changed, true)], []));
+
+    Assert.Equal("••••••••yz==", env.LeftText);
+    Assert.Equal("••••••••1234", header.LeftText);
+    env.ToggleRevealCommand.Execute(null);
+    Assert.Equal("abc123xyz==", env.LeftText);
+  }
+
+  [Fact]
+  public void Args_secret_with_secret_name_keeps_name_and_masks_value()
+  {
+    FieldDiffViewModel args = new(Field(
+      "args",
+      DiffKind.Changed,
+      false,
+      [
+        new DiffToken("JIRA_API_TOKEN=abc=def", DiffKind.Same, true),
+        new DiffToken("PLAIN=value1234", DiffKind.Same, true),
+      ],
+      []));
+
+    Assert.Equal("JIRA_API_TOKEN=••••••••=def\n••••••••1234", args.LeftText);
+    args.ToggleRevealCommand.Execute(null);
+    Assert.Equal("JIRA_API_TOKEN=abc=def\nPLAIN=value1234", args.LeftText);
+  }
+
+  [Fact]
   public void Same_fields_are_dimmed_and_header_labels_are_stripped()
   {
     FieldDiffViewModel same = new(Field("header:X-Id", DiffKind.Same, false, [], []));

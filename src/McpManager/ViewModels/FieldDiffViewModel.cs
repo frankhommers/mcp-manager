@@ -9,6 +9,8 @@ namespace McpManager.ViewModels;
 
 public partial class FieldDiffViewModel : ViewModelBase
 {
+  private const string ArgsField = "args";
+
   private readonly FieldDiff _diff;
 
   [ObservableProperty]
@@ -48,7 +50,7 @@ public partial class FieldDiffViewModel : ViewModelBase
   private void ToggleReveal() => IsRevealed = !IsRevealed;
 
   private List<DiffTokenViewModel> Build(IReadOnlyList<DiffToken> tokens) =>
-    [.. tokens.Select(t => new DiffTokenViewModel(t, IsRevealed))];
+    [.. tokens.Select(t => new DiffTokenViewModel(t, IsRevealed, _diff.Field == ArgsField))];
 
   private static string Join(IReadOnlyList<DiffTokenViewModel> tokens) =>
     string.Join("\n", tokens.Select(t => t.DisplayText));
