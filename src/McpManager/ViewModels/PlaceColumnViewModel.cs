@@ -32,6 +32,15 @@ public partial class PlaceColumnViewModel : ViewModelBase
 
   public TargetFolderViewModel Place { get; }
 
+  public void NotifyPlaceChanged()
+  {
+    OnPropertyChanged(nameof(Header));
+    OnPropertyChanged(nameof(Chips));
+    OnPropertyChanged(nameof(IsGlobal));
+    OnPropertyChanged(nameof(GroupLabel));
+    OnPropertyChanged(nameof(ToolTipText));
+  }
+
   public bool IsGlobal => Place.IsGlobal;
 
   public string GroupLabel => IsGlobal ? "Global" : "Projects";
@@ -60,7 +69,7 @@ public partial class PlaceColumnViewModel : ViewModelBase
   {
     get
     {
-      TargetClientFlags clients = Place.Model.EnabledClients;
+      TargetClientFlags clients = Place.SelectedClient;
       List<string> chips = [];
       foreach ((TargetClientFlags flag, string chip) in ChipMap)
       {

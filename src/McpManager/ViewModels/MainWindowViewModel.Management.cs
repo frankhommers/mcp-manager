@@ -57,8 +57,12 @@ public partial class MainWindowViewModel
     OnPropertyChanged(nameof(IsTargetListActive));
   }
 
+  private bool _suppressMatrixRebuild;
+
   private void RebuildMatrix()
   {
+    if (_suppressMatrixRebuild) return;
+    MatrixViewModel previous = Matrix;
     MatrixViewModel matrix = new(Servers, TargetFolders)
     {
       ServerFilter = Matrix.ServerFilter,
@@ -70,6 +74,7 @@ public partial class MainWindowViewModel
     }
 
     Matrix = matrix;
+    previous.Dispose();
   }
 
   private void InitializeManagement()
@@ -164,7 +169,6 @@ public partial class MainWindowViewModel
     try
     {
       SyncModels();
-      if (Matrix.HasMissingCells) RebuildMatrix();
       PlaceStatusService statusService = new(_configExportService);
       foreach (TargetFolderViewModel target in ManagedTargets)
       {

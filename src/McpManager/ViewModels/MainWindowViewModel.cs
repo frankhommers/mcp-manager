@@ -187,6 +187,7 @@ public partial class MainWindowViewModel : ViewModelBase
     try
     {
       _registry = await _registryService.LoadAsync();
+      _suppressMatrixRebuild = true;
       RefreshFromRegistry();
 
       BridgeCommandHttp = _registry.Settings.BridgeCommandHttp;
@@ -204,6 +205,8 @@ public partial class MainWindowViewModel : ViewModelBase
     }
     finally
     {
+      _suppressMatrixRebuild = false;
+      RebuildMatrix();
       IsLoading = false;
     }
   }

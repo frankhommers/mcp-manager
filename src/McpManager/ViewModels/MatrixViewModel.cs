@@ -1,13 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using McpManager.Core.Models;
 
 namespace McpManager.ViewModels;
 
-public partial class MatrixViewModel : ViewModelBase
+public partial class MatrixViewModel : ViewModelBase, IDisposable
 {
   private readonly List<McpServerViewModel> _servers;
   private readonly List<PlaceColumnViewModel> _allColumns;
@@ -19,19 +21,39 @@ public partial class MatrixViewModel : ViewModelBase
   public MatrixViewModel(IEnumerable<McpServerViewModel> servers, IEnumerable<TargetFolderViewModel> places)
   {
     _servers = servers.ToList();
-    _allColumns = places.Where(p => p.IsManagedTarget)
-      .Select(p => new PlaceColumnViewModel(p))
-      .OrderBy(c => c.IsGlobal ? 0 : 1)
-      .ThenBy(c => c.Header, StringComparer.CurrentCultureIgnoreCase)
-      .ToList();
+    _allColumns = places.Where(p => p.IsManagedTarget).Select(p => new PlaceColumnViewModel(p)).ToList();
+    _allColumns.Sort(CompareColumns);
+    foreach (McpServerViewModel server in _servers)
+    {
+      server.PropertyChanged += OnServerChanged;
+    }
+
+    foreach (PlaceColumnViewModel column in _allColumns)
+    {
+      column.Place.PropertyChanged += OnPlaceChanged;
+      column.Place.ServerSelections.CollectionChanged += OnSelectionsChanged;
+    }
+
     Refresh();
+  }
+
+  public void Dispose()
+  {
+    foreach (McpServerViewModel server in _servers)
+    {
+      server.PropertyChanged -= OnServerChanged;
+    }
+
+    foreach (PlaceColumnViewModel column in _allColumns)
+    {
+      column.Place.PropertyChanged -= OnPlaceChanged;
+      column.Place.ServerSelections.CollectionChanged -= OnSelectionsChanged;
+    }
   }
 
   public ObservableCollection<PlaceColumnViewModel> Columns { get; } = [];
 
   public ObservableCollection<MatrixRowViewModel> Rows { get; } = [];
-
-  public bool HasMissingCells => Rows.Any(r => r.Cells.Any(c => c.ServerId == Guid.Empty));
 
   public void SetStatus(Guid placeId, PlaceStatus status)
   {
@@ -57,6 +79,39 @@ public partial class MatrixViewModel : ViewModelBase
     {
       Rows.Add(new MatrixRowViewModel(server, Columns.Select(c => CellFor(c, server)).ToList()));
     }
+  }
+
+  private void OnServerChanged(object? sender, PropertyChangedEventArgs e)
+  {
+    if (e.PropertyName is nameof(McpServerViewModel.ListName) or nameof(McpServerViewModel.Name)
+      or nameof(McpServerViewModel.DisplayName))
+    {
+      Refresh();
+    }
+  }
+
+  private void OnPlaceChanged(object? sender, PropertyChangedEventArgs e)
+  {
+    if (e.PropertyName is nameof(TargetFolderViewModel.Name) or nameof(TargetFolderViewModel.Path)
+      or nameof(TargetFolderViewModel.SelectedClient) or nameof(TargetFolderViewModel.IsGlobal)
+      or nameof(TargetFolderViewModel.ClientName))
+    {
+      foreach (PlaceColumnViewModel column in _allColumns)
+      {
+        column.NotifyPlaceChanged();
+      }
+
+      _allColumns.Sort(CompareColumns);
+      Refresh();
+    }
+  }
+
+  private void OnSelectionsChanged(object? sender, NotifyCollectionChangedEventArgs e) => Refresh();
+
+  private static int CompareColumns(PlaceColumnViewModel left, PlaceColumnViewModel right)
+  {
+    int group = left.IsGlobal.CompareTo(right.IsGlobal) * -1;
+    return group != 0 ? group : StringComparer.CurrentCultureIgnoreCase.Compare(left.Header, right.Header);
   }
 
   partial void OnServerFilterChanged(string value) => Refresh();

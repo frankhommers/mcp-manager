@@ -111,4 +111,40 @@ public class MatrixViewModelTests
     Assert.False(missing.Rows[0].Cells[0].IsEnabled);
     Assert.Equal(Guid.Empty, missing.Rows[0].Cells[0].ServerId);
   }
+
+  [Fact]
+  public void Cell_becomes_real_selection_when_place_gains_it()
+  {
+    McpServer model = new() { Name = "late" };
+    TargetFolderViewModel place = Place([], "P", TargetClientFlags.ClaudeCode, path: "/p");
+    McpServerViewModel server = Server(model);
+    MatrixViewModel matrix = new([server], [place]);
+    Assert.Equal(Guid.Empty, matrix.Rows[0].Cells[0].ServerId);
+
+    place.RefreshServers([model]);
+
+    ServerSelectionViewModel cell = matrix.Rows[0].Cells[0];
+    Assert.Equal(model.Id, cell.ServerId);
+    Assert.Same(place.ServerSelections.Single(), cell);
+  }
+
+  [Fact]
+  public void Renames_relabel_and_resort_rows_and_columns()
+  {
+    List<McpServer> servers = [new McpServer { Name = "alpha" }, new McpServer { Name = "bravo" }];
+    List<McpServerViewModel> serverVms = servers.Select(s => Server(s)).ToList();
+    TargetFolderViewModel first = Place(servers, "Aaa", TargetClientFlags.ClaudeCode, path: "/a");
+    TargetFolderViewModel second = Place(servers, "Bbb", TargetClientFlags.Codex, path: "/b");
+    MatrixViewModel matrix = new(serverVms, [first, second]);
+
+    serverVms[0].DisplayName = "Zulu";
+    Assert.Equal(["bravo", "Zulu"], matrix.Rows.Select(r => r.Label).ToList());
+
+    first.Name = "Zzz";
+    Assert.Equal([second, first], matrix.Columns.Select(c => c.Place).ToList());
+    Assert.Equal("Zzz", matrix.Columns[1].Header);
+
+    first.SelectedClient = TargetClientFlags.OpenCode;
+    Assert.Equal(["OC"], matrix.Columns[1].Chips);
+  }
 }
