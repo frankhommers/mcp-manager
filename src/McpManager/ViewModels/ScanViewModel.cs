@@ -117,6 +117,7 @@ public partial class ScanViewModel : ViewModelBase
           ScanImportPlanner.FindPlace(registry, folder),
           matches,
           [.. skipped.Select(s => s.StartsWith(prefix, StringComparison.Ordinal) ? s[prefix.Length..] : s)],
+          roots,
           error));
       }
 
