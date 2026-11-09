@@ -135,7 +135,7 @@ public class ConfigScanServiceTests : IDisposable
     Assert.True(global.IsGlobal);
     Assert.Equal(TargetClientFlags.Codex, global.Clients);
     Assert.Single(global.Servers);
-    Assert.Single(result.Where(f => f.IsGlobal));
+    Assert.Single(result, f => f.IsGlobal);
   }
 
   [Fact]
