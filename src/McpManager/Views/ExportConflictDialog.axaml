@@ -13,8 +13,6 @@
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="12">
         <TextBlock Text="Server already exists" FontSize="20" FontWeight="SemiBold" />
-        <SelectableTextBlock Text="{Binding ServerName}" FontSize="16" FontWeight="SemiBold"
-                             TextWrapping="Wrap" />
         <TextBlock Text="Not owned by MCP Manager" FontWeight="SemiBold" />
         <SelectableTextBlock Text="{Binding FilePath}" Opacity="0.75" TextWrapping="Wrap" />
         <TextBlock Text="Replace it with the version from MCP Manager to manage it from now on, or keep the existing configuration and continue exporting the other servers."

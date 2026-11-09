@@ -40,6 +40,8 @@ public partial class DiffViewModel : ViewModelBase
 
   public ServerDiff? Current => _index < _items.Count ? _items[_index] : null;
 
+  public bool HasTitle => !string.IsNullOrEmpty(Current?.ServerName);
+
   public string Position => _items.Count == 0 ? string.Empty : $"{_index + 1} of {_items.Count}";
 
   public bool CanGoNext => _index < _items.Count - 1;
@@ -79,6 +81,7 @@ public partial class DiffViewModel : ViewModelBase
     _index = index;
     Fields = BuildFields();
     OnPropertyChanged(nameof(Current));
+    OnPropertyChanged(nameof(HasTitle));
     OnPropertyChanged(nameof(Fields));
     OnPropertyChanged(nameof(Position));
     OnPropertyChanged(nameof(SelectedChoice));

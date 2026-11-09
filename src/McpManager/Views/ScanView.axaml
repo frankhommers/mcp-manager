@@ -32,8 +32,6 @@
                 IsVisible="{Binding HasWalkthroughError}">
           <TextBlock Text="{Binding WalkthroughError}" FontWeight="SemiBold" TextWrapping="Wrap" />
         </Border>
-        <TextBlock Text="{Binding Walkthrough.Current.ServerName}" FontWeight="SemiBold"
-                   IsVisible="{Binding !Walkthrough.HasMultipleItems}" />
         <views:DiffView DataContext="{Binding Walkthrough}" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
           <Button Content="Cancel" Command="{Binding CancelWalkthroughCommand}" />

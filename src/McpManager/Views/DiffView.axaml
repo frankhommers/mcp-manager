@@ -46,8 +46,8 @@
       <TextBlock Grid.Column="2" Text="{Binding RightLabel}" Classes="cardEyebrow" />
     </Grid>
 
-    <TextBlock Grid.Row="1" Text="{Binding Current.ServerName}" FontWeight="SemiBold"
-               IsVisible="{Binding HasMultipleItems}" />
+    <SelectableTextBlock Grid.Row="1" Text="{Binding Current.ServerName}" FontWeight="SemiBold"
+                         TextWrapping="Wrap" IsVisible="{Binding HasTitle}" />
 
     <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" MaxHeight="420">
       <ItemsControl ItemsSource="{Binding Fields}">

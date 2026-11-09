@@ -182,9 +182,12 @@ public class DiffViewModelTests
     DiffViewModel withoutChoices = Create(1);
     Assert.True(withoutChoices.IsComplete);
     Assert.False(withoutChoices.HasChoices);
+    Assert.False(withoutChoices.HasMultipleItems);
+    Assert.True(withoutChoices.HasTitle);
 
     DiffViewModel empty = new("a", "b", [], []);
     Assert.Null(empty.Current);
+    Assert.False(empty.HasTitle);
     Assert.Equal("", empty.Position);
     Assert.Empty(empty.Fields);
   }
