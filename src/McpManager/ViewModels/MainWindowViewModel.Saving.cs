@@ -122,6 +122,8 @@ public partial class MainWindowViewModel
     Guid? serverId = SelectedServer?.Id;
     Guid? placeId = SelectedTarget?.Id;
     bool showSettings = ShowSettings;
+    bool showScan = ShowScan;
+    Scan.CancelWalkthrough();
     _registry = _changeTracker.RestoreSaved();
     _suppressMatrixRebuild = true;
     try
@@ -137,6 +139,7 @@ public partial class MainWindowViewModel
         SelectedServer = Servers.FirstOrDefault(s => s.Id == serverId);
         SelectedTarget = TargetFolders.FirstOrDefault(t => t.Id == placeId);
         ShowSettings = showSettings;
+        ShowScan = showScan;
       });
     }
     finally
@@ -337,7 +340,7 @@ public partial class MainWindowViewModel
 
   private static string PlaceCount(int count) => count == 1 ? "1 place" : $"{count} places";
 
-  private NavigationSnapshot CurrentNavigation() => new(SelectedServer, SelectedTarget, ShowSettings);
+  private NavigationSnapshot CurrentNavigation() => new(SelectedServer, SelectedTarget, ShowSettings, ShowScan);
 
   private void Navigate(NavigationSnapshot previous, Action apply)
   {
@@ -377,6 +380,7 @@ public partial class MainWindowViewModel
     SelectedServer = previous.Server != null && Servers.Contains(previous.Server) ? previous.Server : null;
     SelectedTarget = previous.Target != null && TargetFolders.Contains(previous.Target) ? previous.Target : null;
     ShowSettings = previous.ShowSettings;
+    ShowScan = previous.ShowScan;
   });
 
   private void WithoutNavigationGuard(Action apply)

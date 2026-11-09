@@ -1,0 +1,82 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:McpManager.ViewModels"
+             xmlns:views="using:McpManager.Views"
+             x:Class="McpManager.Views.ScanView"
+             x:DataType="vm:ScanViewModel">
+  <StackPanel Spacing="16">
+    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+      <StackPanel Spacing="4">
+        <TextBlock Text="Scan" FontSize="24" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding RootsText}" Opacity="0.75" TextWrapping="Wrap" />
+      </StackPanel>
+      <Button Grid.Column="1" Content="Scan again" Command="{Binding ScanCommand}"
+              IsVisible="{Binding !IsScanning}" VerticalAlignment="Top" />
+      <Button Grid.Column="2" Content="Cancel" Command="{Binding ScanCancelCommand}"
+              IsVisible="{Binding IsScanning}" VerticalAlignment="Top" />
+      <Button Grid.Column="3" Content="Add selected" Command="{Binding AddSelectedCommand}"
+              Classes="primaryButton" VerticalAlignment="Top" />
+    </Grid>
+
+    <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding IsScanning}" />
+    <TextBlock Text="{Binding Message}" TextWrapping="Wrap"
+               IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+    <Border Classes="detailCard" IsVisible="{Binding IsWalkthroughOpen}">
+      <StackPanel Spacing="12">
+        <TextBlock Text="These servers differ from your library" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Text="Choose for each server what to keep. Nothing changes until you add the places."
+                   Opacity="0.75" TextWrapping="Wrap" />
+        <Border Padding="12,8" CornerRadius="6"
+                Background="{DynamicResource NotificationCardErrorBackgroundBrush}"
+                IsVisible="{Binding HasWalkthroughError}">
+          <TextBlock Text="{Binding WalkthroughError}" FontWeight="SemiBold" TextWrapping="Wrap" />
+        </Border>
+        <TextBlock Text="{Binding Walkthrough.Current.ServerName}" FontWeight="SemiBold"
+                   IsVisible="{Binding !Walkthrough.HasMultipleItems}" />
+        <views:DiffView DataContext="{Binding Walkthrough}" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+          <Button Content="Cancel" Command="{Binding CancelWalkthroughCommand}" />
+          <Button Content="Add places" Command="{Binding AddPlacesCommand}" Classes="primaryButton" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <ItemsControl ItemsSource="{Binding Folders}" IsEnabled="{Binding !IsWalkthroughOpen}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <StackPanel Spacing="6" />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:ScannedFolderViewModel">
+          <Border Padding="12,8" CornerRadius="6" BorderThickness="1"
+                  BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+              <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Top"
+                        AutomationProperties.Name="{Binding Path}" />
+              <StackPanel Grid.Column="1" Spacing="2">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="{Binding DisplayPath}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  <ItemsControl ItemsSource="{Binding ClientChips}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="x:String">
+                        <TextBlock Text="{Binding}" FontSize="10" Opacity="0.6" VerticalAlignment="Center" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+                <TextBlock Text="{Binding Note}" FontSize="12" FontWeight="SemiBold" Opacity="0.8"
+                           IsVisible="{Binding HasNote}" />
+                <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
+              </StackPanel>
+            </Grid>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </StackPanel>
+</UserControl>

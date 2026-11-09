@@ -255,7 +255,7 @@ public class ScanImportPlanner(IConfigImportService importService)
     to.HttpHeaders = new Dictionary<string, string>(from.HttpHeaders);
   }
 
-  private static TargetFolder? FindPlace(McpRegistry registry, ScannedFolder folder) =>
+  public static TargetFolder? FindPlace(McpRegistry registry, ScannedFolder folder) =>
     registry.TargetFolders.FirstOrDefault(t => folder.IsGlobal
       ? t.IsGlobal && t.EnabledClients == folder.Clients
       : !t.IsGlobal && string.Equals(t.Path, folder.Path, StringComparison.OrdinalIgnoreCase));

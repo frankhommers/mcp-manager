@@ -61,6 +61,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
   public NavigationPage CurrentPage =>
     ShowSettings ? NavigationPage.Settings :
+    ShowScan ? NavigationPage.Scan :
     SelectedProfile != null ? NavigationPage.Profiles :
     SelectedTarget != null ? NavigationPage.Targets :
     SelectedServer != null ? NavigationPage.Servers :
@@ -77,19 +78,17 @@ public partial class MainWindowViewModel : ViewModelBase
   [ObservableProperty] private TargetFolderViewModel? _selectedTarget;
 
   partial void OnSelectedServerChanged(McpServerViewModel? oldValue, McpServerViewModel? newValue) =>
-    Navigate(new NavigationSnapshot(oldValue, SelectedTarget, ShowSettings), () =>
+    Navigate(new NavigationSnapshot(oldValue, SelectedTarget, ShowSettings, ShowScan), () =>
     {
       if (newValue != null)
       {
         SelectedProfile = null;
         SelectedTarget = null;
         ShowSettings = false;
+        ShowScan = false;
       }
 
-      OnPropertyChanged(nameof(CurrentPage));
-      OnPropertyChanged(nameof(ShowOverview));
-      OnPropertyChanged(nameof(IsServerListActive));
-      OnPropertyChanged(nameof(IsTargetListActive));
+      NotifyPageChanged();
 
       OnPropertyChanged(nameof(ServerUsage));
       McpTestResult = "";
@@ -98,20 +97,18 @@ public partial class MainWindowViewModel : ViewModelBase
     });
 
   partial void OnSelectedTargetChanged(TargetFolderViewModel? oldValue, TargetFolderViewModel? newValue) =>
-    Navigate(new NavigationSnapshot(SelectedServer, oldValue, ShowSettings), () =>
+    Navigate(new NavigationSnapshot(SelectedServer, oldValue, ShowSettings, ShowScan), () =>
     {
       if (newValue != null)
       {
         SelectedProfile = null;
         SelectedServer = null;
         ShowSettings = false;
+        ShowScan = false;
         _ = newValue.RefreshExistingServersAsync(_registry?.Settings);
       }
 
-      OnPropertyChanged(nameof(CurrentPage));
-      OnPropertyChanged(nameof(ShowOverview));
-      OnPropertyChanged(nameof(IsServerListActive));
-      OnPropertyChanged(nameof(IsTargetListActive));
+      NotifyPageChanged();
     });
 
   [ObservableProperty] private bool _isLoading;
@@ -121,13 +118,7 @@ public partial class MainWindowViewModel : ViewModelBase
   [ObservableProperty] private bool _showSettings;
 
   partial void OnShowSettingsChanged(bool oldValue, bool newValue) =>
-    Navigate(new NavigationSnapshot(SelectedServer, SelectedTarget, oldValue), () =>
-    {
-      OnPropertyChanged(nameof(CurrentPage));
-      OnPropertyChanged(nameof(ShowOverview));
-      OnPropertyChanged(nameof(IsServerListActive));
-      OnPropertyChanged(nameof(IsTargetListActive));
-    });
+    Navigate(new NavigationSnapshot(SelectedServer, SelectedTarget, oldValue, ShowScan), NotifyPageChanged);
 
   [ObservableProperty] private string _bridgeCommandHttp = "mcp-proxy {args} {headerArgs} {url}";
 
@@ -154,6 +145,7 @@ public partial class MainWindowViewModel : ViewModelBase
     _stdioMcpTester = new StdioMcpTester();
     _transportDetectionService = new TransportDetectionService();
     _shellEnvironmentService = new ShellEnvironmentService();
+    Scan = CreateScan(new ConfigScanService(_configExportService));
     InitializeSidebar();
   }
 
@@ -164,7 +156,8 @@ public partial class MainWindowViewModel : ViewModelBase
     IHttpMcpTester httpMcpTester,
     IStdioMcpTester stdioMcpTester,
     ITransportDetectionService transportDetectionService,
-    IShellEnvironmentService shellEnvironmentService)
+    IShellEnvironmentService shellEnvironmentService,
+    ConfigScanService? scanService = null)
   {
     _registryService = registryService;
     _configExportService = configExportService;
@@ -173,6 +166,7 @@ public partial class MainWindowViewModel : ViewModelBase
     _stdioMcpTester = stdioMcpTester;
     _transportDetectionService = transportDetectionService;
     _shellEnvironmentService = shellEnvironmentService;
+    Scan = CreateScan(scanService ?? new ConfigScanService(_configExportService));
     InitializeSidebar();
   }
 
@@ -214,6 +208,7 @@ public partial class MainWindowViewModel : ViewModelBase
     BridgeCommandStreamableHttp = settings.BridgeCommandStreamableHttp;
     BridgeHeaderArgumentTemplate = settings.BridgeHeaderArgumentTemplate;
     SelectedThemeMode = settings.ThemeMode;
+    LoadScanRoots(settings);
   }
 
   private void RefreshFromRegistry()
@@ -381,6 +376,7 @@ public partial class MainWindowViewModel : ViewModelBase
     SelectedServer = null;
     SelectedTarget = null;
     ShowSettings = false;
+    ShowScan = false;
   });
 
   [RelayCommand]
@@ -395,6 +391,7 @@ public partial class MainWindowViewModel : ViewModelBase
     SelectedProfile = null;
     SelectedServer = null;
     SelectedTarget = null;
+    ShowScan = false;
     ShowSettings = true;
   });
 
@@ -1647,80 +1644,6 @@ public partial class MainWindowViewModel : ViewModelBase
     catch (Exception ex)
     {
       StatusMessage = $"Import error: {ex.Message}";
-    }
-    finally
-    {
-      IsLoading = false;
-    }
-  }
-
-  [RelayCommand]
-  private async Task ScanForMcpConfigsAsync()
-  {
-    if (_registry == null)
-    {
-      return;
-    }
-
-    IsLoading = true;
-    StatusMessage = "Scanning for .mcp.json files...";
-
-    try
-    {
-      string homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-      List<string> foundFiles = new();
-
-      // Search common locations
-      string[] searchPaths = new[]
-      {
-        homeDir,
-        Path.Combine(homeDir, "Projects"),
-        Path.Combine(homeDir, "Developer"),
-        Path.Combine(homeDir, "Code"),
-        Path.Combine(homeDir, "repos"),
-        Path.Combine(homeDir, "Repos"),
-        Path.Combine(homeDir, "src"),
-        Path.Combine(homeDir, "dev"),
-        Path.Combine(homeDir, "Documents"),
-      };
-
-      foreach (string searchPath in searchPaths)
-      {
-        if (!Directory.Exists(searchPath))
-        {
-          continue;
-        }
-
-        try
-        {
-          string[] files = Directory.GetFiles(searchPath, ".mcp.json", SearchOption.AllDirectories);
-          foundFiles.AddRange(files);
-        }
-        catch (UnauthorizedAccessException)
-        {
-          // Skip directories we can't access
-        }
-      }
-
-      int totalAdded = 0;
-      foreach (string file in foundFiles.Distinct())
-      {
-        try
-        {
-          List<McpServer> importedServers = await _configImportService.ImportFromClaudeCodeAsync(file);
-          totalAdded += AddImportedServers(importedServers);
-        }
-        catch
-        {
-          // Skip files that can't be parsed
-        }
-      }
-
-      StatusMessage = $"Found {foundFiles.Count} config files, imported {totalAdded} servers";
-    }
-    catch (Exception ex)
-    {
-      StatusMessage = $"Scan error: {ex.Message}";
     }
     finally
     {

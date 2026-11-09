@@ -65,22 +65,20 @@ public partial class PlaceColumnViewModel : ViewModelBase
     }
   }
 
-  public IReadOnlyList<string> Chips
-  {
-    get
-    {
-      TargetClientFlags clients = Place.SelectedClient;
-      List<string> chips = [];
-      foreach ((TargetClientFlags flag, string chip) in ChipMap)
-      {
-        if ((clients & flag) != TargetClientFlags.None)
-        {
-          chips.Add(chip);
-        }
-      }
+  public IReadOnlyList<string> Chips => ChipsFor(Place.SelectedClient);
 
-      return chips;
+  public static IReadOnlyList<string> ChipsFor(TargetClientFlags clients)
+  {
+    List<string> chips = [];
+    foreach ((TargetClientFlags flag, string chip) in ChipMap)
+    {
+      if ((clients & flag) != TargetClientFlags.None)
+      {
+        chips.Add(chip);
+      }
     }
+
+    return chips;
   }
 
   public string StatusText => Status switch

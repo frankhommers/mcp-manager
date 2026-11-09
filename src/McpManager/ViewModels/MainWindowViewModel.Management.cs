@@ -43,11 +43,9 @@ public partial class MainWindowViewModel
       SelectedServer = null;
       SelectedTarget = null;
       ShowSettings = false;
+      ShowScan = false;
     }
-    OnPropertyChanged(nameof(CurrentPage));
-    OnPropertyChanged(nameof(ShowOverview));
-    OnPropertyChanged(nameof(IsServerListActive));
-    OnPropertyChanged(nameof(IsTargetListActive));
+    NotifyPageChanged();
   }
 
   private bool _suppressMatrixRebuild;
@@ -72,12 +70,17 @@ public partial class MainWindowViewModel
 
   private void InitializeManagement()
   {
+    AttachManagement();
+    MarkWorkspaceSaved();
+    CheckTargets();
+  }
+
+  private void AttachManagement()
+  {
     Profiles.Clear();
     foreach (McpProfile profile in _registry!.Profiles) AttachProfile(profile);
     foreach (TargetFolderViewModel target in TargetFolders) AttachTarget(target);
     SyncModels();
-    MarkWorkspaceSaved();
-    CheckTargets();
   }
 
   private void AttachProfile(McpProfile profile)

@@ -15,7 +15,17 @@ public sealed class DiffChoiceOptionViewModel : ViewModelBase
 
   public DiffChoice Choice { get; }
 
-  public string Label => Choice.ToString();
+  public string Label => Choice switch
+  {
+    DiffChoice.KeepLibrary => "Keep library",
+    DiffChoice.UseFoundVersion => "Put this version in the library",
+    DiffChoice.ImportSeparately => "Import as separate server",
+    DiffChoice.Replace => "Replace with MCP Manager",
+    DiffChoice.KeepExisting => "Keep existing",
+    DiffChoice.Overwrite => "Overwrite with MCP Manager",
+    DiffChoice.KeepFile => "Keep file",
+    _ => Choice.ToString(),
+  };
 
   public bool IsSelected
   {

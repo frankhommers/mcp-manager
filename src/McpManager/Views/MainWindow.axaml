@@ -843,6 +843,36 @@
                                     </StackPanel>
                                 </Border>
 
+                                <Border Classes="detailCard">
+                                    <StackPanel Spacing="12">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="Scan folders" FontWeight="SemiBold" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                                                <TextBlock Text="Scan looks for MCP configs in these folders, up to four levels deep."
+                                                           Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="Add folder"
+                                                    Command="{Binding AddScanRootCommand}"
+                                                    VerticalAlignment="Top" />
+                                        </Grid>
+                                        <TextBlock Text="{Binding DefaultScanRootsText}" Opacity="0.75" FontSize="12"
+                                                   TextWrapping="Wrap" IsVisible="{Binding !HasScanRoots}" />
+                                        <ItemsControl ItemsSource="{Binding ScanRoots}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,2">
+                                                        <TextBlock Text="{Binding}" VerticalAlignment="Center"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <Button Grid.Column="1" Content="Remove"
+                                                                Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RemoveScanRootCommand}"
+                                                                CommandParameter="{Binding}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
                                 <Border Classes="secondaryCard">
                                     <StackPanel Spacing="14">
                                         <Grid ColumnDefinitions="*,Auto">
@@ -876,12 +906,17 @@
                             </StackPanel>
 
                             <StackPanel IsVisible="{Binding ShowOverview}" Spacing="16">
-                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                 <TextBlock Text="Overview" FontSize="24" FontWeight="SemiBold" />
-                                <Button Grid.Column="1" Content="Add place" Command="{Binding AddTargetFolderCommand}" />
+                                <Button Grid.Column="1" Content="Scan" Command="{Binding OpenScanCommand}"
+                                        ToolTip.Tip="Find project folders with MCP configs that are not places yet" />
+                                <Button Grid.Column="2" Content="Add place" Command="{Binding AddTargetFolderCommand}" />
                               </Grid>
                               <views:MatrixView DataContext="{Binding Matrix}" />
                             </StackPanel>
+
+                            <views:ScanView DataContext="{Binding Scan}"
+                                            IsVisible="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ShowScan}" />
 
                             <!-- Server Detail View -->
                             <StackPanel
