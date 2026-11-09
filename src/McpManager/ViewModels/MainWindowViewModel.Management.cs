@@ -19,6 +19,8 @@ public partial class MainWindowViewModel
   public string UpdateSummary => $"{ManagedTargets.Count(t => t.NeedsUpdate || t.HasExternalChanges)} of {ManagedTargets.Count()} targets need attention";
   public string ServerUsage => SelectedServer == null ? "" : "Used by: " + string.Join(", ", ManagedTargets
     .Where(t => t.ServerSelections.Any(s => s.ServerId == SelectedServer.Id && s.IsEnabled)).Select(t => t.Name));
+  private readonly Dictionary<Guid, PlaceStatus> _placeStatuses = [];
+  [ObservableProperty] private MatrixViewModel _matrix = new([], []);
   [ObservableProperty] private ProfileViewModel? _selectedProfile;
   [ObservableProperty] private ProfileViewModel? _bulkProfile;
   public string ProfileUsage => SelectedProfile == null ? "" : "Linked targets: " + string.Join(", ",
@@ -53,6 +55,21 @@ public partial class MainWindowViewModel
     OnPropertyChanged(nameof(ShowOverview));
     OnPropertyChanged(nameof(IsServerListActive));
     OnPropertyChanged(nameof(IsTargetListActive));
+  }
+
+  private void RebuildMatrix()
+  {
+    MatrixViewModel matrix = new(Servers, TargetFolders)
+    {
+      ServerFilter = Matrix.ServerFilter,
+      PlaceFilter = Matrix.PlaceFilter,
+    };
+    foreach ((Guid id, PlaceStatus status) in _placeStatuses)
+    {
+      matrix.SetStatus(id, status);
+    }
+
+    Matrix = matrix;
   }
 
   private void InitializeManagement()
@@ -147,8 +164,13 @@ public partial class MainWindowViewModel
     try
     {
       SyncModels();
+      if (Matrix.HasMissingCells) RebuildMatrix();
+      PlaceStatusService statusService = new(_configExportService);
       foreach (TargetFolderViewModel target in ManagedTargets)
       {
+        PlaceStatus status = statusService.GetStatus(target.Model, _registry);
+        _placeStatuses[target.Id] = status;
+        Matrix.SetStatus(target.Id, status);
         try
         {
           TargetFolder effective = ProfileResolver.Resolve(target.Model, _registry.Profiles);

@@ -27,6 +27,7 @@ public partial class MainWindowViewModel
 
     newValue.CollectionChanged += OnSidebarServersChanged;
     RefreshSidebarServers();
+    RebuildMatrix();
   }
 
   partial void OnTargetFoldersChanged(
@@ -39,11 +40,20 @@ public partial class MainWindowViewModel
 
     newValue.CollectionChanged += OnSidebarTargetsChanged;
     RefreshSidebarTargets();
+    RebuildMatrix();
   }
 
-  private void OnSidebarServersChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshSidebarServers();
+  private void OnSidebarServersChanged(object? sender, NotifyCollectionChangedEventArgs e)
+  {
+    RefreshSidebarServers();
+    RebuildMatrix();
+  }
 
-  private void OnSidebarTargetsChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshSidebarTargets();
+  private void OnSidebarTargetsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+  {
+    RefreshSidebarTargets();
+    RebuildMatrix();
+  }
 
   private void OnSidebarServerChanged(object? sender, PropertyChangedEventArgs e)
   {

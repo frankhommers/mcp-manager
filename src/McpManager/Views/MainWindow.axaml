@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:McpManager.ViewModels"
+        xmlns:views="using:McpManager.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
@@ -851,45 +852,12 @@
                                 </Border>
                             </StackPanel>
 
-                            <StackPanel IsVisible="{Binding ShowOverview}" Spacing="20">
-                              <TextBlock Text="Overview" FontSize="24" FontWeight="SemiBold" />
-                              <TextBlock Text="One library. Shared profiles. All your tools in sync." Opacity="0.75" />
-                              <WrapPanel Orientation="Horizontal">
-                                <Button Content="Check targets" Command="{Binding CheckTargetsCommand}" Margin="0,0,8,8" />
-                                <Button Content="Update all" Classes="primaryButton" Command="{Binding ExportAllTargetsCommand}" Margin="0,0,8,8" />
-                                <Button Content="Add target" Command="{Binding AddTargetFolderCommand}" Margin="0,0,8,8" />
-                                <Button Content="Add profile" Command="{Binding AddProfileCommand}" Margin="0,0,8,8" />
-                              </WrapPanel>
-                              <TextBlock Text="{Binding UpdateSummary}" FontWeight="SemiBold" />
-                              <WrapPanel Orientation="Horizontal">
-                                <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding BulkProfile}" PlaceholderText="Profile for selected targets" MinWidth="200" Margin="0,0,8,8">
-                                  <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:ProfileViewModel"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
-                                </ComboBox>
-                                <Button Content="Assign profile to selected" Command="{Binding AssignProfileToSelectedCommand}" Margin="0,0,8,8" />
-                                <Button Content="Update selected" Command="{Binding UpdateSelectedTargetsCommand}" Margin="0,0,8,8" />
-                              </WrapPanel>
-                              <TextBlock Text="Changes are saved centrally before updating. Existing files receive a backup. Reload your client if it does not pick up changes automatically."
-                                         TextWrapping="Wrap" Opacity="0.75" />
-                              <ItemsControl ItemsSource="{Binding ManagedTargets}">
-                                <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:TargetFolderViewModel">
-                                  <Border Classes="detailCard" Margin="0,0,0,12">
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-                                      <StackPanel Spacing="6">
-                                        <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelectedForBulk}" FontWeight="SemiBold" FontSize="16" />
-                                        <TextBlock Text="{Binding ClientName}" Opacity="0.75" />
-                                        <TextBlock Text="{Binding Scope}" TextWrapping="Wrap" Opacity="0.65" />
-                                        <TextBlock Text="{Binding SelectedProfile.Name, TargetNullValue='No profile · own settings'}" />
-                                        <TextBlock Text="{Binding SyncStatus}" TextWrapping="Wrap" />
-                                        <Expander Header="Preview changes" HorizontalAlignment="Stretch">
-                                          <TextBlock Text="{Binding ChangeSummary}" TextWrapping="Wrap" FontSize="12" />
-                                        </Expander>
-                                      </StackPanel>
-                                      <Button Grid.Column="1" Content="Open" VerticalAlignment="Center"
-                                              Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenTargetCommand}" CommandParameter="{Binding}" />
-                                    </Grid>
-                                  </Border>
-                                </DataTemplate></ItemsControl.ItemTemplate>
-                              </ItemsControl>
+                            <StackPanel IsVisible="{Binding ShowOverview}" Spacing="16">
+                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <TextBlock Text="Overview" FontSize="24" FontWeight="SemiBold" />
+                                <Button Grid.Column="1" Content="Add place" Command="{Binding AddTargetFolderCommand}" />
+                              </Grid>
+                              <views:MatrixView DataContext="{Binding Matrix}" />
                             </StackPanel>
                             <StackPanel IsVisible="{Binding CurrentPage, Converter={x:Static vm:NavigationPageEqualsConverter.Instance}, ConverterParameter=Profiles}" Spacing="20">
                               <Grid ColumnDefinitions="*,Auto">
