@@ -53,14 +53,16 @@ public class ProfileManagementTests : IDisposable
   }
 
   [Fact]
-  public async Task One_server_change_updates_two_clients_and_external_changes_block_the_batch()
+  public async Task One_server_change_updates_two_clients_and_external_change_blocks_its_place()
   {
     McpServer server = new() { Name = "shared", Command = "first-command" };
     McpProfile profile = new() { EnabledServers = [server.Id] };
     TargetFolder first = new() { Name = "Claude project", Path = _directory, ProfileId = profile.Id };
     TargetFolder second = new() { Name = "Codex project", Path = _directory, ProfileId = profile.Id, EnabledClients = TargetClientFlags.Codex };
     (MainWindowViewModel vm, RegistryService registry) = await CreateAsync([server], [profile], [first, second]);
-    await vm.ExportAllTargetsCommand.ExecuteAsync(null);
+    TargetFolderViewModel firstPlace = vm.TargetFolders.Single(t => t.Id == first.Id);
+    await vm.DeployPlaceCommand.ExecuteAsync(firstPlace);
+    await vm.DeployPlaceCommand.ExecuteAsync(vm.TargetFolders.Single(t => t.Id == second.Id));
     Assert.DoesNotContain("failed", vm.StatusMessage);
     string claude = Path.Combine(_directory, ".mcp.json");
     string codex = Path.Combine(_directory, ".codex", "config.toml");
@@ -70,7 +72,7 @@ public class ProfileManagementTests : IDisposable
     vm.CheckTargetsCommand.Execute(null);
     Assert.All(vm.ManagedTargets.Where(t => t.Model.ProfileId == profile.Id), t => Assert.True(t.NeedsUpdate));
     await vm.SaveCommand.ExecuteAsync(null);
-    await vm.ExportAllTargetsCommand.ExecuteAsync(null);
+    await vm.DeployNowCommand.ExecuteAsync(null);
     Assert.Contains("second-command", await File.ReadAllTextAsync(claude));
     Assert.Contains("second-command", await File.ReadAllTextAsync(codex));
     Assert.Contains("first-command", await File.ReadAllTextAsync(claude + ".mcp-manager.bak"));
@@ -79,7 +81,7 @@ public class ProfileManagementTests : IDisposable
     await File.WriteAllTextAsync(claude, edited);
     vm.Servers[0].Command = "third-command";
     await vm.SaveCommand.ExecuteAsync(null);
-    await vm.ExportAllTargetsCommand.ExecuteAsync(null);
+    await vm.DeployPlaceCommand.ExecuteAsync(firstPlace);
     Assert.Contains("External changes", vm.StatusMessage);
     Assert.Equal(edited, await File.ReadAllTextAsync(claude));
     Assert.Contains("second-command", await File.ReadAllTextAsync(codex));
@@ -102,7 +104,8 @@ public class ProfileManagementTests : IDisposable
     Assert.True(vm.TargetFolders.Single(t => t.Id == first.Id).ServerSelections[0].IsEnabled);
     Assert.False(vm.TargetFolders.Single(t => t.Id == second.Id).ServerSelections[0].IsEnabled);
     await vm.SaveCommand.ExecuteAsync(null);
-    await vm.ExportAllTargetsCommand.ExecuteAsync(null);
+    await vm.DeployPlaceCommand.ExecuteAsync(vm.TargetFolders.Single(t => t.Id == first.Id));
+    await vm.DeployPlaceCommand.ExecuteAsync(vm.TargetFolders.Single(t => t.Id == second.Id));
     Assert.Contains("shared", await File.ReadAllTextAsync(Path.Combine(_directory, ".mcp.json")));
     Assert.DoesNotContain("shared", await File.ReadAllTextAsync(Path.Combine(_directory, "other", ".mcp.json")));
   }
@@ -160,22 +163,12 @@ public class ProfileManagementTests : IDisposable
   }
 
   [Fact]
-  public async Task Bulk_assignment_keeps_overrides_and_profile_deletion_is_blocked_while_linked()
+  public void No_commands_bypass_save_and_deploy_rules()
   {
-    McpServer server = new() { Name = "shared", Command = "test" };
-    McpProfile profile = new() { EnabledServers = [server.Id] };
-    TargetFolder target = new() { Path = _directory, DisabledServers = [server.Id] };
-    (MainWindowViewModel vm, _) = await CreateAsync([server], [profile], [target]);
-    TargetFolderViewModel selected = vm.TargetFolders.Single(t => t.Id == target.Id);
-    selected.IsSelectedForBulk = true;
-    vm.BulkProfile = vm.Profiles[0];
-    vm.AssignProfileToSelectedCommand.Execute(null);
-    Assert.Equal(profile.Id, selected.Model.ProfileId);
-    Assert.False(selected.ServerSelections[0].IsEnabled);
-    vm.SelectedProfile = vm.Profiles[0];
-    vm.DeleteProfileCommand.Execute(null);
-    Assert.Single(vm.Profiles);
-    Assert.Contains("Detach", vm.StatusMessage);
+    string[] removed = ["ExportAllTargetsCommand", "AssignProfileToSelectedCommand", "DeleteProfileCommand", "BulkProfile"];
+
+    Assert.All(removed, name => Assert.Null(typeof(MainWindowViewModel).GetProperty(name)));
+    Assert.Null(typeof(TargetFolderViewModel).GetProperty("IsSelectedForBulk"));
   }
 
   [Fact]
@@ -186,7 +179,7 @@ public class ProfileManagementTests : IDisposable
     string config = new McpManager.Core.ConfigGenerators.ClaudeCodeConfigGenerator().GenerateConfig([existing]);
     await File.WriteAllTextAsync(path, config);
     (MainWindowViewModel vm, _) = await CreateAsync([], [], [new() { Path = _directory }]);
-    await vm.ExportAllTargetsCommand.ExecuteAsync(null);
+    await vm.DeployPlaceCommand.ExecuteAsync(vm.ManagedTargets.Single());
     Assert.Contains("not in your library", vm.StatusMessage);
     Assert.Equal(config, await File.ReadAllTextAsync(path));
   }
@@ -199,7 +192,7 @@ public class ProfileManagementTests : IDisposable
     await File.WriteAllTextAsync(path, new McpManager.Core.ConfigGenerators.ClaudeCodeConfigGenerator().GenerateConfig([existing]));
     TargetFolder target = new() { Name = "Legacy", Path = _directory };
     (MainWindowViewModel vm, _) = await CreateAsync([existing], [], [target]);
-    await vm.ExportAllTargetsCommand.ExecuteAsync(null);
+    await vm.DeployPlaceCommand.ExecuteAsync(vm.TargetFolders.Single(t => t.Id == target.Id));
     Assert.Contains("keep-me", await File.ReadAllTextAsync(path));
     Assert.Contains(existing.Id, vm.TargetFolders.Single(t => t.Id == target.Id).Model.EnabledServers);
   }

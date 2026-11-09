@@ -70,7 +70,7 @@ public class SaveFlowTests : IDisposable
     vm.Servers.Single(s => s.Id == _alpha.Id).Command = "";
 
     await vm.OverwriteExternalChangesCommand.ExecuteAsync(null);
-    await vm.ExportAllTargetsCommand.ExecuteAsync(null);
+    await vm.DeployNowCommand.ExecuteAsync(null);
 
     Assert.Equal("Save or cancel your changes before deploying.", vm.StatusMessage);
     Assert.Equal(edited, await File.ReadAllTextAsync(file));

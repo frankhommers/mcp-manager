@@ -21,17 +21,6 @@ public partial class MainWindowViewModel
   private readonly Dictionary<Guid, PlaceStatus> _placeStatuses = [];
   [ObservableProperty] private MatrixViewModel _matrix = new([], []);
   [ObservableProperty] private ProfileViewModel? _selectedProfile;
-  [ObservableProperty] private ProfileViewModel? _bulkProfile;
-
-  [RelayCommand]
-  private void AssignProfileToSelected()
-  {
-    if (BulkProfile == null) { StatusMessage = "Choose a profile first."; return; }
-    List<TargetFolderViewModel> selected = ManagedTargets.Where(t => t.IsSelectedForBulk).ToList();
-    foreach (TargetFolderViewModel target in selected) target.SelectedProfile = BulkProfile;
-    CheckTargets();
-    StatusMessage = $"Assigned '{BulkProfile.Name}' to {selected.Count} targets. Explicit overrides were kept.";
-  }
 
   private int _checkVersion;
   private bool _checking;
@@ -100,20 +89,6 @@ public partial class MainWindowViewModel
     target.ApplyInheritance();
     OnPropertyChanged(nameof(ManagedTargets));
     ScheduleCheck();
-  }
-
-  [RelayCommand]
-  private void DeleteProfile()
-  {
-    if (_registry == null || SelectedProfile == null) return;
-    if (TargetFolders.Any(t => t.SelectedProfile == SelectedProfile))
-    {
-      StatusMessage = "Detach or reassign this profile's targets before deleting it.";
-      return;
-    }
-    _registry.Profiles.Remove(SelectedProfile.Profile);
-    Profiles.Remove(SelectedProfile);
-    SelectedProfile = null;
   }
 
   [RelayCommand]

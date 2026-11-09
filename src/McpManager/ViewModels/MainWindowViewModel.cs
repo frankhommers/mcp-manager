@@ -1763,9 +1763,6 @@ public partial class MainWindowViewModel : ViewModelBase
     }
   }
 
-  [RelayCommand]
-  private async Task ExportAllTargetsAsync() => await UpdateTargetsAsync(ManagedTargets.ToList());
-
   private async Task<ExportConflictResolution?> ResolveExportConflictAsync(ExportConflict conflict)
   {
     Window? window = GetMainWindow();

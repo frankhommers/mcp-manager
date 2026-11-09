@@ -17,7 +17,6 @@ public partial class TargetFolderViewModel : ViewModelBase
   private List<McpServer> _allServers;
   public event EventHandler? ConfigurationChanged;
   [ObservableProperty] private ProfileViewModel? _selectedProfile;
-  [ObservableProperty] private bool _isSelectedForBulk;
   [ObservableProperty] private string _changeSummary = "Check places to preview changes.";
   [ObservableProperty] private string _syncStatus = "Not checked";
   [ObservableProperty] private bool _hasExternalChanges;
