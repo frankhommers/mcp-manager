@@ -105,6 +105,7 @@ public class MatrixViewModelTests
     Assert.Equal("Changed outside MCP Manager", matrix.Columns[0].StatusText);
     matrix.SetStatus(place.Id, PlaceStatus.Behind);
     Assert.Equal("Not deployed", matrix.Columns[0].StatusText);
+    Assert.Equal($"last{Environment.NewLine}/x/last{Environment.NewLine}Not deployed", matrix.Columns[0].ToolTipText);
 
     McpServerViewModel extra = Server(new McpServer { Name = "extra" });
     MatrixViewModel missing = new([extra], [place]);

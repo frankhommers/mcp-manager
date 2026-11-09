@@ -12,7 +12,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="520">
       <Grid ColumnDefinitions="220,*">
         <StackPanel Spacing="0">
-          <Border Height="56" />
+          <Border Height="72" />
           <ItemsControl ItemsSource="{Binding Rows}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:MatrixRowViewModel">
@@ -33,7 +33,7 @@
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:PlaceColumnViewModel">
-                  <Button Width="72" Height="56" Padding="2" Background="Transparent" BorderThickness="0"
+                  <Button Width="96" Height="72" Padding="2" Background="Transparent" BorderThickness="0"
                           HorizontalContentAlignment="Center"
                           ToolTip.Tip="{Binding ToolTipText}"
                           Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenTargetCommand}"
@@ -42,7 +42,8 @@
                       <TextBlock Text="{Binding GroupLabel}"
                                  FontSize="9" Opacity="0.5" HorizontalAlignment="Center" />
                       <TextBlock Text="{Binding Header}" FontSize="11" FontWeight="SemiBold"
-                                 TextTrimming="CharacterEllipsis" MaxWidth="68" HorizontalAlignment="Center" />
+                                 TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                 TextAlignment="Center" MaxWidth="92" HorizontalAlignment="Center" />
                       <StackPanel Orientation="Horizontal" Spacing="3" HorizontalAlignment="Center">
                         <ItemsControl ItemsSource="{Binding Chips}">
                           <ItemsControl.ItemsPanel>
@@ -69,7 +70,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:ServerSelectionViewModel">
-                        <CheckBox Width="72" HorizontalContentAlignment="Center" HorizontalAlignment="Center"
+                        <CheckBox Width="96" HorizontalContentAlignment="Center" HorizontalAlignment="Center"
                                   IsChecked="{Binding IsEnabled}"
                                   IsEnabled="{Binding ServerId, Converter={x:Static vm:MatrixCellEnabledConverter.Instance}}" />
                       </DataTemplate>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using McpManager.Core.Models;
 
@@ -95,5 +96,6 @@ public partial class PlaceColumnViewModel : ViewModelBase
 
   public bool ShowHollowDot => Status == PlaceStatus.NotDeployedYet;
 
-  public string ToolTipText => $"{Place.Path}{Environment.NewLine}{StatusText}";
+  public string ToolTipText =>
+    string.Join(Environment.NewLine, new[] { Header, Place.Path, StatusText }.Where(s => !string.IsNullOrWhiteSpace(s)));
 }
