@@ -80,8 +80,8 @@ public static class ServerDiffService
     StringComparer sortComparer,
     string managedKey)
   {
-    Dictionary<string, string> leftMap = new(left.Where(p => !lookupComparer.Equals(p.Key, managedKey)), lookupComparer);
-    Dictionary<string, string> rightMap = new(right.Where(p => !lookupComparer.Equals(p.Key, managedKey)), lookupComparer);
+    Dictionary<string, string> leftMap = WithoutKey(left, managedKey, lookupComparer);
+    Dictionary<string, string> rightMap = WithoutKey(right, managedKey, lookupComparer);
 
     return leftMap.Keys.Union(rightMap.Keys, lookupComparer)
       .OrderBy(k => k, sortComparer)
@@ -91,6 +91,21 @@ public static class ServerDiffService
         string? r = rightMap.TryGetValue(key, out string? rv) ? rv : null;
         return Value(prefix + key, l, r, SecretMask.IsSecretKey(key));
       });
+  }
+
+  private static Dictionary<string, string> WithoutKey(
+    Dictionary<string, string> values, string excluded, StringComparer comparer)
+  {
+    Dictionary<string, string> result = new(comparer);
+    foreach ((string key, string value) in values)
+    {
+      if (!comparer.Equals(key, excluded))
+      {
+        result[key] = value;
+      }
+    }
+
+    return result;
   }
 
   private static FieldDiff? Tools(List<string> left, List<string> right)

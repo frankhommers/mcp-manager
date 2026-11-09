@@ -140,6 +140,17 @@ public class ServerDiffServiceTests
   }
 
   [Fact]
+  public void Header_keys_differing_only_by_case_do_not_throw()
+  {
+    McpServer left = new() { Name = "s", HttpHeaders = { ["Authorization"] = "Bearer a", ["authorization"] = "Bearer b" } };
+    McpServer right = new() { Name = "s", HttpHeaders = { ["AUTHORIZATION"] = "Bearer b" } };
+
+    ServerDiff diff = ServerDiffService.Compare(left, right);
+
+    Assert.Single(diff.Fields, f => f.Field.StartsWith("header:", StringComparison.Ordinal));
+  }
+
+  [Fact]
   public void Env_only_on_one_side_is_added_and_fields_are_ordered()
   {
     McpServer left = new() { Name = "s", Command = "x", AlwaysAllow = ["b", "a"] };

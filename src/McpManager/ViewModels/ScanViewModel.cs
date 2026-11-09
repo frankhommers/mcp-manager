@@ -100,13 +100,24 @@ public partial class ScanViewModel : ViewModelBase
       foreach (ScannedFolder folder in found)
       {
         List<string> skipped = [];
-        IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry.Servers, skipped);
+        IReadOnlyList<ScanServerMatch> matches = [];
+        string? error = null;
+        try
+        {
+          matches = _planner.Match([folder], registry.Servers, skipped);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+          error = ex.Message;
+        }
+
         string prefix = folder.Path + ": ";
         Folders.Add(new ScannedFolderViewModel(
           folder,
           ScanImportPlanner.FindPlace(registry, folder),
           matches,
-          [.. skipped.Select(s => s.StartsWith(prefix, StringComparison.Ordinal) ? s[prefix.Length..] : s)]));
+          [.. skipped.Select(s => s.StartsWith(prefix, StringComparison.Ordinal) ? s[prefix.Length..] : s)],
+          error));
       }
 
       Message = Folders.Count switch
@@ -141,14 +152,24 @@ public partial class ScanViewModel : ViewModelBase
       return;
     }
 
-    List<ScannedFolder> selected = [.. Folders.Where(f => f.IsSelected).Select(f => f.Folder)];
+    List<ScannedFolder> selected = [.. Folders.Where(f => f.IsSelected && f.CanSelect).Select(f => f.Folder)];
     if (selected.Count == 0)
     {
       Message = "Select at least one folder.";
       return;
     }
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match(selected, registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches;
+    try
+    {
+      matches = _planner.Match(selected, registry.Servers);
+    }
+    catch (Exception ex)
+    {
+      Message = $"Could not compare: {ex.Message}";
+      return;
+    }
+
     List<ScanServerMatch> differing = [.. matches.Where(m => m.Kind == ScanMatchKind.Differs)];
     if (differing.Count == 0)
     {

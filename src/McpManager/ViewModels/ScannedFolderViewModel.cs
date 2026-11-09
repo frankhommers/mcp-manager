@@ -16,10 +16,12 @@ public partial class ScannedFolderViewModel : ViewModelBase
     ScannedFolder folder,
     TargetFolder? existing,
     IReadOnlyList<ScanServerMatch> matches,
-    IReadOnlyList<string> skipped)
+    IReadOnlyList<string> skipped,
+    string? error = null)
   {
     Folder = folder;
     IsNew = existing == null;
+    CanSelect = error == null;
     if (existing == null)
     {
       bool looksLikeTest = folder.Path.Contains("test", StringComparison.OrdinalIgnoreCase);
@@ -33,7 +35,12 @@ public partial class ScannedFolderViewModel : ViewModelBase
       _isSelected = gainedHarness;
     }
 
-    Summary = BuildSummary(folder, matches, skipped);
+    if (error != null)
+    {
+      _isSelected = false;
+    }
+
+    Summary = error == null ? BuildSummary(folder, matches, skipped) : $"Could not compare: {error}";
   }
 
   public ScannedFolder Folder { get; }
@@ -45,6 +52,8 @@ public partial class ScannedFolderViewModel : ViewModelBase
   public IReadOnlyList<string> ClientChips => PlaceColumnViewModel.ChipsFor(Folder.Clients);
 
   public bool IsNew { get; }
+
+  public bool CanSelect { get; }
 
   public string Note { get; }
 

@@ -167,6 +167,49 @@ public class ScanViewModelTests : IDisposable
     Assert.Equal(before, RegistryService.Serialize(registry));
   }
 
+  [Fact]
+  public async Task Duplicate_header_keys_do_not_break_the_scan()
+  {
+    Write("app/.mcp.json",
+      """{"mcpServers":{"api":{"type":"http","url":"https://x","headers":{"Authorization":"a","authorization":"b"}}}}""");
+    McpRegistry registry = Registry(new McpServer
+    {
+      Name = "api",
+      TransportType = McpTransportType.Http,
+      Url = "https://x",
+      HttpHeaders = { ["Authorization"] = "c" },
+    });
+    ScanViewModel scan = CreateScan(registry);
+
+    await scan.ScanCommand.ExecuteAsync(null);
+
+    Assert.Equal("Found 1 folder.", scan.Message);
+    Assert.Equal("1 differs", Folder(scan, "app").Summary);
+  }
+
+  [Fact]
+  public async Task Folder_comparison_failure_is_reported_in_its_row()
+  {
+    Write("good/.mcp.json", ClaudeJson("tool", "run"));
+    Write("bad/.mcp.json", ClaudeJson("tool", "run"));
+    McpRegistry registry = Registry();
+    ScanViewModel scan = new(
+      new ConfigScanService(new ConfigExportService(), _ => []),
+      new FailingPlanner("bad"),
+      () => registry,
+      _ => { });
+
+    await scan.ScanCommand.ExecuteAsync(null);
+
+    Assert.Equal("Found 2 folders.", scan.Message);
+    ScannedFolderViewModel bad = Folder(scan, "bad");
+    Assert.Equal("Could not compare: boom", bad.Summary);
+    Assert.False(bad.IsSelected);
+    Assert.False(bad.CanSelect);
+    Assert.Equal("1 unknown", Folder(scan, "good").Summary);
+    Assert.True(Folder(scan, "good").IsSelected);
+  }
+
   private static ScannedFolderViewModel Folder(ScanViewModel scan, string name) =>
     scan.Folders.Single(f => Path.GetFileName(f.Path) == name);
 
@@ -202,6 +245,21 @@ public class ScanViewModelTests : IDisposable
 
   private static string ClaudeJson(string name, string command) =>
     $"{{\"mcpServers\":{{\"{name}\":{{\"command\":\"{command}\"}}}}}}";
+
+  private sealed class FailingPlanner(string failingFolder) : ScanImportPlanner(new ConfigImportService())
+  {
+    public override IReadOnlyList<ScanServerMatch> Match(
+      IEnumerable<ScannedFolder> folders, IReadOnlyList<McpServer> library, ICollection<string>? skipped = null)
+    {
+      List<ScannedFolder> list = [.. folders];
+      if (list.Any(f => Path.GetFileName(f.Path) == failingFolder))
+      {
+        throw new InvalidOperationException("boom");
+      }
+
+      return base.Match(list, library, skipped);
+    }
+  }
 
   private sealed class ShellStub : IShellEnvironmentService
   {

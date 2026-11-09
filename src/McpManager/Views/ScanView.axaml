@@ -53,7 +53,7 @@
           <Border Padding="12,8" CornerRadius="6" BorderThickness="1"
                   BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
-              <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Top"
+              <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding CanSelect}" VerticalAlignment="Top"
                         AutomationProperties.Name="{Binding Path}" />
               <StackPanel Grid.Column="1" Spacing="2">
                 <StackPanel Orientation="Horizontal" Spacing="8">

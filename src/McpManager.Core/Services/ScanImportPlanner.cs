@@ -7,7 +7,7 @@ namespace McpManager.Core.Services;
 
 public class ScanImportPlanner(IConfigImportService importService)
 {
-  public IReadOnlyList<ScanServerMatch> Match(IEnumerable<ScannedFolder> folders, IReadOnlyList<McpServer> library,
+  public virtual IReadOnlyList<ScanServerMatch> Match(IEnumerable<ScannedFolder> folders, IReadOnlyList<McpServer> library,
     ICollection<string>? skipped = null)
   {
     List<ScanServerMatch> matches = [];
