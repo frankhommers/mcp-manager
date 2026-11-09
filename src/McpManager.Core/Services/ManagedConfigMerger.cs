@@ -63,7 +63,8 @@ public static class ManagedConfigMerger
       current, desired, ManagedServerIdentity.Read,
       node => node?.ToJsonString(WriteOptions) ?? "null", filePath, client, resolutions, adoptedNames);
 
-    foreach (string name in current.Where(s => ManagedServerIdentity.Read(s.Value) != null)
+    foreach (string name in current.Where(s => ManagedServerIdentity.Read(s.Value) != null ||
+                                               adoptedNames?.Contains(s.Key) == true)
                .Select(s => s.Key).ToList())
     {
       current.Remove(name);
@@ -99,7 +100,8 @@ public static class ManagedConfigMerger
       current, desired, ManagedServerIdentity.Read,
       server => TomlSerializer.Serialize(new TomlTable { ["server"] = server }), filePath, client, resolutions, adoptedNames);
 
-    foreach (string name in current.Where(s => ManagedServerIdentity.Read(s.Value) != null)
+    foreach (string name in current.Where(s => ManagedServerIdentity.Read(s.Value) != null ||
+                                               adoptedNames?.Contains(s.Key) == true)
                .Select(s => s.Key).ToList())
     {
       current.Remove(name);

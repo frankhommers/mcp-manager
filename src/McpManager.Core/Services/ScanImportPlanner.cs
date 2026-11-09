@@ -1,10 +1,14 @@
+using System.Text;
+using System.Text.Json;
 using McpManager.Core.Models;
+using Tomlyn;
 
 namespace McpManager.Core.Services;
 
 public class ScanImportPlanner(IConfigImportService importService)
 {
-  public IReadOnlyList<ScanServerMatch> Match(IEnumerable<ScannedFolder> folders, IReadOnlyList<McpServer> library)
+  public IReadOnlyList<ScanServerMatch> Match(IEnumerable<ScannedFolder> folders, IReadOnlyList<McpServer> library,
+    ICollection<string>? skipped = null)
   {
     List<ScanServerMatch> matches = [];
     Dictionary<string, McpServer> firstUnknown = new(StringComparer.Ordinal);
@@ -18,7 +22,17 @@ public class ScanImportPlanner(IConfigImportService importService)
 
       foreach (ExistingTargetServer found in distinct)
       {
-        McpServer imported = importService.ImportServer(found);
+        McpServer imported;
+        try
+        {
+          imported = importService.ImportServer(found);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or JsonException or TomlException)
+        {
+          skipped?.Add($"{folder.Path}: {found.Name}: {ex.Message}");
+          continue;
+        }
+
         McpServer? known = FindInLibrary(library, found);
         if (known == null && firstUnknown.TryGetValue(found.Name, out McpServer? first))
         {
@@ -48,17 +62,16 @@ public class ScanImportPlanner(IConfigImportService importService)
     IReadOnlyDictionary<ScanServerMatch, ScanChoice> choices)
   {
     List<ScannedFolder> folders = selected.ToList();
+    List<PlannedServer> plan = [];
     foreach (ScannedFolder folder in folders)
     {
       foreach (ScanServerMatch match in FolderMatches(folder, matches))
       {
-        if (match.Kind == ScanMatchKind.Differs && !choices.ContainsKey(match))
-        {
-          throw new ArgumentException(
-            $"No choice was made for server '{match.Found.Name}' in '{folder.Path}'.", nameof(choices));
-        }
+        plan.Add(Plan(folder, match, choices));
       }
     }
+
+    ValidateConflicts(plan);
 
     foreach (ScannedFolder folder in folders)
     {
@@ -66,20 +79,124 @@ public class ScanImportPlanner(IConfigImportService importService)
       TargetFolder place = FindPlace(registry, folder) ?? AddPlace(registry, folder, placeName);
       place.EnabledClients |= folder.Clients;
 
-      foreach (ScanServerMatch match in FolderMatches(folder, matches))
+      foreach (PlannedServer entry in plan.Where(p => ReferenceEquals(p.Folder, folder)))
       {
-        McpServer server = Resolve(registry, match, choices, placeName);
-        if (!match.Found.IsEnabled)
+        if (entry.Choice == ScanChoice.ImportSeparately)
+        {
+          entry.Target.Name = $"{entry.Match.Found.Name}-{Slug(placeName)}";
+        }
+
+        McpServer server = EnsureInLibrary(registry, entry.Target);
+        if (entry.Choice == ScanChoice.UseFoundVersion)
+        {
+          CopyDefinition(entry.Match.Imported, server);
+        }
+
+        if (!entry.Match.Found.IsEnabled)
         {
           continue;
         }
 
         place.EnabledServers.Add(server.Id);
         place.DisabledServers.Remove(server.Id);
-        place.AdoptedServerNames.Add(match.Found.Name);
+        place.AdoptedServerNames.Add(entry.Match.Found.Name);
       }
     }
   }
+
+  private static PlannedServer Plan(
+    ScannedFolder folder,
+    ScanServerMatch match,
+    IReadOnlyDictionary<ScanServerMatch, ScanChoice> choices)
+  {
+    if (match.Library == null)
+    {
+      return new PlannedServer(folder, match, ScanChoice.KeepLibrary, match.Imported);
+    }
+
+    ScanChoice choice = ScanChoice.KeepLibrary;
+    if (match.Kind == ScanMatchKind.Differs)
+    {
+      if (!choices.TryGetValue(match, out choice))
+      {
+        throw new ArgumentException(
+          $"No choice was made for server '{match.Found.Name}' in '{folder.Path}'.", nameof(choices));
+      }
+
+      if (!Enum.IsDefined(choice))
+      {
+        throw new ArgumentException(
+          $"Invalid choice for server '{match.Found.Name}' in '{folder.Path}'.", nameof(choices));
+      }
+    }
+
+    McpServer target = choice == ScanChoice.ImportSeparately ? match.Imported : match.Library;
+    return new PlannedServer(folder, match, choice, target);
+  }
+
+  private static void ValidateConflicts(List<PlannedServer> plan)
+  {
+    foreach (IGrouping<McpServer, PlannedServer> group in plan
+               .Where(p => p.Choice != ScanChoice.ImportSeparately)
+               .GroupBy(p => p.Target))
+    {
+      List<PlannedServer> overwrites = group.Where(p => p.Choice == ScanChoice.UseFoundVersion).ToList();
+      string name = group.First().Match.Found.Name;
+      foreach (PlannedServer other in overwrites.Skip(1))
+      {
+        if (!SameDefinition(overwrites[0].Match.Imported, other.Match.Imported))
+        {
+          throw new ArgumentException(
+            $"Folders '{overwrites[0].Folder.Path}' and '{other.Folder.Path}' both want to replace server " +
+            $"'{name}' with different definitions.", nameof(plan));
+        }
+      }
+
+      if (overwrites.Count == 0)
+      {
+        continue;
+      }
+
+      McpServer final = overwrites[0].Match.Imported;
+      foreach (PlannedServer adopter in group)
+      {
+        if (!SameDefinition(final, adopter.Match.Imported))
+        {
+          throw new ArgumentException(
+            $"Server '{name}' in '{adopter.Folder.Path}' would be changed by the version from '{overwrites[0].Folder.Path}'.",
+            nameof(plan));
+        }
+      }
+    }
+  }
+
+  private static bool SameDefinition(McpServer left, McpServer right)
+  {
+    McpServer normalized = new()
+    {
+      Name = right.Name,
+      AlwaysAllow = left.AlwaysAllow,
+    };
+    CopyDefinition(right, normalized);
+    return !ServerDiffService.Compare(left, normalized).HasDifferences;
+  }
+
+  private static string Slug(string value)
+  {
+    StringBuilder builder = new();
+    foreach (char c in value.ToLowerInvariant())
+    {
+      char mapped = c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-' ? c : '-';
+      if (mapped != '-' || (builder.Length > 0 && builder[^1] != '-'))
+      {
+        builder.Append(mapped);
+      }
+    }
+
+    return builder.ToString().Trim('-');
+  }
+
+  private sealed record PlannedServer(ScannedFolder Folder, ScanServerMatch Match, ScanChoice Choice, McpServer Target);
 
   private static IEnumerable<ScanServerMatch> FolderMatches(ScannedFolder folder, IReadOnlyList<ScanServerMatch> matches) =>
     matches.Where(m => string.Equals(m.FolderPath, folder.Path, StringComparison.Ordinal));
@@ -96,32 +213,6 @@ public class ScanImportPlanner(IConfigImportService importService)
     }
 
     return library.FirstOrDefault(s => string.Equals(s.Name, found.Name, StringComparison.Ordinal));
-  }
-
-  private McpServer Resolve(
-    McpRegistry registry,
-    ScanServerMatch match,
-    IReadOnlyDictionary<ScanServerMatch, ScanChoice> choices,
-    string placeName)
-  {
-    if (match.Library == null)
-    {
-      return EnsureInLibrary(registry, match.Imported);
-    }
-
-    ScanChoice choice = match.Kind == ScanMatchKind.Differs ? choices[match] : ScanChoice.KeepLibrary;
-    switch (choice)
-    {
-      case ScanChoice.ImportSeparately:
-        match.Imported.Name = $"{match.Found.Name}-{placeName}";
-        return EnsureInLibrary(registry, match.Imported);
-      case ScanChoice.UseFoundVersion:
-        McpServer target = EnsureInLibrary(registry, match.Library);
-        CopyDefinition(match.Imported, target);
-        return target;
-      default:
-        return EnsureInLibrary(registry, match.Library);
-    }
   }
 
   private static McpServer EnsureInLibrary(McpRegistry registry, McpServer server)

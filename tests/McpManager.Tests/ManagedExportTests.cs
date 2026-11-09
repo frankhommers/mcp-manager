@@ -219,6 +219,33 @@ public class ManagedExportTests : IDisposable
   }
 
   [Fact]
+  public void Adopted_name_not_desired_is_removed_from_json()
+  {
+    const string existing = """{"mcpServers":{"tool":{"command":"old"},"manual":{"command":"keep"}}}""";
+    string generated = new ClaudeCodeConfigGenerator().GenerateConfig([]);
+
+    string result = ManagedConfigMerger.MergeJson(
+      existing, generated, "mcpServers", "test", TargetClientFlags.ClaudeCode, null, new HashSet<string> { "tool" });
+
+    JsonNode servers = JsonNode.Parse(result)!["mcpServers"]!;
+    Assert.Null(servers["tool"]);
+    Assert.NotNull(servers["manual"]);
+  }
+
+  [Fact]
+  public void Adopted_name_not_desired_is_removed_from_toml()
+  {
+    const string existing = "[mcp_servers.tool]\ncommand = \"old\"\n\n[mcp_servers.manual]\ncommand = \"keep\"\n";
+    string generated = new CodexConfigGenerator().GenerateConfig([]);
+
+    string result = ManagedConfigMerger.MergeToml(
+      existing, generated, "test", TargetClientFlags.Codex, null, new HashSet<string> { "tool" });
+
+    Assert.DoesNotContain("tool", result);
+    Assert.Contains("manual", result);
+  }
+
+  [Fact]
   public void Invalid_marker_does_not_claim_ownership()
   {
     const string existing = """

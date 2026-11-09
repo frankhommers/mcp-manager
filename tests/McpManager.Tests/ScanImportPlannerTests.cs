@@ -175,6 +175,7 @@ public class ScanImportPlannerTests
     Assert.Equal(3, registry.Servers.Count);
     McpServer added = registry.Servers[2];
     Assert.Equal("tool-api-2", added.Name);
+    Assert.Contains("tool", registry.TargetFolders[0].AdoptedServerNames);
     Assert.Equal("A", registry.Servers[0].EnvironmentVariables["TOKEN"]);
     Assert.Equal(3, registry.Servers.Select(s => s.Id).Distinct().Count());
     Assert.Contains(added.Id, registry.TargetFolders[0].EnabledServers);
@@ -281,5 +282,128 @@ public class ScanImportPlannerTests
     });
 
     Assert.Equal(2, registry.Servers.Select(s => s.Id).Distinct().Count());
+  }
+
+  [Fact]
+  public void Import_separately_slugs_global_place_name()
+  {
+    McpRegistry registry = new();
+    registry.Servers.Add(Library("tool", "old", "A"));
+    ScannedFolder global = Folder(
+      "/home/.claude.json", TargetClientFlags.ClaudeCodeGlobal, true,
+      Found("tool", "new", "B", client: TargetClientFlags.ClaudeCodeGlobal));
+
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([global], registry.Servers);
+    _planner.Apply(registry, [global], matches, new Dictionary<ScanServerMatch, ScanChoice>
+    {
+      [matches[0]] = ScanChoice.ImportSeparately,
+    });
+
+    Assert.Equal("tool-claude-code", registry.Servers[1].Name);
+  }
+
+  [Fact]
+  public void Unparseable_entries_are_skipped_and_reported()
+  {
+    ExistingTargetServer bad = new("bad", null, true, TargetClientFlags.ClaudeCode, "/x/.mcp.json", "{ not json");
+    ScannedFolder folder = Folder("/p/a", TargetClientFlags.ClaudeCode, false, bad, Found("good", "run"));
+    List<string> skipped = [];
+
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], [], skipped);
+
+    Assert.Equal("good", Assert.Single(matches).Found.Name);
+    string message = Assert.Single(skipped);
+    Assert.StartsWith("/p/a: bad: ", message);
+  }
+
+  [Fact]
+  public void Undefined_choice_is_rejected()
+  {
+    McpRegistry registry = new();
+    registry.Servers.Add(Library("tool", "run", "A"));
+    ScannedFolder folder = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "B"));
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry.Servers);
+
+    Assert.Throws<ArgumentException>(() => _planner.Apply(registry, [folder], matches,
+      new Dictionary<ScanServerMatch, ScanChoice> { [matches[0]] = (ScanChoice)99 }));
+    Assert.Empty(registry.TargetFolders);
+  }
+
+  [Fact]
+  public void Two_different_found_versions_cannot_both_replace_the_library()
+  {
+    McpRegistry registry = new();
+    McpServer library = Library("tool", "run", "A");
+    registry.Servers.Add(library);
+    ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "B"));
+    ScannedFolder b = Folder("/p/b", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "C"));
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry.Servers);
+
+    ArgumentException ex = Assert.Throws<ArgumentException>(() => _planner.Apply(registry, [a, b], matches,
+      matches.ToDictionary(m => m, _ => ScanChoice.UseFoundVersion)));
+
+    Assert.Contains("tool", ex.Message);
+    Assert.Contains("/p/a", ex.Message);
+    Assert.Contains("/p/b", ex.Message);
+    Assert.Empty(registry.TargetFolders);
+    Assert.Equal("A", library.EnvironmentVariables["TOKEN"]);
+  }
+
+  [Theory]
+  [InlineData(ScanChoice.KeepLibrary)]
+  [InlineData(ScanChoice.ImportSeparately)]
+  public void Replacing_the_library_conflicts_with_a_folder_that_keeps_a_different_version(ScanChoice other)
+  {
+    McpRegistry registry = new();
+    registry.Servers.Add(Library("tool", "run", "A"));
+    ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "B"));
+    ScannedFolder b = Folder("/p/b", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "C"));
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry.Servers);
+    Dictionary<ScanServerMatch, ScanChoice> choices = new()
+    {
+      [matches[0]] = other,
+      [matches[1]] = ScanChoice.UseFoundVersion,
+    };
+
+    if (other == ScanChoice.KeepLibrary)
+    {
+      Assert.Throws<ArgumentException>(() => _planner.Apply(registry, [a, b], matches, choices));
+      Assert.Empty(registry.TargetFolders);
+    }
+    else
+    {
+      _planner.Apply(registry, [a, b], matches, choices);
+      Assert.Equal("C", registry.Servers[0].EnvironmentVariables["TOKEN"]);
+    }
+  }
+
+  [Fact]
+  public void Replacing_the_library_conflicts_with_a_known_folder()
+  {
+    McpRegistry registry = new();
+    registry.Servers.Add(Library("tool", "run", "A"));
+    ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "A"));
+    ScannedFolder b = Folder("/p/b", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "C"));
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry.Servers);
+
+    Assert.Throws<ArgumentException>(() => _planner.Apply(registry, [a, b], matches,
+      new Dictionary<ScanServerMatch, ScanChoice> { [matches[1]] = ScanChoice.UseFoundVersion }));
+    Assert.Empty(registry.TargetFolders);
+  }
+
+  [Fact]
+  public void Replacing_a_first_occurrence_conflicts_unless_that_folder_is_unselected()
+  {
+    ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "A"));
+    ScannedFolder b = Folder("/p/b", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "C"));
+    McpRegistry registry = new();
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry.Servers);
+    Dictionary<ScanServerMatch, ScanChoice> choices = new() { [matches[1]] = ScanChoice.UseFoundVersion };
+
+    Assert.Throws<ArgumentException>(() => _planner.Apply(registry, [a, b], matches, choices));
+    Assert.Empty(registry.Servers);
+
+    _planner.Apply(registry, [b], matches, choices);
+    Assert.Equal("C", Assert.Single(registry.Servers).EnvironmentVariables["TOKEN"]);
   }
 }
