@@ -76,43 +76,43 @@ public partial class MainWindowViewModel : ViewModelBase
 
   [ObservableProperty] private TargetFolderViewModel? _selectedTarget;
 
-  // When server is selected, clear target selection and hide settings
-  partial void OnSelectedServerChanged(McpServerViewModel? value)
-  {
-    if (value != null)
+  partial void OnSelectedServerChanged(McpServerViewModel? oldValue, McpServerViewModel? newValue) =>
+    Navigate(new NavigationSnapshot(oldValue, SelectedTarget, ShowSettings), () =>
     {
-      SelectedProfile = null;
-      SelectedTarget = null;
-      ShowSettings = false;
-    }
+      if (newValue != null)
+      {
+        SelectedProfile = null;
+        SelectedTarget = null;
+        ShowSettings = false;
+      }
 
-    OnPropertyChanged(nameof(CurrentPage));
-    OnPropertyChanged(nameof(ShowOverview));
-    OnPropertyChanged(nameof(IsServerListActive));
-    OnPropertyChanged(nameof(IsTargetListActive));
+      OnPropertyChanged(nameof(CurrentPage));
+      OnPropertyChanged(nameof(ShowOverview));
+      OnPropertyChanged(nameof(IsServerListActive));
+      OnPropertyChanged(nameof(IsTargetListActive));
 
-    OnPropertyChanged(nameof(ServerUsage));
-    McpTestResult = ""; // Clear test result when switching servers
-    DetectResult = ""; // Clear detect result when switching servers
-    FetchToolsResult = ""; // Clear fetch tools result when switching servers
-  }
+      OnPropertyChanged(nameof(ServerUsage));
+      McpTestResult = "";
+      DetectResult = "";
+      FetchToolsResult = "";
+    });
 
-  // When target is selected, clear server selection and hide settings
-  partial void OnSelectedTargetChanged(TargetFolderViewModel? value)
-  {
-    if (value != null)
+  partial void OnSelectedTargetChanged(TargetFolderViewModel? oldValue, TargetFolderViewModel? newValue) =>
+    Navigate(new NavigationSnapshot(SelectedServer, oldValue, ShowSettings), () =>
     {
-      SelectedProfile = null;
-      SelectedServer = null;
-      ShowSettings = false;
-      _ = value.RefreshExistingServersAsync(_registry?.Settings);
-    }
+      if (newValue != null)
+      {
+        SelectedProfile = null;
+        SelectedServer = null;
+        ShowSettings = false;
+        _ = newValue.RefreshExistingServersAsync(_registry?.Settings);
+      }
 
-    OnPropertyChanged(nameof(CurrentPage));
-    OnPropertyChanged(nameof(ShowOverview));
-    OnPropertyChanged(nameof(IsServerListActive));
-    OnPropertyChanged(nameof(IsTargetListActive));
-  }
+      OnPropertyChanged(nameof(CurrentPage));
+      OnPropertyChanged(nameof(ShowOverview));
+      OnPropertyChanged(nameof(IsServerListActive));
+      OnPropertyChanged(nameof(IsTargetListActive));
+    });
 
   [ObservableProperty] private bool _isLoading;
 
@@ -120,13 +120,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
   [ObservableProperty] private bool _showSettings;
 
-  partial void OnShowSettingsChanged(bool value)
-  {
-    OnPropertyChanged(nameof(CurrentPage));
-    OnPropertyChanged(nameof(ShowOverview));
-    OnPropertyChanged(nameof(IsServerListActive));
-    OnPropertyChanged(nameof(IsTargetListActive));
-  }
+  partial void OnShowSettingsChanged(bool oldValue, bool newValue) =>
+    Navigate(new NavigationSnapshot(SelectedServer, SelectedTarget, oldValue), () =>
+    {
+      OnPropertyChanged(nameof(CurrentPage));
+      OnPropertyChanged(nameof(ShowOverview));
+      OnPropertyChanged(nameof(IsServerListActive));
+      OnPropertyChanged(nameof(IsTargetListActive));
+    });
 
   [ObservableProperty] private string _bridgeCommandHttp = "mcp-proxy {args} {headerArgs} {url}";
 
@@ -189,12 +190,7 @@ public partial class MainWindowViewModel : ViewModelBase
       _registry = await _registryService.LoadAsync();
       _suppressMatrixRebuild = true;
       RefreshFromRegistry();
-
-      BridgeCommandHttp = _registry.Settings.BridgeCommandHttp;
-      BridgeCommandSse = _registry.Settings.BridgeCommandSse;
-      BridgeCommandStreamableHttp = _registry.Settings.BridgeCommandStreamableHttp;
-      BridgeHeaderArgumentTemplate = _registry.Settings.BridgeHeaderArgumentTemplate;
-      SelectedThemeMode = _registry.Settings.ThemeMode;
+      LoadSettings(_registry.Settings);
       InitializeManagement();
       StatusMessage = "";
     }
@@ -209,6 +205,15 @@ public partial class MainWindowViewModel : ViewModelBase
       RebuildMatrix();
       IsLoading = false;
     }
+  }
+
+  private void LoadSettings(GlobalSettings settings)
+  {
+    BridgeCommandHttp = settings.BridgeCommandHttp;
+    BridgeCommandSse = settings.BridgeCommandSse;
+    BridgeCommandStreamableHttp = settings.BridgeCommandStreamableHttp;
+    BridgeHeaderArgumentTemplate = settings.BridgeHeaderArgumentTemplate;
+    SelectedThemeMode = settings.ThemeMode;
   }
 
   private void RefreshFromRegistry()
@@ -255,7 +260,10 @@ public partial class MainWindowViewModel : ViewModelBase
   private void OnTargetPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
   {
     if (e.PropertyName is nameof(TargetFolderViewModel.Name) or nameof(TargetFolderViewModel.Path)
-        or nameof(TargetFolderViewModel.BridgeArgs)) ScheduleCheck();
+        or nameof(TargetFolderViewModel.BridgeArgs) or nameof(TargetFolderViewModel.EnableClaudeCode)
+        or nameof(TargetFolderViewModel.EnableClaudeDesktop) or nameof(TargetFolderViewModel.EnableOpenCode)
+        or nameof(TargetFolderViewModel.EnableCodex) or nameof(TargetFolderViewModel.EnableCursor)
+        or nameof(TargetFolderViewModel.EnableVsCode)) ScheduleCheck();
     if (sender is TargetFolderViewModel target &&
         e.PropertyName is nameof(TargetFolderViewModel.Path) or nameof(TargetFolderViewModel.EnableClaudeCode)
           or nameof(TargetFolderViewModel.EnableClaudeDesktop) or nameof(TargetFolderViewModel.EnableOpenCode)
@@ -366,14 +374,14 @@ public partial class MainWindowViewModel : ViewModelBase
   #region Selection Commands
 
   [RelayCommand]
-  private void ClearSelection()
+  private void ClearSelection() => Navigate(CurrentNavigation(), () =>
   {
     SelectedProfile = null;
     CheckTargets();
     SelectedServer = null;
     SelectedTarget = null;
     ShowSettings = false;
-  }
+  });
 
   [RelayCommand]
   private void SelectServer(McpServerViewModel? server)
@@ -382,13 +390,13 @@ public partial class MainWindowViewModel : ViewModelBase
   }
 
   [RelayCommand]
-  private void OpenSettings()
+  private void OpenSettings() => Navigate(CurrentNavigation(), () =>
   {
     SelectedProfile = null;
     SelectedServer = null;
     SelectedTarget = null;
     ShowSettings = true;
-  }
+  });
 
   [ObservableProperty] private string _bridgeTestResult = "";
 
@@ -458,6 +466,7 @@ public partial class MainWindowViewModel : ViewModelBase
     if (_registry != null)
     {
       _registry.Settings.BridgeCommandHttp = value;
+      ScheduleCheck();
     }
 
     BridgeTestResult = ""; // Clear test result when command changes
@@ -468,6 +477,7 @@ public partial class MainWindowViewModel : ViewModelBase
     if (_registry != null)
     {
       _registry.Settings.BridgeCommandSse = value;
+      ScheduleCheck();
     }
   }
 
@@ -476,6 +486,7 @@ public partial class MainWindowViewModel : ViewModelBase
     if (_registry != null)
     {
       _registry.Settings.BridgeCommandStreamableHttp = value;
+      ScheduleCheck();
     }
   }
 
@@ -484,6 +495,7 @@ public partial class MainWindowViewModel : ViewModelBase
     if (_registry != null)
     {
       _registry.Settings.BridgeHeaderArgumentTemplate = value;
+      ScheduleCheck();
     }
   }
 
@@ -502,6 +514,7 @@ public partial class MainWindowViewModel : ViewModelBase
     if (_registry != null)
     {
       _registry.Settings.ThemeMode = value;
+      ScheduleCheck();
     }
   }
 
@@ -573,7 +586,7 @@ public partial class MainWindowViewModel : ViewModelBase
     McpServerViewModel vm = new(server);
     vm.PropertyChanged += OnServerPropertyChanged;
     Servers.Add(vm);
-    SelectedServer = vm;
+    WithoutNavigationGuard(() => SelectedServer = vm);
 
     // Auto-enable new server for all targets
     foreach (TargetFolder target in _registry.TargetFolders)
@@ -588,7 +601,7 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     OnPropertyChanged(nameof(ServerGroups));
-    StatusMessage = "Server added - don't forget to Save!";
+    StatusMessage = "Server added.";
   }
 
   [RelayCommand]
@@ -636,7 +649,7 @@ public partial class MainWindowViewModel : ViewModelBase
     McpServerViewModel vm = new(server);
     vm.PropertyChanged += OnServerPropertyChanged;
     Servers.Add(vm);
-    SelectedServer = vm;
+    WithoutNavigationGuard(() => SelectedServer = vm);
 
     foreach (TargetFolder target in _registry.TargetFolders)
     {
@@ -649,7 +662,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     string summary = vm.ApplyParsed(parsed);
     OnPropertyChanged(nameof(ServerGroups));
-    StatusMessage = $"{summary} - don't forget to Save!";
+    StatusMessage = summary;
   }
 
   [RelayCommand]
@@ -698,7 +711,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
       _registry.Servers.Remove(server);
       Servers.Remove(SelectedServer);
-      SelectedServer = null;
+      WithoutNavigationGuard(() => SelectedServer = null);
 
       // Refresh target folder server lists
       foreach (TargetFolderViewModel target in TargetFolders)
@@ -1419,7 +1432,7 @@ public partial class MainWindowViewModel : ViewModelBase
     vm.PropertyChanged += OnTargetPropertyChanged;
     TargetFolders.Add(vm);
     AttachTarget(vm);
-    SelectedTarget = vm;
+    WithoutNavigationGuard(() => SelectedTarget = vm);
   }
 
 
@@ -1449,7 +1462,7 @@ public partial class MainWindowViewModel : ViewModelBase
       _registry.TargetFolders.Remove(target);
       SelectedTarget.PropertyChanged -= OnTargetPropertyChanged;
       TargetFolders.Remove(SelectedTarget);
-      SelectedTarget = null;
+      WithoutNavigationGuard(() => SelectedTarget = null);
       CheckTargets();
     }
   }
@@ -1742,34 +1755,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
   #endregion
 
-  #region Save & Export Commands
-
-  [RelayCommand]
-  private async Task SaveAsync()
-  {
-    if (_registry == null)
-    {
-      return;
-    }
-
-    IsLoading = true;
-    StatusMessage = "Saving...";
-
-    try
-    {
-      SyncModels();
-      await _registryService.SaveAsync(_registry);
-      StatusMessage = "Saved successfully";
-    }
-    catch (Exception ex)
-    {
-      StatusMessage = $"Error saving: {ex.Message}";
-    }
-    finally
-    {
-      IsLoading = false;
-    }
-  }
+  #region Export Commands
 
   [RelayCommand]
   private async Task ExportSelectedTargetAsync()
@@ -1782,7 +1768,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     if (selectedTarget.IsManagedTarget)
     {
-      await UpdateTargetsAsync([selectedTarget]);
+      await DeployPlaceAsync(selectedTarget);
       return;
     }
     SyncModels();
@@ -1845,7 +1831,7 @@ public partial class MainWindowViewModel : ViewModelBase
   }
 
   [RelayCommand]
-  private Task ExportAllTargetsAsync() => UpdateTargetsAsync(ManagedTargets.ToList());
+  private async Task ExportAllTargetsAsync() => await UpdateTargetsAsync(ManagedTargets.ToList());
 
   private async Task<ExportConflictResolution?> ResolveExportConflictAsync(ExportConflict conflict)
   {

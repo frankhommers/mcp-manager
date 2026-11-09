@@ -92,6 +92,29 @@ public class PlaceStatusServiceTests : IDisposable
   }
 
   [Fact]
+  public void Changed_places_are_the_places_with_changed_files()
+  {
+    string otherDirectory = Directory.CreateTempSubdirectory("mcp-manager-status-other-").FullName;
+    try
+    {
+      (McpRegistry current, TargetFolder first) = CreateRegistry(_directory);
+      TargetFolder second = new() { Name = "Other", Path = otherDirectory, EnabledServers = [current.Servers[0].Id] };
+      current.TargetFolders.Add(second);
+      current.TargetFolders.Add(new TargetFolder { Name = "Clipboard", IsClipboard = true });
+      second.EnabledServers.Clear();
+      McpRegistry saved = JsonSerializer.Deserialize<McpRegistry>(JsonSerializer.Serialize(current))!;
+      second.EnabledServers.Add(current.Servers[0].Id);
+
+      Assert.Equal([second.Id], new PlaceStatusService(_export).GetChangedPlaces(saved, current).Select(t => t.Id));
+      Assert.Empty(new PlaceStatusService(_export).GetChangedPlaces(current, current));
+    }
+    finally
+    {
+      Directory.Delete(otherDirectory, recursive: true);
+    }
+  }
+
+  [Fact]
   public void Unchanged_registry_counts_no_files()
   {
     (McpRegistry current, _) = CreateRegistry(_directory);

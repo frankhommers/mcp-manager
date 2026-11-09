@@ -42,6 +42,10 @@
     <ProjectReference Include="..\McpManager.Core\McpManager.Core.csproj"/>
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="McpManager.Tests" />
+  </ItemGroup>
+
   <!-- Sign with entitlements on macOS so NSOpenPanel can access all folders -->
   <Target Name="SignWithEntitlements" AfterTargets="Build" Condition="$([MSBuild]::IsOSPlatform('OSX'))">
     <Exec Command="codesign --force --sign - --entitlements &quot;$(ProjectDir)McpManager.entitlements&quot; &quot;$(ProjectDir)$(OutputPath)McpManager&quot;"/>

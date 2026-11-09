@@ -1,0 +1,24 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:McpManager.Views"
+        x:Class="McpManager.Views.ReviewDeployDialog"
+        Title="Review deploy"
+        Width="860" MinWidth="640" MaxHeight="760"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        SizeToContent="Height">
+  <Grid Margin="24" RowDefinitions="*,Auto" RowSpacing="20">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="12">
+        <TextBlock Text="Changes that are not deployed yet" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Text="Deploy writes these changes into the harness config files. Backups are saved beside them."
+                   Opacity="0.75" TextWrapping="Wrap" />
+        <views:DiffView x:Name="DiffHost" />
+      </StackPanel>
+    </ScrollViewer>
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+      <Button Content="Close" IsCancel="True" Click="CloseButton_OnClick" />
+      <Button Content="Deploy" Classes="primaryButton" Click="DeployButton_OnClick" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -16,15 +16,12 @@ public partial class MainWindowViewModel
   public ObservableCollection<ProfileViewModel> Profiles { get; } = [];
   public IEnumerable<TargetFolderViewModel> ManagedTargets => TargetFolders.Where(t => t.IsManagedTarget)
     .OrderBy(t => t.Scope).ThenBy(t => t.Name);
-  public string UpdateSummary => $"{ManagedTargets.Count(t => t.NeedsUpdate || t.HasExternalChanges)} of {ManagedTargets.Count()} targets need attention";
   public string ServerUsage => SelectedServer == null ? "" : "Used by: " + string.Join(", ", ManagedTargets
     .Where(t => t.ServerSelections.Any(s => s.ServerId == SelectedServer.Id && s.IsEnabled)).Select(t => t.Name));
   private readonly Dictionary<Guid, PlaceStatus> _placeStatuses = [];
   [ObservableProperty] private MatrixViewModel _matrix = new([], []);
   [ObservableProperty] private ProfileViewModel? _selectedProfile;
   [ObservableProperty] private ProfileViewModel? _bulkProfile;
-  public string ProfileUsage => SelectedProfile == null ? "" : "Linked targets: " + string.Join(", ",
-    ManagedTargets.Where(t => t.SelectedProfile == SelectedProfile).Select(t => t.Name));
 
   [RelayCommand]
   private void AssignProfileToSelected()
@@ -35,9 +32,6 @@ public partial class MainWindowViewModel
     CheckTargets();
     StatusMessage = $"Assigned '{BulkProfile.Name}' to {selected.Count} targets. Explicit overrides were kept.";
   }
-
-  [RelayCommand]
-  private Task UpdateSelectedTargetsAsync() => UpdateTargetsAsync(ManagedTargets.Where(t => t.IsSelectedForBulk).ToList());
 
   private int _checkVersion;
   private bool _checking;
@@ -50,7 +44,6 @@ public partial class MainWindowViewModel
       SelectedTarget = null;
       ShowSettings = false;
     }
-    OnPropertyChanged(nameof(ProfileUsage));
     OnPropertyChanged(nameof(CurrentPage));
     OnPropertyChanged(nameof(ShowOverview));
     OnPropertyChanged(nameof(IsServerListActive));
@@ -82,6 +75,8 @@ public partial class MainWindowViewModel
     Profiles.Clear();
     foreach (McpProfile profile in _registry!.Profiles) AttachProfile(profile);
     foreach (TargetFolderViewModel target in TargetFolders) AttachTarget(target);
+    SyncModels();
+    MarkWorkspaceSaved();
     CheckTargets();
   }
 
@@ -105,16 +100,6 @@ public partial class MainWindowViewModel
   }
 
   [RelayCommand]
-  private void AddProfile()
-  {
-    if (_registry == null) return;
-    McpProfile profile = new();
-    _registry.Profiles.Add(profile);
-    AttachProfile(profile);
-    SelectedProfile = Profiles.Last();
-  }
-
-  [RelayCommand]
   private void DeleteProfile()
   {
     if (_registry == null || SelectedProfile == null) return;
@@ -127,9 +112,6 @@ public partial class MainWindowViewModel
     Profiles.Remove(SelectedProfile);
     SelectedProfile = null;
   }
-
-  [RelayCommand]
-  private void DetachProfile() { if (SelectedTarget != null) SelectedTarget.SelectedProfile = null; }
 
   [RelayCommand]
   private void OpenTarget(TargetFolderViewModel target) => SelectedTarget = target;
@@ -170,10 +152,12 @@ public partial class MainWindowViewModel
     {
       SyncModels();
       PlaceStatusService statusService = new(_configExportService);
+      int behindCount = 0;
       foreach (TargetFolderViewModel target in ManagedTargets)
       {
         PlaceStatus status = statusService.GetStatus(target.Model, _registry);
         _placeStatuses[target.Id] = status;
+        if (status == PlaceStatus.Behind) behindCount++;
         Matrix.SetStatus(target.Id, status);
         try
         {
@@ -197,11 +181,10 @@ public partial class MainWindowViewModel
         }
       }
       OnPropertyChanged(nameof(ManagedTargets));
-      OnPropertyChanged(nameof(UpdateSummary));
       OnPropertyChanged(nameof(ServerUsage));
-      OnPropertyChanged(nameof(ProfileUsage));
+      UpdateSaveState(statusService, behindCount);
     }
-    catch (Exception ex) { StatusMessage = $"Could not check targets: {ex.Message}"; }
+    catch (Exception ex) { StatusMessage = $"Could not check places: {ex.Message}"; }
     finally { _checking = false; }
   }
 
@@ -211,21 +194,27 @@ public partial class MainWindowViewModel
     if (SelectedTarget?.IsManagedTarget == true) await UpdateTargetsAsync([SelectedTarget], true);
   }
 
-  private async Task UpdateTargetsAsync(List<TargetFolderViewModel> targets, bool overwriteExternal = false)
+  private async Task<bool> UpdateTargetsAsync(List<TargetFolderViewModel> targets, bool overwriteExternal = false)
   {
-    if (_registry == null || IsLoading) return;
+    if (_registry == null) return false;
+    if (IsLoading)
+    {
+      StatusMessage = "Another operation is still running. Deploy again when it has finished.";
+      return false;
+    }
     CheckTargets();
     IsLoading = true;
     try
     {
-      if (targets.Count == 0) { StatusMessage = "No managed targets yet."; return; }
+      if (targets.Count == 0) { StatusMessage = "No places to deploy."; return false; }
       if (!overwriteExternal && targets.Any(t => t.HasExternalChanges))
       {
-        StatusMessage = "External changes detected. Open the affected target, inspect its config, then explicitly reapply central settings.";
-        return;
+        StatusMessage = "External changes detected. Open the affected place and inspect its config before deploying.";
+        return false;
       }
       SyncModels();
       await _registryService.SaveAsync(_registry);
+      MarkWorkspaceSaved();
       DeployResult result;
       try
       {
@@ -236,7 +225,7 @@ public partial class MainWindowViewModel
       {
         foreach (TargetFolderViewModel target in targets) target.ReloadSelectionsFromModel();
       }
-      if (result.Cancelled) { StatusMessage = "Update cancelled. No target files changed."; return; }
+      if (result.Cancelled) { StatusMessage = "Deploy cancelled. No files changed."; return false; }
       foreach (TargetFolderViewModel target in targets)
       {
         target.HasExternalChanges = false;
@@ -244,27 +233,31 @@ public partial class MainWindowViewModel
         {
           target.NeedsUpdate = TargetSyncService.NeedsUpdate(_configExportService.PreviewConfigs(
             ProfileResolver.Resolve(target.Model, _registry.Profiles), _registry.Servers, _registry.Settings));
-          target.SyncStatus = target.NeedsUpdate ? "Updated with differences · inspect target"
-            : "Updated · reload the client if needed";
+          target.SyncStatus = target.NeedsUpdate ? "Deployed with differences · inspect place"
+            : "Deployed · reload the client if needed";
         }
         catch (ExportConflictException)
         {
           target.NeedsUpdate = true;
-          target.SyncStatus = "Updated · conflicting existing entries kept";
+          target.SyncStatus = "Deployed · conflicting existing entries kept";
         }
       }
+      SyncModels();
       await _registryService.SaveAsync(_registry);
-      StatusMessage = $"Updated {targets.Count} targets. Backups saved beside existing configurations.";
+      MarkWorkspaceSaved();
+      StatusMessage = $"Deployed {PlaceCount(targets.Count)}. Backups saved beside existing configurations.";
+      return true;
     }
     catch (Exception ex)
     {
-      foreach (TargetFolderViewModel target in targets) target.SyncStatus = $"Update failed: {ex.Message}";
-      StatusMessage = $"Update failed: {ex.Message}";
+      foreach (TargetFolderViewModel target in targets) target.SyncStatus = $"Deploy failed: {ex.Message}";
+      StatusMessage = $"Deploy failed: {ex.Message}";
+      return false;
     }
     finally
     {
       IsLoading = false;
-      OnPropertyChanged(nameof(UpdateSummary));
+      CheckTargets();
     }
   }
 }

@@ -47,12 +47,14 @@ public partial class MainWindowViewModel
   {
     RefreshSidebarServers();
     RebuildMatrix();
+    ScheduleCheck();
   }
 
   private void OnSidebarTargetsChanged(object? sender, NotifyCollectionChangedEventArgs e)
   {
     RefreshSidebarTargets();
     RebuildMatrix();
+    ScheduleCheck();
   }
 
   private void OnSidebarServerChanged(object? sender, PropertyChangedEventArgs e)

@@ -1,0 +1,20 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="McpManager.Views.UnsavedChangesDialog"
+        Title="Unsaved changes"
+        Width="460"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        SizeToContent="Height">
+  <StackPanel Margin="24" Spacing="16">
+    <TextBlock Text="You have unsaved changes" FontSize="18" FontWeight="SemiBold" />
+    <TextBlock Text="Save stores them in MCP Manager. Discard returns to the last saved state. Stay keeps you here."
+               TextWrapping="Wrap" Opacity="0.75" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+      <Button Content="Stay" IsCancel="True" Click="StayButton_OnClick" />
+      <Button Content="Discard" Click="DiscardButton_OnClick" />
+      <Button Content="Save" IsDefault="True" Classes="primaryButton" Click="SaveButton_OnClick" />
+    </StackPanel>
+  </StackPanel>
+</Window>

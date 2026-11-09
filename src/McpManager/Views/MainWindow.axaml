@@ -579,15 +579,6 @@
                                            Opacity="0.65"
                                            TextWrapping="Wrap" />
 
-                                <Grid ColumnDefinitions="*,Auto" Margin="4,8,4,0">
-                                  <TextBlock Text="PROFILES" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                  <Button Grid.Column="1" Content="+" Command="{Binding AddProfileCommand}" ToolTip.Tip="Add profile" />
-                                </Grid>
-                                <ListBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" Background="Transparent">
-                                  <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ProfileViewModel">
-                                    <TextBlock Text="{Binding Name}" />
-                                  </DataTemplate></ListBox.ItemTemplate>
-                                </ListBox>
                                 <!-- Targets Section -->
                                 <Grid ColumnDefinitions="*,Auto" Margin="4,8,4,0">
                                     <TextBlock Text="TARGETS" FontSize="11" FontWeight="SemiBold"
@@ -671,14 +662,6 @@
                                 BorderThickness="0,1,0,0"
                                 BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
                             <StackPanel Spacing="6">
-                                <Button Content="Save all"
-                                        Command="{Binding SaveCommand}"
-                                        HorizontalAlignment="Stretch"
-                                        HorizontalContentAlignment="Center" />
-                                <Button Content="Update all"
-                                        Command="{Binding ExportAllTargetsCommand}"
-                                        HorizontalAlignment="Stretch"
-                                        HorizontalContentAlignment="Center" />
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
                                             Spacing="8" Margin="0,2,0,0">
                                     <Button Command="{Binding OpenSponsorLinkCommand}"
@@ -716,22 +699,62 @@
                         Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
 
                 <!-- Main Content -->
-                <Grid Grid.Column="2" RowDefinitions="Auto,*">
+                <Grid Grid.Column="2" RowDefinitions="Auto,Auto,*">
 
-                    <!-- Top Bar / Content Header -->
-                    <Border Grid.Row="0" Padding="24,12"
+                    <!-- Save bar -->
+                    <Border Grid.Row="0" Padding="24,10"
+                            CornerRadius="0,20,0,0"
+                            BorderThickness="0,0,0,1"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                            IsVisible="{Binding IsDirty}">
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12">
+                            <TextBlock Text="● Unsaved changes" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Cancel" Command="{Binding CancelCommand}"
+                                    ToolTip.Tip="Return to the last saved state" />
+                            <CheckBox Grid.Column="2" Content="{Binding AlsoDeployText}"
+                                      IsChecked="{Binding AlsoDeploy}" IsEnabled="{Binding CanAlsoDeploy}"
+                                      ToolTip.Tip="After saving, write the changed configuration files" />
+                            <Button Grid.Column="3" Content="Save" Command="{Binding SaveCommand}"
+                                    Classes="primaryButton" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Deploy bar -->
+                    <Border Grid.Row="0" Padding="24,10"
+                            CornerRadius="0,20,0,0"
+                            BorderThickness="0,0,0,1"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            IsVisible="{Binding ShowDeployBar}">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                            <TextBlock Text="{Binding DeployBarText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Review" Command="{Binding ReviewDeployCommand}" />
+                            <Button Grid.Column="2" Content="Deploy now" Command="{Binding DeployNowCommand}"
+                                    Classes="primaryButton" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Content Header -->
+                    <Border Grid.Row="1" Padding="24,12"
                             CornerRadius="0,20,0,0"
                             BorderThickness="0,0,0,1"
                             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                             IsVisible="{Binding SelectedTarget, Converter={x:Static ObjectConverters.IsNotNull}}">
-                        <Button HorizontalAlignment="Right"
-                                Content="{Binding SelectedTarget.Name, StringFormat='Update {0}'}"
-                                Command="{Binding ExportSelectedTargetCommand}"
-                                Classes="primaryButton" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="Deploy"
+                                    Command="{Binding DeployPlaceCommand}"
+                                    CommandParameter="{Binding SelectedTarget}"
+                                    IsVisible="{Binding SelectedTarget.IsManagedTarget}"
+                                    Classes="primaryButton" />
+                            <Button Content="{Binding SelectedTarget.Name, StringFormat='Export {0}'}"
+                                    Command="{Binding ExportSelectedTargetCommand}"
+                                    IsVisible="{Binding !SelectedTarget.IsManagedTarget}"
+                                    Classes="primaryButton" />
+                        </StackPanel>
                     </Border>
 
                     <!-- Content Area -->
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
                         <StackPanel Margin="24,24,24,48">
                             <!-- Settings View -->
                             <StackPanel IsVisible="{Binding CurrentPage, Converter={x:Static vm:NavigationPageEqualsConverter.Instance}, ConverterParameter=Settings}" Spacing="20">
@@ -858,16 +881,6 @@
                                 <Button Grid.Column="1" Content="Add place" Command="{Binding AddTargetFolderCommand}" />
                               </Grid>
                               <views:MatrixView DataContext="{Binding Matrix}" />
-                            </StackPanel>
-                            <StackPanel IsVisible="{Binding CurrentPage, Converter={x:Static vm:NavigationPageEqualsConverter.Instance}, ConverterParameter=Profiles}" Spacing="20">
-                              <Grid ColumnDefinitions="*,Auto">
-                                <TextBlock Text="Profile" FontSize="24" FontWeight="SemiBold" />
-                                <Button Grid.Column="1" Content="Delete profile" Command="{Binding DeleteProfileCommand}" />
-                              </Grid>
-                              <TextBox Text="{Binding SelectedProfile.Name}" Watermark="Profile name" />
-                              <TextBlock Text="{Binding ProfileUsage}" TextWrapping="Wrap" />
-                              <TextBlock Text="Choose shared servers and tool preferences. Linked targets inherit changes unless they have their own settings." TextWrapping="Wrap" />
-                              <ContentControl Content="{Binding SelectedProfile}" ContentTemplate="{StaticResource SelectionEditor}" />
                             </StackPanel>
 
                             <!-- Server Detail View -->
@@ -1202,11 +1215,11 @@
                                                  MinHeight="120"
                                                  MaxHeight="320" />
 
-                                        <TextBlock Text="Fetch tools to discover available tools. Configure shared preferences in a profile and exceptions in a target."
+                                        <TextBlock Text="Fetch tools to discover available tools. Choose tool permissions per place."
                                                    Opacity="0.75" FontSize="12"
                                                    IsVisible="{Binding !SelectedServer.HasTools}" />
 
-                                        <TextBlock Text="Configure shared tool preferences in a profile and exceptions in a target."
+                                        <TextBlock Text="These are the default tool permissions. Places can choose their own."
                                                    Opacity="0.75" FontSize="12"
                                                    IsVisible="{Binding SelectedServer.HasTools}" />
                                     </StackPanel>
@@ -1244,14 +1257,7 @@
                                 </Border>
                                 <Border Classes="detailCard">
                                   <StackPanel Spacing="10">
-                                    <TextBlock Text="Shared profile" FontWeight="SemiBold" />
-                                    <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedTarget.SelectedProfile}" PlaceholderText="Own settings (no profile)" HorizontalAlignment="Stretch">
-                                      <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:ProfileViewModel"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                    <WrapPanel Orientation="Horizontal">
-                                      <Button Content="Detach profile" Command="{Binding DetachProfileCommand}" Margin="0,0,8,0" />
-                                      <Button Content="Reset all overrides" Command="{Binding SelectedTarget.ResetOverridesCommand}" />
-                                    </WrapPanel>
+                                    <TextBlock Text="Status" FontWeight="SemiBold" />
                                     <TextBlock Text="{Binding SelectedTarget.PermissionSupport}" TextWrapping="Wrap" FontSize="12" Opacity="0.75" />
                                     <TextBlock Text="{Binding SelectedTarget.SyncStatus}" IsVisible="{Binding SelectedTarget.IsManagedTarget}" TextWrapping="Wrap" />
                                     <Expander Header="Preview changes" IsVisible="{Binding SelectedTarget.IsManagedTarget}" HorizontalAlignment="Stretch">
@@ -1276,8 +1282,6 @@
                                                         ToolTip.Tip="Discover tools for all included servers that have no tools yet" />
                                             </Grid>
                                             <TextBlock Text="Include a server, then open Tools to choose its tool permissions."
-                                                       Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
-                                            <TextBlock Text="Server and tool choices inherit from the profile. Editing a choice creates an explicit target override."
                                                        Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
                                         </StackPanel>
                                         <StackPanel Spacing="8" IsVisible="{Binding !SelectedTarget.IsClipboard}">
@@ -1311,7 +1315,7 @@
                                                        Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
                                             <TextBlock Text="These servers are in the target configuration and missing from your library. Import a server to add it to MCP Manager and select it for this target."
                                                        Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
-                                            <TextBlock Text="Save keeps your library changes. Export updates the target configuration."
+                                            <TextBlock Text="Save keeps your library changes. Deploy writes them into the config files."
                                                        Opacity="0.75" FontSize="12" TextWrapping="Wrap" />
                                         </StackPanel>
                                         <ItemsControl ItemsSource="{Binding SelectedTarget.FoundServers}">

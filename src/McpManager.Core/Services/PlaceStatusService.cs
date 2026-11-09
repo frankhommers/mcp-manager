@@ -38,22 +38,25 @@ public class PlaceStatusService(IConfigExportService exportService)
     }
   }
 
-  public int CountChangedFiles(McpRegistry saved, McpRegistry current)
-  {
-    int count = 0;
-    foreach (TargetFolder target in current.TargetFolders.Where(t => !t.IsClipboard && !t.IsQuickExport))
-    {
-      try
-      {
-        count += CountChangedFiles(target, saved, current);
-      }
-      catch (Exception ex) when (IsPreviewFailure(ex))
-      {
-        count += CountAllFiles(target, current);
-      }
-    }
+  public int CountChangedFiles(McpRegistry saved, McpRegistry current) =>
+    ManagedPlaces(current).Sum(target => CountChangedFilesSafely(target, saved, current));
 
-    return count;
+  public IReadOnlyList<TargetFolder> GetChangedPlaces(McpRegistry saved, McpRegistry current) =>
+    ManagedPlaces(current).Where(target => CountChangedFilesSafely(target, saved, current) > 0).ToList();
+
+  private static IEnumerable<TargetFolder> ManagedPlaces(McpRegistry registry) =>
+    registry.TargetFolders.Where(t => !t.IsClipboard && !t.IsQuickExport);
+
+  private int CountChangedFilesSafely(TargetFolder target, McpRegistry saved, McpRegistry current)
+  {
+    try
+    {
+      return CountChangedFiles(target, saved, current);
+    }
+    catch (Exception ex) when (IsPreviewFailure(ex))
+    {
+      return CountAllFiles(target, current);
+    }
   }
 
   private int CountChangedFiles(TargetFolder target, McpRegistry saved, McpRegistry current)
