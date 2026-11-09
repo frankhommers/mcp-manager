@@ -274,10 +274,19 @@ public class ConfigExportService : IConfigExportService
 
   private static string GetConfigFilePath(string basePath, IConfigGenerator generator)
   {
-    if (generator is OpenCodeConfigGenerator && !File.Exists(Path.Combine(basePath, "opencode.jsonc")) &&
-        File.Exists(Path.Combine(basePath, "opencode.json")))
+    if (generator is OpenCodeConfigGenerator)
     {
-      return Path.Combine(basePath, "opencode.json");
+      string nestedPath = Path.Combine(basePath, ".opencode", "opencode.json");
+      if (File.Exists(nestedPath))
+      {
+        return nestedPath;
+      }
+
+      if (!File.Exists(Path.Combine(basePath, "opencode.jsonc")) &&
+          File.Exists(Path.Combine(basePath, "opencode.json")))
+      {
+        return Path.Combine(basePath, "opencode.json");
+      }
     }
 
     if (string.IsNullOrEmpty(generator.ConfigSubFolder))

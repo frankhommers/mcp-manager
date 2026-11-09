@@ -124,6 +124,30 @@ public class ConfigGeneratorTests
     Assert.Equal("value", server["env"]?["API_KEY"]?.GetValue<string>());
   }
 
+  [Fact]
+  public void OpenCode_uses_nested_opencode_folder_when_present()
+  {
+    DirectoryInfo directory = Directory.CreateTempSubdirectory("mcp-manager-opencode-");
+    try
+    {
+      Directory.CreateDirectory(Path.Combine(directory.FullName, ".opencode"));
+      string nested = Path.Combine(directory.FullName, ".opencode", "opencode.json");
+      File.WriteAllText(nested, "{}");
+      TargetFolder target = new() { Path = directory.FullName, EnabledClients = TargetClientFlags.OpenCode };
+      ConfigExportService service = new();
+
+      Assert.Equal(nested, service.GetConfigFilePaths(target)[TargetClientFlags.OpenCode]);
+
+      File.WriteAllText(Path.Combine(directory.FullName, "opencode.jsonc"), "{}");
+
+      Assert.Equal(nested, service.GetConfigFilePaths(target)[TargetClientFlags.OpenCode]);
+    }
+    finally
+    {
+      directory.Delete(recursive: true);
+    }
+  }
+
   private static McpServer CreateRemoteServer() => new()
   {
     Name = "remote",
