@@ -25,9 +25,7 @@ public class TargetConfigSelectionService(IConfigExportService exportService)
       try
       {
         string content = await File.ReadAllTextAsync(path).ConfigureAwait(false);
-        List<ExistingTargetServer> servers = client == TargetClientFlags.Codex
-          ? ReadToml(content, path)
-          : ReadJson(content, client, path);
+        IReadOnlyList<ExistingTargetServer> servers = Parse(content, client, path);
         fileCount++;
         existingServers.AddRange(servers);
         foreach (ExistingTargetServer server in servers)
@@ -57,6 +55,9 @@ public class TargetConfigSelectionService(IConfigExportService exportService)
       Servers = existingServers,
     };
   }
+
+  public static IReadOnlyList<ExistingTargetServer> Parse(string content, TargetClientFlags client, string path) =>
+    client == TargetClientFlags.Codex ? ReadToml(content, path) : ReadJson(content, client, path);
 
   private static List<ExistingTargetServer> ReadJson(string content, TargetClientFlags client, string path)
   {
