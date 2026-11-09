@@ -29,6 +29,13 @@ public class RegistryService : IRegistryService
     }
 
     string json = await File.ReadAllTextAsync(RegistryFilePath);
+    return Deserialize(json);
+  }
+
+  public static string Serialize(McpRegistry registry) => JsonSerializer.Serialize(registry, JsonOptions);
+
+  public static McpRegistry Deserialize(string json)
+  {
     using JsonDocument document = JsonDocument.Parse(json);
     if (!document.RootElement.TryGetProperty("formatVersion", out JsonElement version) || version.GetInt32() != CurrentFormatVersion)
     {
@@ -46,7 +53,7 @@ public class RegistryService : IRegistryService
       Directory.CreateDirectory(directory);
     }
 
-    string json = JsonSerializer.Serialize(registry, JsonOptions);
+    string json = Serialize(registry);
     string temporaryPath = RegistryFilePath + ".tmp";
     await File.WriteAllTextAsync(temporaryPath, json);
     if (!OperatingSystem.IsWindows())
