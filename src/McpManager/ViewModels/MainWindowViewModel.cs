@@ -706,12 +706,16 @@ public partial class MainWindowViewModel : ViewModelBase
       return;
     }
 
-    McpServer? server = _registry.Servers.FirstOrDefault(s => s.Id == SelectedServer.Id);
+    McpServerViewModel selected = SelectedServer;
+    McpServer? server = _registry.Servers.FirstOrDefault(s => s.Id == selected.Id);
     if (server != null)
     {
       _registry.Servers.Remove(server);
-      Servers.Remove(SelectedServer);
-      WithoutNavigationGuard(() => SelectedServer = null);
+      WithoutNavigationGuard(() =>
+      {
+        Servers.Remove(selected);
+        SelectedServer = null;
+      });
 
       // Refresh target folder server lists
       foreach (TargetFolderViewModel target in TargetFolders)
@@ -1456,13 +1460,17 @@ public partial class MainWindowViewModel : ViewModelBase
       return;
     }
 
-    TargetFolder? target = _registry.TargetFolders.FirstOrDefault(t => t.Id == SelectedTarget.Id);
+    TargetFolderViewModel selected = SelectedTarget;
+    TargetFolder? target = _registry.TargetFolders.FirstOrDefault(t => t.Id == selected.Id);
     if (target != null)
     {
       _registry.TargetFolders.Remove(target);
-      SelectedTarget.PropertyChanged -= OnTargetPropertyChanged;
-      TargetFolders.Remove(SelectedTarget);
-      WithoutNavigationGuard(() => SelectedTarget = null);
+      selected.PropertyChanged -= OnTargetPropertyChanged;
+      WithoutNavigationGuard(() =>
+      {
+        TargetFolders.Remove(selected);
+        SelectedTarget = null;
+      });
       CheckTargets();
     }
   }

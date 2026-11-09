@@ -43,6 +43,83 @@ public class SaveFlowTests : IDisposable
   }
 
   [Fact]
+  public async Task Never_set_cell_toggled_on_then_off_stays_clean_in_deployed_place()
+  {
+    MainWindowViewModel vm = await CreateAsync(placesDeployed: true);
+    ServerSelectionViewModel cell = Place(vm, "B").ServerSelections.Single(s => s.ServerId == _alpha.Id);
+
+    cell.IsEnabled = true;
+    vm.CheckTargetsCommand.Execute(null);
+    Assert.True(vm.IsDirty);
+    cell.IsEnabled = false;
+    vm.CheckTargetsCommand.Execute(null);
+
+    Assert.False(vm.IsDirty);
+  }
+
+  [Fact]
+  public async Task Reapply_while_dirty_writes_nothing()
+  {
+    MainWindowViewModel vm = await CreateAsync();
+    await vm.DeployPlaceCommand.ExecuteAsync(Place(vm, "A"));
+    string file = Path.Combine(ProjectA, ".mcp.json");
+    string edited = (await File.ReadAllTextAsync(file)).Replace("alpha-command", "manual-command");
+    await File.WriteAllTextAsync(file, edited);
+    string workspace = await File.ReadAllTextAsync(WorkspacePath);
+    vm.SelectedTarget = Place(vm, "A");
+    vm.Servers.Single(s => s.Id == _alpha.Id).Command = "";
+
+    await vm.ReapplyTargetCommand.ExecuteAsync(null);
+    await vm.ExportAllTargetsCommand.ExecuteAsync(null);
+
+    Assert.Equal("Save or cancel your changes before deploying.", vm.StatusMessage);
+    Assert.Equal(edited, await File.ReadAllTextAsync(file));
+    Assert.Equal(workspace, await File.ReadAllTextAsync(WorkspacePath));
+  }
+
+  [Fact]
+  public async Task Deleting_selected_server_or_place_does_not_prompt()
+  {
+    MainWindowViewModel vm = await CreateAsync();
+    int guards = 0;
+    vm.ScheduleNavigationGuard = _ => guards++;
+    vm.SidebarServers.CollectionChanged += (_, _) => vm.SelectedServer = null;
+    vm.SidebarTargets.CollectionChanged += (_, _) => vm.SelectedTarget = null;
+    vm.SelectedServer = vm.Servers.Single(s => s.Id == _beta.Id);
+    int afterSelectingServer = guards;
+
+    vm.DeleteServerCommand.Execute(null);
+
+    Assert.Equal(afterSelectingServer, guards);
+    Assert.Null(vm.SelectedServer);
+    vm.SelectedTarget = Place(vm, "B");
+    int afterSelectingPlace = guards;
+
+    vm.DeleteTargetFolderCommand.Execute(null);
+
+    Assert.Equal(afterSelectingPlace, guards);
+    Assert.Null(vm.SelectedTarget);
+    Assert.DoesNotContain(vm.TargetFolders, t => t.Name == "B");
+  }
+
+  [Fact]
+  public async Task Review_names_server_place_and_file()
+  {
+    MainWindowViewModel vm = await CreateAsync();
+    Place(vm, "B").ServerSelections.Single(s => s.ServerId == _alpha.Id).IsEnabled = true;
+    await vm.SaveCommand.ExecuteAsync(null);
+    await vm.DeployPlaceCommand.ExecuteAsync(Place(vm, "A"));
+    await vm.DeployPlaceCommand.ExecuteAsync(Place(vm, "B"));
+    vm.Servers.Single(s => s.Id == _alpha.Id).Command = "changed-command";
+    await vm.SaveCommand.ExecuteAsync(null);
+    Assert.Equal(2, vm.BehindCount);
+
+    List<string> names = vm.BuildDeployReview().Select(d => d.ServerName).Order().ToList();
+
+    Assert.Equal(["alpha · A · .mcp.json", "alpha · B · .mcp.json"], names);
+  }
+
+  [Fact]
   public async Task Editing_marks_dirty_and_resets_also_deploy()
   {
     MainWindowViewModel vm = await CreateAsync();
@@ -231,8 +308,9 @@ public class SaveFlowTests : IDisposable
   private static TargetFolderViewModel Place(MainWindowViewModel vm, string name) =>
     vm.TargetFolders.Single(t => t.Name == name);
 
-  private async Task<MainWindowViewModel> CreateAsync()
+  private async Task<MainWindowViewModel> CreateAsync(bool placesDeployed = false)
   {
+    DateTimeOffset? deployedAt = placesDeployed ? DateTimeOffset.UtcNow : null;
     Directory.CreateDirectory(ProjectA);
     Directory.CreateDirectory(ProjectB);
     RegistryService registryService = new(WorkspacePath);
@@ -241,8 +319,8 @@ public class SaveFlowTests : IDisposable
       Servers = [_alpha, _beta],
       TargetFolders =
       [
-        new TargetFolder { Name = "A", Path = ProjectA, EnabledServers = [_beta.Id, _alpha.Id] },
-        new TargetFolder { Name = "B", Path = ProjectB, EnabledServers = [_beta.Id] },
+        new TargetFolder { Name = "A", Path = ProjectA, LastAppliedAt = deployedAt, EnabledServers = [_beta.Id, _alpha.Id] },
+        new TargetFolder { Name = "B", Path = ProjectB, LastAppliedAt = deployedAt, EnabledServers = [_beta.Id] },
       ],
       Settings = new GlobalSettings { CodexConfigPath = Path.Combine(_directory, "global.toml") },
     });

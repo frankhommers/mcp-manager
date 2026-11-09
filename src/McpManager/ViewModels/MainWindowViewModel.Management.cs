@@ -202,7 +202,7 @@ public partial class MainWindowViewModel
       StatusMessage = "Another operation is still running. Deploy again when it has finished.";
       return false;
     }
-    CheckTargets();
+    if (!EnsureCleanForDeploy()) return false;
     IsLoading = true;
     try
     {
@@ -212,9 +212,6 @@ public partial class MainWindowViewModel
         StatusMessage = "External changes detected. Open the affected place and inspect its config before deploying.";
         return false;
       }
-      SyncModels();
-      await _registryService.SaveAsync(_registry);
-      MarkWorkspaceSaved();
       DeployResult result;
       try
       {

@@ -69,6 +69,7 @@ public class ProfileManagementTests : IDisposable
     vm.Servers[0].Command = "second-command";
     vm.CheckTargetsCommand.Execute(null);
     Assert.All(vm.ManagedTargets.Where(t => t.Model.ProfileId == profile.Id), t => Assert.True(t.NeedsUpdate));
+    await vm.SaveCommand.ExecuteAsync(null);
     await vm.ExportAllTargetsCommand.ExecuteAsync(null);
     Assert.Contains("second-command", await File.ReadAllTextAsync(claude));
     Assert.Contains("second-command", await File.ReadAllTextAsync(codex));
@@ -77,6 +78,7 @@ public class ProfileManagementTests : IDisposable
     string edited = (await File.ReadAllTextAsync(claude)).Replace("second-command", "manual-command");
     await File.WriteAllTextAsync(claude, edited);
     vm.Servers[0].Command = "third-command";
+    await vm.SaveCommand.ExecuteAsync(null);
     await vm.ExportAllTargetsCommand.ExecuteAsync(null);
     Assert.Contains("External changes", vm.StatusMessage);
     Assert.Equal(edited, await File.ReadAllTextAsync(claude));
@@ -99,6 +101,7 @@ public class ProfileManagementTests : IDisposable
     vm.CheckTargetsCommand.Execute(null);
     Assert.True(vm.TargetFolders.Single(t => t.Id == first.Id).ServerSelections[0].IsEnabled);
     Assert.False(vm.TargetFolders.Single(t => t.Id == second.Id).ServerSelections[0].IsEnabled);
+    await vm.SaveCommand.ExecuteAsync(null);
     await vm.ExportAllTargetsCommand.ExecuteAsync(null);
     Assert.Contains("shared", await File.ReadAllTextAsync(Path.Combine(_directory, ".mcp.json")));
     Assert.DoesNotContain("shared", await File.ReadAllTextAsync(Path.Combine(_directory, "other", ".mcp.json")));

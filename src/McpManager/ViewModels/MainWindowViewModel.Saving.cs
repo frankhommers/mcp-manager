@@ -197,6 +197,11 @@ public partial class MainWindowViewModel
       return;
     }
 
+    if (items.Count == 0)
+    {
+      StatusMessage = "No server changes to show; only settings files differ.";
+    }
+
     DiffViewModel diff = new("In file", "MCP Manager will write", items, []);
     bool deploy = await new Views.ReviewDeployDialog(diff).ShowDialog<bool>(window);
     if (deploy)
@@ -297,12 +302,13 @@ public partial class MainWindowViewModel
     .Where(t => _placeStatuses.GetValueOrDefault(t.Id) == PlaceStatus.Behind)
     .ToList();
 
-  private List<ServerDiff> BuildDeployReview()
+  internal List<ServerDiff> BuildDeployReview()
   {
     ConfigFileDiffService diffService = new(_configImportService);
     List<ServerDiff> items = [];
     foreach (TargetFolderViewModel place in BehindPlaces())
     {
+      string placeName = string.IsNullOrWhiteSpace(place.Name) ? place.Path : place.Name;
       TargetFolder effective = ProfileResolver.Resolve(place.Model, _registry!.Profiles);
       Dictionary<string, TargetClientFlags> clients = [];
       foreach ((TargetClientFlags client, string path) in _configExportService.GetConfigFilePaths(effective, _registry.Settings))
@@ -319,9 +325,10 @@ public partial class MainWindowViewModel
         }
 
         string? onDisk = File.Exists(path) ? File.ReadAllText(path) : null;
+        string fileName = Path.GetFileName(path);
         items.AddRange(diffService.Compare(path, client, onDisk, content).Servers
           .Where(s => s.Kind != DiffKind.Same)
-          .Select(s => s.Details));
+          .Select(s => s.Details with { ServerName = $"{s.ServerName} · {placeName} · {fileName}" }));
       }
     }
 
@@ -367,8 +374,8 @@ public partial class MainWindowViewModel
   private void RestoreNavigation(NavigationSnapshot previous) => WithoutNavigationGuard(() =>
   {
     SelectedProfile = null;
-    SelectedServer = previous.Server;
-    SelectedTarget = previous.Target;
+    SelectedServer = previous.Server != null && Servers.Contains(previous.Server) ? previous.Server : null;
+    SelectedTarget = previous.Target != null && TargetFolders.Contains(previous.Target) ? previous.Target : null;
     ShowSettings = previous.ShowSettings;
   });
 

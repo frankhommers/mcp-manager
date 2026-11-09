@@ -514,13 +514,14 @@ public partial class TargetFolderViewModel : ViewModelBase
 
     _model.EnabledServers.Clear();
     _model.DisabledServers.Clear();
+    bool exclusionsMatter = SelectedProfile != null || _model.ProfileId != null || _model.LastAppliedAt == null;
 
     foreach (ServerSelectionViewModel selection in ServerSelections)
     {
       if (_selectionOverrides.TryGetValue(selection.ServerId, out bool enabled))
       {
         if (enabled) _model.EnabledServers.Add(selection.ServerId);
-        else _model.DisabledServers.Add(selection.ServerId);
+        else if (exclusionsMatter) _model.DisabledServers.Add(selection.ServerId);
       }
     }
   }
