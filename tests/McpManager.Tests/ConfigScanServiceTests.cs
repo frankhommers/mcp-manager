@@ -138,6 +138,36 @@ public class ConfigScanServiceTests : IDisposable
     Assert.Single(result.Where(f => f.IsGlobal));
   }
 
+  [Fact]
+  public async Task Home_folder_is_never_a_project_folder()
+  {
+    string home = Path.Combine(_root, "home");
+    Write("home/.mcp.json", ClaudeJson("one"));
+    Write("home/proj/.mcp.json", ClaudeJson("one"));
+    ConfigScanService service = new(new ConfigExportService(), (_) => [], home + Path.DirectorySeparatorChar);
+
+    IReadOnlyList<ScannedFolder> result = await service.ScanAsync([home], new GlobalSettings());
+
+    Assert.Equal(Path.Combine(home, "proj"), Assert.Single(result).Path);
+  }
+
+  [Fact]
+  public async Task Folder_whose_config_is_a_global_config_is_not_a_project_folder()
+  {
+    string dots = Path.Combine(_root, "dots");
+    Write("dots/.codex/config.toml", "[mcp_servers.g]\ncommand = 'c'\n");
+    Write("dots/.mcp.json", ClaudeJson("one"));
+    Write("proj/.mcp.json", ClaudeJson("one"));
+    ConfigScanService service = new(new ConfigExportService(), (_) =>
+      [(TargetClientFlags.Codex, Path.Combine(dots, ".codex"))]);
+
+    IReadOnlyList<ScannedFolder> result = await service.ScanAsync(
+      [_root], new GlobalSettings { CodexConfigPath = Path.Combine(dots, ".codex", "config.toml") });
+
+    Assert.Equal([Path.Combine(_root, "proj")], result.Where(f => !f.IsGlobal).Select(f => f.Path));
+    Assert.Single(result, f => f.IsGlobal);
+  }
+
   private async Task<IReadOnlyList<ScannedFolder>> ScanAsync() =>
     await _service.ScanAsync([_root], new GlobalSettings());
 

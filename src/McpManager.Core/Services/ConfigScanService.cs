@@ -4,7 +4,8 @@ namespace McpManager.Core.Services;
 
 public class ConfigScanService(
   IConfigExportService exportService,
-  Func<GlobalSettings, IReadOnlyList<(TargetClientFlags Client, string Path)>>? globalTargets = null)
+  Func<GlobalSettings, IReadOnlyList<(TargetClientFlags Client, string Path)>>? globalTargets = null,
+  string? homeDirectory = null)
 {
   public const int MaxDepth = 4;
 
@@ -25,6 +26,12 @@ public class ConfigScanService(
     IEnumerable<string> roots, GlobalSettings settings, CancellationToken cancellationToken = default)
   {
     Dictionary<string, ScannedFolder> folders = new(StringComparer.Ordinal);
+    IReadOnlyList<(TargetClientFlags Client, string Path)> globals = (globalTargets ?? GetDefaultGlobalTargets)(settings);
+    HashSet<string> globalFiles = new(
+      globals.SelectMany(g => ConfigFiles(new TargetFolder { Path = g.Path, EnabledClients = g.Client, IsGlobal = true }, settings)),
+      StringComparer.OrdinalIgnoreCase);
+    string home = Path.TrimEndingDirectorySeparator(
+      Path.GetFullPath(homeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
     foreach (string root in roots)
     {
       Stack<(string Directory, int Depth)> pending = new();
@@ -33,12 +40,13 @@ public class ConfigScanService(
       {
         cancellationToken.ThrowIfCancellationRequested();
         (string directory, int depth) = pending.Pop();
-        if (!folders.ContainsKey(directory))
+        if (!folders.ContainsKey(directory) &&
+            !string.Equals(Path.TrimEndingDirectorySeparator(directory), home, StringComparison.OrdinalIgnoreCase))
         {
           TargetClientFlags clients = DetectClients(directory);
-          if (clients != TargetClientFlags.None)
+          TargetFolder target = new() { Path = directory, EnabledClients = clients };
+          if (clients != TargetClientFlags.None && !ConfigFiles(target, settings).Any(globalFiles.Contains))
           {
-            TargetFolder target = new() { Path = directory, EnabledClients = clients };
             folders[directory] = await ReadAsync(target, settings, isGlobal: false).ConfigureAwait(false);
           }
         }
@@ -54,8 +62,7 @@ public class ConfigScanService(
     }
 
     List<ScannedFolder> results = folders.Values.OrderBy(f => f.Path, StringComparer.Ordinal).ToList();
-    foreach ((TargetClientFlags client, string path) in
-             (globalTargets ?? GetDefaultGlobalTargets)(settings))
+    foreach ((TargetClientFlags client, string path) in globals)
     {
       cancellationToken.ThrowIfCancellationRequested();
       TargetFolder target = new() { Path = path, EnabledClients = client, IsGlobal = true };
@@ -79,6 +86,9 @@ public class ConfigScanService(
     return new ScannedFolder(
       target.Path, isGlobal, target.EnabledClients, existing.Servers, existing.UnreadableFiles, differ);
   }
+
+  private IEnumerable<string> ConfigFiles(TargetFolder target, GlobalSettings settings) =>
+    exportService.GetConfigFilePaths(target, settings).Values.Select(Path.GetFullPath);
 
   private static TargetClientFlags DetectClients(string directory)
   {
