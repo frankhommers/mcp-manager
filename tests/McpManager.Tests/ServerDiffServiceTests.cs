@@ -1,3 +1,4 @@
+using McpManager.Core.ConfigGenerators;
 using McpManager.Core.Models;
 using McpManager.Core.Services;
 
@@ -47,6 +48,65 @@ public class ServerDiffServiceTests
     Assert.True(args.Left.Single(t => t.Text == "hunter2hunter2").IsSecret);
     Assert.False(args.Left.Single(t => t.Text == "--api-key").IsSecret);
   }
+
+  [Fact]
+  public void Header_values_in_default_bridge_template_are_secret()
+  {
+    ClaudeDesktopConfigGenerator generator = new();
+    ResolvedCommand bridge = BridgeCommandResolver.Resolve(
+      generator.BridgeCommandHttp,
+      "https://example.com/mcp",
+      null,
+      generator.BridgeHeaderArgumentTemplate,
+      new Dictionary<string, string> { ["Authorization"] = "Bearer abcdef123456", ["X-Api-Key"] = "k-987654" });
+    McpServer left = new() { Name = "s", Command = bridge.Command, Args = [.. bridge.Arguments] };
+
+    FieldDiff args = ServerDiffService.Compare(left, new McpServer { Name = "s" }).Fields.Single(f => f.Field == "args");
+
+    Assert.True(args.Left.Single(t => t.Text == "Bearer abcdef123456").IsSecret);
+    Assert.True(args.Left.Single(t => t.Text == "k-987654").IsSecret);
+    Assert.False(args.Left.Single(t => t.Text == "Authorization").IsSecret);
+    Assert.All(args.Left.Where(t => t.Text == "--headers"), t => Assert.False(t.IsSecret));
+    Assert.False(args.Left.Single(t => t.Text == "https://example.com/mcp").IsSecret);
+  }
+
+  [Fact]
+  public void Header_given_as_key_colon_value_is_secret()
+  {
+    McpServer left = Docker("--header", "Authorization: Bearer abcdef123456", "https://example.com/mcp");
+
+    FieldDiff args = ServerDiffService.Compare(left, Docker()).Fields.Single(f => f.Field == "args");
+
+    Assert.True(args.Left.Single(t => t.Text.StartsWith("Authorization")).IsSecret);
+    Assert.False(args.Left.Single(t => t.Text == "https://example.com/mcp").IsSecret);
+  }
+
+  [Fact]
+  public void Secret_url_query_values_are_secret_in_url_and_args()
+  {
+    McpServer left = new()
+    {
+      Name = "s",
+      Url = "https://example.com/mcp?api_key=abcdef123456&mode=fast",
+      Args = ["--url", "https://example.com/sse?token=zyxw9876", "https://example.com/?mode=fast"],
+    };
+
+    ServerDiff diff = ServerDiffService.Compare(left, new McpServer { Name = "s" });
+
+    FieldDiff url = diff.Fields.Single(f => f.Field == "url");
+    Assert.True(url.IsSecret);
+    Assert.True(Assert.Single(url.Left).IsSecret);
+    FieldDiff args = diff.Fields.Single(f => f.Field == "args");
+    Assert.True(args.Left.Single(t => t.Text.Contains("token=")).IsSecret);
+    Assert.False(args.Left.Single(t => t.Text.Contains("mode=")).IsSecret);
+  }
+
+  [Theory]
+  [InlineData("https://example.com/mcp?api_key=abcdef123456&mode=fast", "https://example.com/mcp?api_key=••••••••3456&mode=fast")]
+  [InlineData("https://example.com/mcp?mode=fast&token=ab#top", "https://example.com/mcp?mode=fast&token=••••••••#top")]
+  [InlineData("https://example.com/mcp?mode=fast", "https://example.com/mcp?mode=fast")]
+  public void Mask_query_masks_only_secret_values(string url, string expected) =>
+    Assert.Equal(expected, SecretMask.MaskQuery(url));
 
   [Fact]
   public void Different_secrets_with_same_last_four_are_still_changed()

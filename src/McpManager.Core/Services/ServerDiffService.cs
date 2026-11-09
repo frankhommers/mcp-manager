@@ -65,9 +65,11 @@ public static class ServerDiffService
     DiffKind leftKind = kind == DiffKind.Same ? DiffKind.Same : kind == DiffKind.Changed ? DiffKind.Changed : DiffKind.Removed;
     DiffKind rightKind = kind == DiffKind.Same ? DiffKind.Same : kind == DiffKind.Changed ? DiffKind.Changed : DiffKind.Added;
 
-    List<DiffToken> leftTokens = left == null ? [] : [new DiffToken(left, leftKind, secretKey)];
-    List<DiffToken> rightTokens = right == null ? [] : [new DiffToken(right, rightKind, secretKey)];
-    return new FieldDiff(field, kind, secretKey, leftTokens, rightTokens);
+    bool leftSecret = secretKey || SecretMask.HasSecretQuery(left);
+    bool rightSecret = secretKey || SecretMask.HasSecretQuery(right);
+    List<DiffToken> leftTokens = left == null ? [] : [new DiffToken(left, leftKind, leftSecret)];
+    List<DiffToken> rightTokens = right == null ? [] : [new DiffToken(right, rightKind, rightSecret)];
+    return new FieldDiff(field, kind, leftSecret || rightSecret, leftTokens, rightTokens);
   }
 
   private static IEnumerable<FieldDiff> Map(
@@ -181,15 +183,19 @@ public static class ServerDiffService
     for (int i = 0; i < args.Count; i++)
     {
       string arg = args[i];
-      int equals = arg.IndexOf('=');
-      if (equals > 0 && SecretMask.IsSecretKey(arg[..equals]))
+      int separator = arg.IndexOfAny(['=', ':']);
+      if (separator > 0 && SecretMask.IsSecretKey(arg[..separator].TrimStart('-')))
       {
         secret[i] = true;
       }
-      else if (i > 0 && !arg.StartsWith('-') && args[i - 1].StartsWith('-')
-        && !args[i - 1].Contains('=') && SecretMask.IsSecretKey(args[i - 1]))
+      else if (i > 0 && !secret[i - 1] && !arg.StartsWith('-') && !args[i - 1].Contains('=')
+        && SecretMask.IsSecretKey(args[i - 1].TrimStart('-')))
       {
         secret[i] = true;
+      }
+      else
+      {
+        secret[i] = SecretMask.HasSecretQuery(arg);
       }
     }
 

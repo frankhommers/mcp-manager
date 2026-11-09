@@ -4,6 +4,7 @@ using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using McpManager.Core.Models;
+using McpManager.Core.Services;
 
 namespace McpManager.ViewModels;
 
@@ -50,7 +51,9 @@ public partial class FieldDiffViewModel : ViewModelBase
   private void ToggleReveal() => IsRevealed = !IsRevealed;
 
   private List<DiffTokenViewModel> Build(IReadOnlyList<DiffToken> tokens) =>
-    [.. tokens.Select(t => new DiffTokenViewModel(t, IsRevealed, _diff.Field == ArgsField))];
+    [.. tokens.Select(t => new DiffTokenViewModel(t, IsRevealed, _diff.Field == ArgsField, HasSecretKey))];
+
+  private bool HasSecretKey => Label != _diff.Field && SecretMask.IsSecretKey(Label);
 
   private static string Join(IReadOnlyList<DiffTokenViewModel> tokens) =>
     string.Join("\n", tokens.Select(t => t.DisplayText));

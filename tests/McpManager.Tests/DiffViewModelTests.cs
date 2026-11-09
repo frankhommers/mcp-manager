@@ -90,6 +90,40 @@ public class DiffViewModelTests
   }
 
   [Fact]
+  public void Secret_url_query_masks_only_the_value()
+  {
+    FieldDiffViewModel url = new(Field(
+      "url", DiffKind.Changed, true,
+      [new DiffToken("https://example.com/mcp?api_key=abcdef123456&mode=fast", DiffKind.Changed, true)], []));
+    FieldDiffViewModel args = new(Field(
+      "args", DiffKind.Changed, true,
+      [new DiffToken("--url=https://example.com/sse?token=zyxw9876", DiffKind.Removed, true)], []));
+
+    Assert.Equal("https://example.com/mcp?api_key=••••••••3456&mode=fast", url.LeftText);
+    Assert.Equal("--url=https://example.com/sse?token=••••••••9876", args.LeftText);
+    url.ToggleRevealCommand.Execute(null);
+    Assert.Equal("https://example.com/mcp?api_key=abcdef123456&mode=fast", url.LeftText);
+  }
+
+  [Fact]
+  public void Secret_header_values_mask_whole_value_even_with_query()
+  {
+    FieldDiffViewModel header = new(Field(
+      "header:Authorization", DiffKind.Changed, true,
+      [new DiffToken("https://token.example.com/?token=abcdef123456", DiffKind.Changed, true)], []));
+    FieldDiffViewModel args = new(Field(
+      "args", DiffKind.Changed, true,
+      [
+        new DiffToken("Authorization", DiffKind.Same, false),
+        new DiffToken("Bearer abcdef123456", DiffKind.Same, true),
+        new DiffToken("Authorization: Bearer zyxw9876", DiffKind.Same, true),
+      ], []));
+
+    Assert.Equal("••••••••3456", header.LeftText);
+    Assert.Equal("Authorization\n••••••••3456\nAuthorization:••••••••9876", args.LeftText);
+  }
+
+  [Fact]
   public void Same_fields_are_dimmed_and_header_labels_are_stripped()
   {
     FieldDiffViewModel same = new(Field("header:X-Id", DiffKind.Same, false, [], []));
