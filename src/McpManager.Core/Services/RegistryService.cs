@@ -136,4 +136,21 @@ public class RegistryService : IRegistryService
     string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     return Path.Combine(home, ".claude.json");
   }
+
+  public static IReadOnlyList<string> GetDefaultScanRoots(GlobalSettings settings)
+  {
+    if (settings.ScanRoots.Count > 0)
+    {
+      return settings.ScanRoots;
+    }
+
+    if (!string.IsNullOrWhiteSpace(settings.DefaultProjectsRoot))
+    {
+      return [settings.DefaultProjectsRoot];
+    }
+
+    string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    string repos = Path.Combine(home, "Repos");
+    return [Directory.Exists(repos) ? repos : home];
+  }
 }

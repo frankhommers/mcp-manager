@@ -95,6 +95,7 @@ public class GlobalSettings
   public string? ClaudeDesktopConfigPath { get; set; }
   public string? CodexConfigPath { get; set; }
   public string? DefaultProjectsRoot { get; set; }
+  public List<string> ScanRoots { get; set; } = [];
 
   /// <summary>
   /// Bridge command for wrapping HTTP servers for Claude Desktop.
