@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using McpManager.Core.Models;
+using McpManager.ViewModels;
 
 namespace McpManager.Views;
 
@@ -9,6 +10,12 @@ public partial class ExportConflictDialog : Window
   public ExportConflictDialog()
   {
     InitializeComponent();
+  }
+
+  public ExportConflictDialog(ExportConflict conflict, DiffViewModel diff) : this()
+  {
+    DataContext = conflict;
+    DiffHost.DataContext = diff;
   }
 
   private void KeepButton_OnClick(object? sender, RoutedEventArgs e) =>

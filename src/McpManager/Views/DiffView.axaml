@@ -1,0 +1,115 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:McpManager.ViewModels"
+             x:Class="McpManager.Views.DiffView"
+             x:DataType="vm:DiffViewModel">
+  <UserControl.Styles>
+    <Style Selector="TextBlock.cardEyebrow">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Opacity" Value="0.75" />
+    </Style>
+    <Style Selector="Border.diffRow">
+      <Setter Property="Padding" Value="12,10" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+    </Style>
+    <Style Selector="Border.diffRow.dimmed">
+      <Setter Property="Opacity" Value="0.5" />
+    </Style>
+    <Style Selector="Border.token">
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="4,1" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Border.token.added">
+      <Setter Property="Background" Value="{DynamicResource NotificationCardSuccessBackgroundBrush}" />
+    </Style>
+    <Style Selector="Border.token.removed">
+      <Setter Property="Background" Value="{DynamicResource NotificationCardErrorBackgroundBrush}" />
+    </Style>
+    <Style Selector="Border.token.removed TextBlock">
+      <Setter Property="TextDecorations" Value="Strikethrough" />
+    </Style>
+    <Style Selector="TextBlock.tokenText">
+      <Setter Property="FontFamily" Value="monospace" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="12">
+    <Grid ColumnDefinitions="140,*,*" ColumnSpacing="12" Margin="12,0">
+      <TextBlock Grid.Column="1" Text="{Binding LeftLabel}" Classes="cardEyebrow" />
+      <TextBlock Grid.Column="2" Text="{Binding RightLabel}" Classes="cardEyebrow" />
+    </Grid>
+
+    <TextBlock Grid.Row="1" Text="{Binding Current.ServerName}" FontWeight="SemiBold"
+               IsVisible="{Binding HasMultipleItems}" />
+
+    <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" MaxHeight="420">
+      <ItemsControl ItemsSource="{Binding Fields}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="6" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:FieldDiffViewModel">
+            <Border Classes="diffRow" Classes.dimmed="{Binding IsDimmed}">
+              <Grid ColumnDefinitions="140,*,*" ColumnSpacing="12">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <Button Content="{Binding RevealLabel}" Command="{Binding ToggleRevealCommand}"
+                          IsVisible="{Binding IsSecret}" Padding="8,2" FontSize="11"
+                          HorizontalAlignment="Left" />
+                </StackPanel>
+                <ItemsControl Grid.Column="1" ItemsSource="{Binding LeftTokens}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DiffTokenViewModel">
+                      <Border Classes="token" Classes.added="{Binding IsAdded}"
+                              Classes.removed="{Binding IsRemoved}">
+                        <TextBlock Classes="tokenText" Text="{Binding DisplayText}" />
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ItemsControl Grid.Column="2" ItemsSource="{Binding RightTokens}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DiffTokenViewModel">
+                      <Border Classes="token" Classes.added="{Binding IsAdded}"
+                              Classes.removed="{Binding IsRemoved}">
+                        <TextBlock Classes="tokenText" Text="{Binding DisplayText}" />
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <ItemsControl Grid.Row="3" ItemsSource="{Binding Options}" IsVisible="{Binding HasChoices}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="12" />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:DiffChoiceOptionViewModel">
+          <RadioButton Content="{Binding Label}" GroupName="DiffChoice" IsChecked="{Binding IsSelected}" />
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasMultipleItems}">
+      <Button Content="Previous" Command="{Binding PreviousCommand}" />
+      <TextBlock Text="{Binding Position}" VerticalAlignment="Center" />
+      <Button Content="Next" Command="{Binding NextCommand}" />
+    </StackPanel>
+  </Grid>
+</UserControl>

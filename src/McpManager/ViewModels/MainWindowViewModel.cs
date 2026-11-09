@@ -1853,7 +1853,12 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     StatusMessage = $"Export paused: '{conflict.ServerName}' is not owned by MCP Manager.";
-    Views.ExportConflictDialog dialog = new() { DataContext = conflict };
+    DiffViewModel diff = new(
+      "In file",
+      "MCP Manager will write",
+      [new ConfigFileDiffService(_configImportService).CompareConflict(conflict)],
+      []);
+    Views.ExportConflictDialog dialog = new(conflict, diff);
     return await dialog.ShowDialog<ExportConflictResolution?>(window);
   }
 

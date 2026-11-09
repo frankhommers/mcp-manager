@@ -1,10 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:McpManager.Views"
         xmlns:models="using:McpManager.Core.Models"
         x:Class="McpManager.Views.ExportConflictDialog"
         x:DataType="models:ExportConflict"
         Title="Export conflict"
-        Width="680" MinWidth="560" MaxHeight="760"
+        Width="860" MinWidth="640" MaxHeight="760"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         SizeToContent="Height">
@@ -20,22 +21,7 @@
                    TextWrapping="Wrap" />
         <TextBlock Text="Cancel export leaves all destination files unchanged."
                    Opacity="0.75" TextWrapping="Wrap" />
-        <Expander Header="Compare configurations" HorizontalAlignment="Stretch">
-          <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-            <StackPanel Spacing="8">
-              <TextBlock Text="Existing configuration" FontWeight="SemiBold" />
-              <TextBox Text="{Binding ExistingConfiguration, Mode=OneWay}" IsReadOnly="True"
-                       AcceptsReturn="True" TextWrapping="Wrap" Height="220"
-                       FontFamily="monospace" FontSize="12" />
-            </StackPanel>
-            <StackPanel Grid.Column="1" Spacing="8">
-              <TextBlock Text="MCP Manager" FontWeight="SemiBold" />
-              <TextBox Text="{Binding ProposedConfiguration, Mode=OneWay}" IsReadOnly="True"
-                       AcceptsReturn="True" TextWrapping="Wrap" Height="220"
-                       FontFamily="monospace" FontSize="12" />
-            </StackPanel>
-          </Grid>
-        </Expander>
+        <views:DiffView x:Name="DiffHost" />
       </StackPanel>
     </ScrollViewer>
     <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
