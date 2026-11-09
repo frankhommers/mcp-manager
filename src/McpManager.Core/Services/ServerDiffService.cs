@@ -4,12 +4,21 @@ namespace McpManager.Core.Services;
 
 public static class ServerDiffService
 {
+  public const string TypeField = "type";
+  public const string CommandField = "command";
+  public const string ArgsField = "args";
+  public const string UrlField = "url";
+  public const string CwdField = "cwd";
+  public const string EnvPrefix = "env:";
+  public const string HeaderPrefix = "header:";
+  public const string ToolsField = "tools";
+
   public static ServerDiff Compare(McpServer left, McpServer right)
   {
     List<FieldDiff> fields = [];
 
-    AddIfPresent(fields, Scalar("type", left.TransportType.GetDisplayName(), right.TransportType.GetDisplayName()));
-    AddIfPresent(fields, Scalar("command", left.Command, right.Command));
+    AddIfPresent(fields, Scalar(TypeField, left.TransportType.GetDisplayName(), right.TransportType.GetDisplayName()));
+    AddIfPresent(fields, Scalar(CommandField, left.Command, right.Command));
 
     FieldDiff? args = Args(left.Args, right.Args);
     if (args != null)
@@ -17,12 +26,12 @@ public static class ServerDiffService
       fields.Add(args);
     }
 
-    AddIfPresent(fields, Scalar("url", left.Url, right.Url));
-    AddIfPresent(fields, Scalar("cwd", left.WorkingDirectory, right.WorkingDirectory));
+    AddIfPresent(fields, Scalar(UrlField, left.Url, right.Url));
+    AddIfPresent(fields, Scalar(CwdField, left.WorkingDirectory, right.WorkingDirectory));
 
-    fields.AddRange(Map("env:", left.EnvironmentVariables, right.EnvironmentVariables,
+    fields.AddRange(Map(EnvPrefix, left.EnvironmentVariables, right.EnvironmentVariables,
       StringComparer.Ordinal, StringComparer.Ordinal, ManagedServerIdentity.EnvironmentKey));
-    fields.AddRange(Map("header:", left.HttpHeaders, right.HttpHeaders,
+    fields.AddRange(Map(HeaderPrefix, left.HttpHeaders, right.HttpHeaders,
       StringComparer.OrdinalIgnoreCase, StringComparer.OrdinalIgnoreCase, ManagedServerIdentity.HeaderKey));
 
     FieldDiff? tools = Tools(left.AlwaysAllow, right.AlwaysAllow);
@@ -121,7 +130,7 @@ public static class ServerDiffService
       .Select(t => new DiffToken(t, rightSet.Contains(t) ? DiffKind.Same : DiffKind.Removed, false)).ToList();
     List<DiffToken> rightTokens = rightSet.Order(StringComparer.Ordinal)
       .Select(t => new DiffToken(t, leftSet.Contains(t) ? DiffKind.Same : DiffKind.Added, false)).ToList();
-    return Build("tools", leftTokens, rightTokens);
+    return Build(ToolsField, leftTokens, rightTokens);
   }
 
   private static FieldDiff? Args(List<string> left, List<string> right)
@@ -177,7 +186,7 @@ public static class ServerDiffService
       rightTokens.Add(new DiffToken(right[b], DiffKind.Added, rightSecret[b]));
     }
 
-    return Build("args", leftTokens, rightTokens);
+    return Build(ArgsField, leftTokens, rightTokens);
   }
 
   private static FieldDiff Build(string field, List<DiffToken> left, List<DiffToken> right)

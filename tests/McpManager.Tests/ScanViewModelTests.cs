@@ -233,6 +233,34 @@ public class ScanViewModelTests : IDisposable
     Assert.True(Folder(scan, "good").IsSelected);
   }
 
+  [Fact]
+  public async Task Bridged_claude_desktop_item_offers_keep_or_import_only()
+  {
+    string desktop = Path.Combine(_directory, "desktop");
+    Directory.CreateDirectory(desktop);
+    McpServer found = new()
+    {
+      Name = "api", TransportType = McpTransportType.Http, Url = "https://x", HttpHeaders = { ["Authorization"] = "new" },
+    };
+    await File.WriteAllTextAsync(Path.Combine(desktop, "claude_desktop_config.json"),
+      new McpManager.Core.ConfigGenerators.ClaudeDesktopConfigGenerator().GenerateConfig([found]));
+    McpRegistry registry = Registry(new McpServer
+    {
+      Name = "api", TransportType = McpTransportType.Http, Url = "https://x", HttpHeaders = { ["Authorization"] = "old" },
+    });
+    ScanViewModel scan = new(
+      new ConfigScanService(new ConfigExportService(), _ => [(TargetClientFlags.ClaudeDesktop, desktop)]),
+      new ScanImportPlanner(new ConfigImportService(), new ConfigExportService()),
+      () => registry,
+      _ => { });
+    await scan.ScanCommand.ExecuteAsync(null);
+
+    scan.AddSelectedCommand.Execute(null);
+
+    Assert.Equal(["Keep library", "Import as separate server"], scan.Walkthrough!.Options.Select(o => o.Label));
+    Assert.Equal("api · Global/claude_desktop_config.json", scan.Walkthrough.Current!.ServerName);
+  }
+
   private static ScannedFolderViewModel Folder(ScanViewModel scan, string name) =>
     scan.Folders.Single(f => Path.GetFileName(f.Path) == name);
 
@@ -244,7 +272,7 @@ public class ScanViewModelTests : IDisposable
 
   private static ScanViewModel CreateScan(McpRegistry registry, Action<int>? applied = null) => new(
     new ConfigScanService(new ConfigExportService(), _ => []),
-    new ScanImportPlanner(new ConfigImportService()),
+    new ScanImportPlanner(new ConfigImportService(), new ConfigExportService()),
     () => registry,
     applied ?? (_ => { }));
 
@@ -269,10 +297,11 @@ public class ScanViewModelTests : IDisposable
   private static string ClaudeJson(string name, string command) =>
     $"{{\"mcpServers\":{{\"{name}\":{{\"command\":\"{command}\"}}}}}}";
 
-  private sealed class FailingPlanner(string failingFolder) : ScanImportPlanner(new ConfigImportService())
+  private sealed class FailingPlanner(string failingFolder)
+    : ScanImportPlanner(new ConfigImportService(), new ConfigExportService())
   {
     public override IReadOnlyList<ScanServerMatch> Match(
-      IEnumerable<ScannedFolder> folders, IReadOnlyList<McpServer> library, ICollection<string>? skipped = null)
+      IEnumerable<ScannedFolder> folders, McpRegistry registry, ICollection<string>? skipped = null)
     {
       List<ScannedFolder> list = [.. folders];
       if (list.Any(f => Path.GetFileName(f.Path) == failingFolder))
@@ -280,7 +309,7 @@ public class ScanViewModelTests : IDisposable
         throw new InvalidOperationException("boom");
       }
 
-      return base.Match(list, library, skipped);
+      return base.Match(list, registry, skipped);
     }
   }
 

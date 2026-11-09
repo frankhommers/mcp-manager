@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using McpManager.Core.ConfigGenerators;
 using McpManager.Core.Models;
 using McpManager.Core.Services;
 
@@ -6,7 +7,7 @@ namespace McpManager.Tests;
 
 public class ScanImportPlannerTests
 {
-  private readonly ScanImportPlanner _planner = new(new ConfigImportService());
+  private readonly ScanImportPlanner _planner = new(new ConfigImportService(), new ConfigExportService());
 
   private static ExistingTargetServer Found(
     string name,
@@ -49,6 +50,110 @@ public class ScanImportPlannerTests
     return server;
   }
 
+  private static ExistingTargetServer Deployed(
+    TargetClientFlags client,
+    McpServer server,
+    string folder = "/p/a",
+    Dictionary<Guid, Dictionary<string, string>>? envOverrides = null)
+  {
+    (IConfigGenerator generator, string file) = client switch
+    {
+      TargetClientFlags.OpenCode => ((IConfigGenerator)new OpenCodeConfigGenerator(), "opencode.json"),
+      TargetClientFlags.Codex => (new CodexConfigGenerator(), Path.Combine(".codex", "config.toml")),
+      TargetClientFlags.ClaudeDesktop => (new ClaudeDesktopConfigGenerator(), "claude_desktop_config.json"),
+      _ => (new ClaudeCodeConfigGenerator(), ".mcp.json"),
+    };
+    string path = Path.Combine(folder, file);
+    return TargetConfigSelectionService.Parse(generator.GenerateConfig([server], envOverrides), client, path).Single();
+  }
+
+  private static McpServer Http(string token) => new()
+  {
+    Name = "api",
+    TransportType = McpTransportType.Http,
+    Url = "https://example.com/mcp",
+    HttpHeaders = { ["Authorization"] = $"Bearer {token}" },
+  };
+
+  [Theory]
+  [InlineData(TargetClientFlags.ClaudeCode)]
+  [InlineData(TargetClientFlags.OpenCode)]
+  [InlineData(TargetClientFlags.Codex)]
+  [InlineData(TargetClientFlags.ClaudeDesktop)]
+  public void Own_output_for_http_server_is_known(TargetClientFlags client)
+  {
+    McpServer library = Http("abc");
+    McpRegistry registry = new() { Servers = [library] };
+    ScannedFolder folder = Folder("/p/a", client, client == TargetClientFlags.ClaudeDesktop, Deployed(client, library));
+
+    ScanServerMatch match = Assert.Single(_planner.Match([folder], registry));
+
+    Assert.Equal(ScanMatchKind.Known, match.Kind);
+    Assert.False(match.Diff!.HasDifferences);
+  }
+
+  [Fact]
+  public void Env_override_of_existing_place_is_part_of_the_comparison()
+  {
+    McpServer library = Library("tool", "run", "library-token");
+    TargetFolder place = new()
+    {
+      Name = "a",
+      Path = "/p/a",
+      EnabledServers = [library.Id],
+      ServerEnvOverrides = { [library.Id] = new Dictionary<string, string> { ["TOKEN"] = "place-token" } },
+    };
+    McpRegistry registry = new() { Servers = [library], TargetFolders = [place] };
+    ScannedFolder folder = Folder("/p/a", TargetClientFlags.ClaudeCode, false,
+      Deployed(TargetClientFlags.ClaudeCode, library, envOverrides: place.ServerEnvOverrides));
+
+    Assert.Equal(ScanMatchKind.Known, Assert.Single(_planner.Match([folder], registry)).Kind);
+  }
+
+  [Fact]
+  public void Found_version_from_opencode_changes_only_what_differs()
+  {
+    McpServer library = Http("abc");
+    McpRegistry registry = new() { Servers = [library] };
+    ScannedFolder folder = Folder("/p/a", TargetClientFlags.OpenCode, false, Deployed(TargetClientFlags.OpenCode, Http("xyz")));
+
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry);
+    Assert.Equal(["header:Authorization"],
+      matches[0].Diff!.Fields.Where(f => f.Kind != DiffKind.Same).Select(f => f.Field));
+    _planner.Apply(registry, [folder], matches, new Dictionary<ScanServerMatch, ScanChoice>
+    {
+      [matches[0]] = ScanChoice.UseFoundVersion,
+    });
+
+    Assert.Equal(McpTransportType.Http, library.TransportType);
+    Assert.Equal("Bearer xyz", library.HttpHeaders["Authorization"]);
+  }
+
+  [Fact]
+  public void Bridged_claude_desktop_entry_cannot_replace_the_library()
+  {
+    McpServer library = Http("abc");
+    McpRegistry registry = new() { Servers = [library] };
+    ScannedFolder folder = Folder("/desktop", TargetClientFlags.ClaudeDesktop, true,
+      Deployed(TargetClientFlags.ClaudeDesktop, Http("xyz"), "/desktop"));
+
+    ScanServerMatch match = Assert.Single(_planner.Match([folder], registry));
+
+    Assert.Equal(ScanMatchKind.Differs, match.Kind);
+    Assert.False(match.CanUseFoundVersion);
+    Assert.Throws<ArgumentException>(() => _planner.Apply(registry, [folder], [match],
+      new Dictionary<ScanServerMatch, ScanChoice> { [match] = ScanChoice.UseFoundVersion }));
+    Assert.Empty(registry.TargetFolders);
+    Assert.Equal("Bearer abc", library.HttpHeaders["Authorization"]);
+
+    _planner.Apply(registry, [folder], [match],
+      new Dictionary<ScanServerMatch, ScanChoice> { [match] = ScanChoice.ImportSeparately });
+    McpServer separate = registry.Servers[1];
+    Assert.Equal("api-claude-desktop", separate.Name);
+    Assert.Equal(McpTransportType.Stdio, separate.TransportType);
+    Assert.Contains("Bearer xyz", separate.Args);
+  }
+
   [Fact]
   public void Unknown_server_is_imported_once_across_folders()
   {
@@ -56,7 +161,7 @@ public class ScanImportPlannerTests
     ScannedFolder b = Folder("/p/b", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "A"));
     McpRegistry registry = new();
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry);
     Assert.Equal(ScanMatchKind.Unknown, matches[0].Kind);
     Assert.Equal(ScanMatchKind.Known, matches[1].Kind);
 
@@ -74,7 +179,7 @@ public class ScanImportPlannerTests
     ScannedFolder b = Folder("/p/b", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "B"));
     McpRegistry registry = new();
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry);
 
     Assert.Equal(ScanMatchKind.Differs, matches[1].Kind);
     Assert.Same(matches[0].Imported, matches[1].Library);
@@ -92,7 +197,7 @@ public class ScanImportPlannerTests
     registry.Servers.Add(Library("tool", "run", "A"));
     ScannedFolder folder = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "B"));
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry);
 
     Assert.Equal(ScanMatchKind.Differs, matches[0].Kind);
     ArgumentException ex = Assert.Throws<ArgumentException>(() =>
@@ -110,7 +215,7 @@ public class ScanImportPlannerTests
     Guid id = library.Id;
     ScannedFolder folder = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("old-name", "run", managedId: id));
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], [library]);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], new McpRegistry { Servers = [library] });
 
     Assert.Same(library, matches[0].Library);
     Assert.Equal(ScanMatchKind.Known, matches[0].Kind);
@@ -126,7 +231,7 @@ public class ScanImportPlannerTests
     registry.Servers.Add(library);
     ScannedFolder folder = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "new", "B"));
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry);
     _planner.Apply(registry, [folder], matches, new Dictionary<ScanServerMatch, ScanChoice>
     {
       [matches[0]] = ScanChoice.UseFoundVersion,
@@ -148,7 +253,7 @@ public class ScanImportPlannerTests
     registry.Servers.Add(library);
     ScannedFolder folder = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "new", "B"));
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry);
     _planner.Apply(registry, [folder], matches, new Dictionary<ScanServerMatch, ScanChoice>
     {
       [matches[0]] = ScanChoice.KeepLibrary,
@@ -166,7 +271,7 @@ public class ScanImportPlannerTests
     registry.Servers.Add(Library("tool-api", "x"));
     ScannedFolder folder = Folder("/p/api/", TargetClientFlags.ClaudeCode, false, Found("tool", "new", "B"));
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry);
     _planner.Apply(registry, [folder], matches, new Dictionary<ScanServerMatch, ScanChoice>
     {
       [matches[0]] = ScanChoice.ImportSeparately,
@@ -196,7 +301,7 @@ public class ScanImportPlannerTests
       Found("off", "run", enabled: false));
     McpRegistry registry = new();
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry);
     Assert.Equal(3, matches.Count);
     _planner.Apply(registry, [folder], matches, new Dictionary<ScanServerMatch, ScanChoice>());
 
@@ -230,7 +335,7 @@ public class ScanImportPlannerTests
     registry.TargetFolders.Add(existing);
     ScannedFolder folder = Folder("/p/a", TargetClientFlags.Codex, false, Found("fresh", "run", client: TargetClientFlags.Codex));
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry);
     _planner.Apply(registry, [folder], matches, new Dictionary<ScanServerMatch, ScanChoice>());
 
     Assert.Same(existing, Assert.Single(registry.TargetFolders));
@@ -257,7 +362,7 @@ public class ScanImportPlannerTests
 
     for (int i = 0; i < 2; i++)
     {
-      IReadOnlyList<ScanServerMatch> matches = _planner.Match([global], registry.Servers);
+      IReadOnlyList<ScanServerMatch> matches = _planner.Match([global], registry);
       _planner.Apply(registry, [global], matches, new Dictionary<ScanServerMatch, ScanChoice>());
     }
 
@@ -274,7 +379,7 @@ public class ScanImportPlannerTests
     McpRegistry registry = new();
     registry.Servers.Add(library);
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry);
     Assert.Same(library, matches[0].Library);
     _planner.Apply(registry, [folder], matches, new Dictionary<ScanServerMatch, ScanChoice>
     {
@@ -293,7 +398,7 @@ public class ScanImportPlannerTests
       "/home/.claude.json", TargetClientFlags.ClaudeCodeGlobal, true,
       Found("tool", "new", "B", client: TargetClientFlags.ClaudeCodeGlobal));
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([global], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([global], registry);
     _planner.Apply(registry, [global], matches, new Dictionary<ScanServerMatch, ScanChoice>
     {
       [matches[0]] = ScanChoice.ImportSeparately,
@@ -309,7 +414,7 @@ public class ScanImportPlannerTests
     ScannedFolder folder = Folder("/p/a", TargetClientFlags.ClaudeCode, false, bad, Found("good", "run"));
     List<string> skipped = [];
 
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], [], skipped);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], new McpRegistry(), skipped);
 
     Assert.Equal("good", Assert.Single(matches).Found.Name);
     string message = Assert.Single(skipped);
@@ -322,7 +427,7 @@ public class ScanImportPlannerTests
     McpRegistry registry = new();
     registry.Servers.Add(Library("tool", "run", "A"));
     ScannedFolder folder = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "B"));
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], registry);
 
     Assert.Throws<ArgumentException>(() => _planner.Apply(registry, [folder], matches,
       new Dictionary<ScanServerMatch, ScanChoice> { [matches[0]] = (ScanChoice)99 }));
@@ -337,7 +442,7 @@ public class ScanImportPlannerTests
     registry.Servers.Add(library);
     ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "B"));
     ScannedFolder b = Folder("/p/b", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "C"));
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry);
 
     ArgumentException ex = Assert.Throws<ArgumentException>(() => _planner.Apply(registry, [a, b], matches,
       matches.ToDictionary(m => m, _ => ScanChoice.UseFoundVersion)));
@@ -358,7 +463,7 @@ public class ScanImportPlannerTests
     registry.Servers.Add(Library("tool", "run", "A"));
     ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "B"));
     ScannedFolder b = Folder("/p/b", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "C"));
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry);
     Dictionary<ScanServerMatch, ScanChoice> choices = new()
     {
       [matches[0]] = other,
@@ -384,7 +489,7 @@ public class ScanImportPlannerTests
     registry.Servers.Add(Library("tool", "run", "A"));
     ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "A"));
     ScannedFolder b = Folder("/p/b", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "C"));
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry);
 
     Assert.Throws<ArgumentException>(() => _planner.Apply(registry, [a, b], matches,
       new Dictionary<ScanServerMatch, ScanChoice> { [matches[1]] = ScanChoice.UseFoundVersion }));
@@ -397,7 +502,7 @@ public class ScanImportPlannerTests
     ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "A"));
     ScannedFolder b = Folder("/p/b", TargetClientFlags.ClaudeCode, false, Found("tool", "run", "C"));
     McpRegistry registry = new();
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry.Servers);
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([a, b], registry);
     Dictionary<ScanServerMatch, ScanChoice> choices = new() { [matches[1]] = ScanChoice.UseFoundVersion };
 
     Assert.Throws<ArgumentException>(() => _planner.Apply(registry, [a, b], matches, choices));

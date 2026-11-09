@@ -5,9 +5,9 @@ using Tomlyn;
 
 namespace McpManager.Core.Services;
 
-public class ScanImportPlanner(IConfigImportService importService)
+public class ScanImportPlanner(IConfigImportService importService, IConfigExportService exportService)
 {
-  public virtual IReadOnlyList<ScanServerMatch> Match(IEnumerable<ScannedFolder> folders, IReadOnlyList<McpServer> library,
+  public virtual IReadOnlyList<ScanServerMatch> Match(IEnumerable<ScannedFolder> folders, McpRegistry registry,
     ICollection<string>? skipped = null)
   {
     List<ScanServerMatch> matches = [];
@@ -33,12 +33,7 @@ public class ScanImportPlanner(IConfigImportService importService)
           continue;
         }
 
-        McpServer? known = FindInLibrary(library, found);
-        if (known == null && firstUnknown.TryGetValue(found.Name, out McpServer? first))
-        {
-          known = first;
-        }
-
+        McpServer? known = FindInLibrary(registry.Servers, found) ?? firstUnknown.GetValueOrDefault(found.Name);
         if (known == null)
         {
           firstUnknown[found.Name] = imported;
@@ -46,9 +41,10 @@ public class ScanImportPlanner(IConfigImportService importService)
           continue;
         }
 
-        ServerDiff diff = ServerDiffService.Compare(known, imported);
+        ServerDiff diff = ServerDiffService.Compare(Render(registry, folder, found, known) ?? known, imported);
         ScanMatchKind kind = diff.HasDifferences ? ScanMatchKind.Differs : ScanMatchKind.Known;
-        matches.Add(new ScanServerMatch(folder.Path, found, imported, known, kind, diff));
+        bool bridged = found.Client == TargetClientFlags.ClaudeDesktop && known.TransportType != McpTransportType.Stdio;
+        matches.Add(new ScanServerMatch(folder.Path, found, imported, known, kind, diff, !bridged));
       }
     }
 
@@ -71,7 +67,7 @@ public class ScanImportPlanner(IConfigImportService importService)
       }
     }
 
-    ValidateConflicts(plan);
+    Dictionary<McpServer, McpServer> replacements = ValidateConflicts(registry, plan);
 
     foreach (ScannedFolder folder in folders)
     {
@@ -87,9 +83,9 @@ public class ScanImportPlanner(IConfigImportService importService)
         }
 
         McpServer server = EnsureInLibrary(registry, entry.Target);
-        if (entry.Choice == ScanChoice.UseFoundVersion)
+        if (replacements.Remove(entry.Target, out McpServer? replacement))
         {
-          CopyDefinition(entry.Match.Imported, server);
+          CopyDefinition(replacement, server);
         }
 
         if (!entry.Match.Found.IsEnabled)
@@ -101,6 +97,36 @@ public class ScanImportPlanner(IConfigImportService importService)
         place.DisabledServers.Remove(server.Id);
         place.AdoptedServerNames.Add(entry.Match.Found.Name);
       }
+    }
+  }
+
+  private McpServer? Render(McpRegistry registry, ScannedFolder folder, ExistingTargetServer found, McpServer server)
+  {
+    try
+    {
+      TargetFolder? place = FindPlace(registry, folder);
+      TargetFolder? effective = place == null ? null : ProfileResolver.Resolve(place, registry.Profiles);
+      TargetFolder target = new()
+      {
+        Path = folder.Path,
+        IsGlobal = folder.IsGlobal,
+        EnabledClients = found.Client,
+        EnabledServers = [server.Id],
+        ServerEnvOverrides = effective?.ServerEnvOverrides ?? [],
+        ServerToolOverrides = effective?.ServerToolOverrides ?? [],
+        BridgeArgs = effective?.BridgeArgs ?? string.Empty,
+        AdoptedServerNames = [server.Name],
+      };
+      string path = exportService.GetConfigFilePaths(target, registry.Settings)[found.Client];
+      string content = exportService.PreviewConfigs(target, [server], registry.Settings)[path];
+      return importService.ImportServer(
+        TargetConfigSelectionService.Parse(content, found.Client, path).Single(s => s.Name == server.Name));
+    }
+    catch (Exception ex) when (ex is InvalidDataException or JsonException or TomlException
+                                 or InvalidOperationException or KeyNotFoundException or ArgumentException
+                                 or IOException or UnauthorizedAccessException)
+    {
+      return null;
     }
   }
 
@@ -128,45 +154,114 @@ public class ScanImportPlanner(IConfigImportService importService)
         throw new ArgumentException(
           $"Invalid choice for server '{match.Found.Name}' in '{folder.Path}'.", nameof(choices));
       }
+
+      if (choice == ScanChoice.UseFoundVersion && !match.CanUseFoundVersion)
+      {
+        throw new ArgumentException(
+          $"Server '{match.Found.Name}' in '{folder.Path}' is wrapped by a bridge for Claude Desktop. " +
+          "Keep the library version or import it as a separate server.", nameof(choices));
+      }
     }
 
     McpServer target = choice == ScanChoice.ImportSeparately ? match.Imported : match.Library;
     return new PlannedServer(folder, match, choice, target);
   }
 
-  private static void ValidateConflicts(List<PlannedServer> plan)
+  private Dictionary<McpServer, McpServer> ValidateConflicts(McpRegistry registry, List<PlannedServer> plan)
   {
+    Dictionary<McpServer, McpServer> replacements = [];
     foreach (IGrouping<McpServer, PlannedServer> group in plan
                .Where(p => p.Choice != ScanChoice.ImportSeparately)
                .GroupBy(p => p.Target))
     {
       List<PlannedServer> overwrites = group.Where(p => p.Choice == ScanChoice.UseFoundVersion).ToList();
-      string name = group.First().Match.Found.Name;
-      foreach (PlannedServer other in overwrites.Skip(1))
-      {
-        if (!SameDefinition(overwrites[0].Match.Imported, other.Match.Imported))
-        {
-          throw new ArgumentException(
-            $"Folders '{overwrites[0].Folder.Path}' and '{other.Folder.Path}' both want to replace server " +
-            $"'{name}' with different definitions.", nameof(plan));
-        }
-      }
-
       if (overwrites.Count == 0)
       {
         continue;
       }
 
-      McpServer final = overwrites[0].Match.Imported;
-      foreach (PlannedServer adopter in group)
+      string name = group.Key.Name;
+      McpServer replacement = WithFoundChanges(group.Key, overwrites[0].Match);
+      foreach (PlannedServer other in overwrites.Skip(1))
       {
-        if (!SameDefinition(final, adopter.Match.Imported))
+        if (!SameDefinition(replacement, WithFoundChanges(group.Key, other.Match)))
         {
           throw new ArgumentException(
-            $"Server '{name}' in '{adopter.Folder.Path}' would be changed by the version from '{overwrites[0].Folder.Path}'.",
-            nameof(plan));
+            $"'{Describe(overwrites[0])}' and '{Describe(other)}' both want to replace server " +
+            $"'{name}' with different definitions.", nameof(plan));
         }
       }
+
+      foreach (PlannedServer adopter in group)
+      {
+        McpServer rendered = Render(registry, adopter.Folder, adopter.Match.Found, replacement) ?? replacement;
+        if (ServerDiffService.Compare(rendered, adopter.Match.Imported).Fields
+            .Any(f => f.Kind != DiffKind.Same && f.Field != ServerDiffService.ToolsField))
+        {
+          throw new ArgumentException(
+            $"Server '{name}' in '{Describe(adopter)}' would be changed by the version from " +
+            $"'{Describe(overwrites[0])}'.", nameof(plan));
+        }
+      }
+
+      replacements[group.Key] = replacement;
+    }
+
+    return replacements;
+  }
+
+  private static string Describe(PlannedServer entry) =>
+    $"{entry.Folder.Path} ({Path.GetFileName(entry.Match.Found.FilePath)})";
+
+  private static McpServer WithFoundChanges(McpServer library, ScanServerMatch match)
+  {
+    McpServer result = new() { Name = library.Name, AlwaysAllow = library.AlwaysAllow };
+    CopyDefinition(library, result);
+    McpServer found = match.Imported;
+    foreach (FieldDiff field in match.Diff!.Fields.Where(f => f.Kind != DiffKind.Same))
+    {
+      switch (field.Field)
+      {
+        case ServerDiffService.TypeField:
+          result.TransportType = found.TransportType;
+          break;
+        case ServerDiffService.CommandField:
+          result.Command = found.Command;
+          break;
+        case ServerDiffService.ArgsField:
+          result.Args = [.. found.Args];
+          break;
+        case ServerDiffService.UrlField:
+          result.Url = found.Url;
+          break;
+        case ServerDiffService.CwdField:
+          result.WorkingDirectory = found.WorkingDirectory;
+          break;
+        case string env when env.StartsWith(ServerDiffService.EnvPrefix, StringComparison.Ordinal):
+          CopyValue(found.EnvironmentVariables, result.EnvironmentVariables,
+            env[ServerDiffService.EnvPrefix.Length..], StringComparer.Ordinal);
+          break;
+        case string header when header.StartsWith(ServerDiffService.HeaderPrefix, StringComparison.Ordinal):
+          CopyValue(found.HttpHeaders, result.HttpHeaders,
+            header[ServerDiffService.HeaderPrefix.Length..], StringComparer.OrdinalIgnoreCase);
+          break;
+      }
+    }
+
+    return result;
+  }
+
+  private static void CopyValue(
+    Dictionary<string, string> from, Dictionary<string, string> to, string key, StringComparer comparer)
+  {
+    foreach (string existing in to.Keys.Where(k => comparer.Equals(k, key)).ToList())
+    {
+      to.Remove(existing);
+    }
+
+    foreach ((string foundKey, string value) in from.Where(p => comparer.Equals(p.Key, key)))
+    {
+      to[foundKey] = value;
     }
   }
 

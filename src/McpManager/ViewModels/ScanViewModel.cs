@@ -104,7 +104,7 @@ public partial class ScanViewModel : ViewModelBase
         string? error = null;
         try
         {
-          matches = _planner.Match([folder], registry.Servers, skipped);
+          matches = _planner.Match([folder], registry, skipped);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -163,7 +163,7 @@ public partial class ScanViewModel : ViewModelBase
     IReadOnlyList<ScanServerMatch> matches;
     try
     {
-      matches = _planner.Match(selected, registry.Servers);
+      matches = _planner.Match(selected, registry);
     }
     catch (Exception ex)
     {
@@ -185,7 +185,8 @@ public partial class ScanViewModel : ViewModelBase
       "Library",
       "Found in project",
       [.. differing.Select(m => m.Diff! with { ServerName = WalkthroughTitle(m, selected) })],
-      WalkthroughChoices);
+      WalkthroughChoices,
+      (index, choice) => choice != DiffChoice.UseFoundVersion || differing[index].CanUseFoundVersion);
   }
 
   private bool CanAddPlaces() => Walkthrough?.IsComplete == true;

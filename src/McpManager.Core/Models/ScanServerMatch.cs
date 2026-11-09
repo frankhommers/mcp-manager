@@ -6,4 +6,5 @@ public sealed record ScanServerMatch(
   McpServer Imported,
   McpServer? Library,
   ScanMatchKind Kind,
-  ServerDiff? Diff);
+  ServerDiff? Diff,
+  bool CanUseFoundVersion = true);

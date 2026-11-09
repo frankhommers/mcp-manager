@@ -9,6 +9,8 @@ namespace McpManager.ViewModels;
 public partial class DiffViewModel : ViewModelBase
 {
   private readonly IReadOnlyList<ServerDiff> _items;
+  private readonly IReadOnlyList<DiffChoice> _choices;
+  private readonly Func<int, DiffChoice, bool>? _isAvailable;
   private readonly DiffChoice?[] _selected;
   private int _index;
 
@@ -16,13 +18,16 @@ public partial class DiffViewModel : ViewModelBase
     string leftLabel,
     string rightLabel,
     IReadOnlyList<ServerDiff> items,
-    IReadOnlyList<DiffChoice> choices)
+    IReadOnlyList<DiffChoice> choices,
+    Func<int, DiffChoice, bool>? isAvailable = null)
   {
     LeftLabel = leftLabel;
     RightLabel = rightLabel;
     _items = items;
-    Options = [.. choices.Select(c => new DiffChoiceOptionViewModel(this, c))];
+    _choices = choices;
+    _isAvailable = isAvailable;
     _selected = new DiffChoice?[items.Count];
+    Options = BuildOptions();
     Fields = BuildFields();
   }
 
@@ -30,9 +35,9 @@ public partial class DiffViewModel : ViewModelBase
 
   public string RightLabel { get; }
 
-  public IReadOnlyList<DiffChoiceOptionViewModel> Options { get; }
+  public IReadOnlyList<DiffChoiceOptionViewModel> Options { get; private set; }
 
-  public bool HasChoices => Options.Count > 0;
+  public bool HasChoices => _choices.Count > 0;
 
   public bool HasMultipleItems => _items.Count > 1;
 
@@ -57,7 +62,7 @@ public partial class DiffViewModel : ViewModelBase
     get => Current == null ? null : _selected[_index];
     set
     {
-      if (Current == null || _selected[_index] == value)
+      if (Current == null || _selected[_index] == value || (value is DiffChoice choice && !IsAvailable(_index, choice)))
       {
         return;
       }
@@ -80,9 +85,11 @@ public partial class DiffViewModel : ViewModelBase
   {
     _index = index;
     Fields = BuildFields();
+    Options = BuildOptions();
     OnPropertyChanged(nameof(Current));
     OnPropertyChanged(nameof(HasTitle));
     OnPropertyChanged(nameof(Fields));
+    OnPropertyChanged(nameof(Options));
     OnPropertyChanged(nameof(Position));
     OnPropertyChanged(nameof(SelectedChoice));
     RefreshOptions();
@@ -99,6 +106,11 @@ public partial class DiffViewModel : ViewModelBase
       option.Refresh();
     }
   }
+
+  private bool IsAvailable(int index, DiffChoice choice) => _isAvailable?.Invoke(index, choice) ?? true;
+
+  private List<DiffChoiceOptionViewModel> BuildOptions() =>
+    [.. _choices.Where(c => IsAvailable(_index, c)).Select(c => new DiffChoiceOptionViewModel(this, c))];
 
   private List<FieldDiffViewModel> BuildFields() =>
     Current == null ? [] : [.. Current.Fields.Select(f => new FieldDiffViewModel(f))];

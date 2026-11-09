@@ -152,6 +152,24 @@ public class DiffViewModelTests
   }
 
   [Fact]
+  public void Unavailable_choices_are_hidden_per_item()
+  {
+    DiffViewModel diff = new(
+      "Library",
+      "Found",
+      [Server("s1"), Server("s2")],
+      [DiffChoice.KeepLibrary, DiffChoice.UseFoundVersion, DiffChoice.ImportSeparately],
+      (index, choice) => index == 0 || choice != DiffChoice.UseFoundVersion);
+
+    Assert.Equal(3, diff.Options.Count);
+    diff.NextCommand.Execute(null);
+
+    Assert.Equal([DiffChoice.KeepLibrary, DiffChoice.ImportSeparately], diff.Options.Select(o => o.Choice));
+    diff.SelectedChoice = DiffChoice.UseFoundVersion;
+    Assert.Null(diff.SelectedChoice);
+  }
+
+  [Fact]
   public void Navigation_keeps_choice_per_item()
   {
     DiffViewModel diff = Create(3, DiffChoice.KeepLibrary, DiffChoice.UseFoundVersion);

@@ -40,7 +40,7 @@ public partial class MainWindowViewModel
 
   private ScanViewModel CreateScan(ConfigScanService scanService) => new(
     scanService,
-    new ScanImportPlanner(_configImportService),
+    new ScanImportPlanner(_configImportService, _configExportService),
     () =>
     {
       SyncModels();

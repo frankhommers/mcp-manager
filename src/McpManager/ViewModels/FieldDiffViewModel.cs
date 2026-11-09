@@ -10,8 +10,6 @@ namespace McpManager.ViewModels;
 
 public partial class FieldDiffViewModel : ViewModelBase
 {
-  private const string ArgsField = "args";
-
   private readonly FieldDiff _diff;
 
   [ObservableProperty]
@@ -26,8 +24,8 @@ public partial class FieldDiffViewModel : ViewModelBase
 
   public string Field => _diff.Field;
 
-  public string Label => _diff.Field.StartsWith("env:", StringComparison.Ordinal)
-    || _diff.Field.StartsWith("header:", StringComparison.Ordinal)
+  public string Label => _diff.Field.StartsWith(ServerDiffService.EnvPrefix, StringComparison.Ordinal)
+    || _diff.Field.StartsWith(ServerDiffService.HeaderPrefix, StringComparison.Ordinal)
     ? _diff.Field[(_diff.Field.IndexOf(':') + 1)..]
     : _diff.Field;
 
@@ -51,7 +49,7 @@ public partial class FieldDiffViewModel : ViewModelBase
   private void ToggleReveal() => IsRevealed = !IsRevealed;
 
   private List<DiffTokenViewModel> Build(IReadOnlyList<DiffToken> tokens) =>
-    [.. tokens.Select(t => new DiffTokenViewModel(t, IsRevealed, _diff.Field == ArgsField, HasSecretKey))];
+    [.. tokens.Select(t => new DiffTokenViewModel(t, IsRevealed, _diff.Field == ServerDiffService.ArgsField, HasSecretKey))];
 
   private bool HasSecretKey => Label != _diff.Field && SecretMask.IsSecretKey(Label);
 
