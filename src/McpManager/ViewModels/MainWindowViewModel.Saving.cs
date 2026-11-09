@@ -261,13 +261,9 @@ public partial class MainWindowViewModel
   {
     PlaceStatusService statusService = new(_configExportService);
     HashSet<Guid> changed = statusService.GetChangedPlaces(before, _registry!).Select(t => t.Id).ToHashSet();
-    Dictionary<Guid, PlaceStatus> statuses = ManagedTargets.ToDictionary(
-      t => t.Id, t => statusService.GetStatus(t.Model, _registry!));
-    List<TargetFolderViewModel> candidates = ManagedTargets
-      .Where(t => changed.Contains(t.Id) || statuses[t.Id] == PlaceStatus.Behind)
-      .ToList();
+    List<TargetFolderViewModel> candidates = ManagedTargets.Where(t => changed.Contains(t.Id)).ToList();
     List<TargetFolderViewModel> external = candidates
-      .Where(t => statuses[t.Id] == PlaceStatus.ExternallyChanged)
+      .Where(t => statusService.GetStatus(t.Model, _registry!) == PlaceStatus.ExternallyChanged)
       .ToList();
     List<TargetFolderViewModel> targets = candidates.Except(external).ToList();
     string skipped = external.Count == 0

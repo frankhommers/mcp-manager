@@ -189,6 +189,29 @@ public class SaveFlowTests : IDisposable
   }
 
   [Fact]
+  public async Task Save_with_deploy_skips_places_that_were_already_behind()
+  {
+    MainWindowViewModel vm = await CreateAsync();
+    await vm.DeployPlaceCommand.ExecuteAsync(Place(vm, "A"));
+    await vm.DeployPlaceCommand.ExecuteAsync(Place(vm, "B"));
+    vm.Servers.Single(s => s.Id == _beta.Id).Command = "beta-changed";
+    await vm.SaveCommand.ExecuteAsync(null);
+    Assert.Equal(2, vm.BehindCount);
+    string fileB = await File.ReadAllTextAsync(Path.Combine(ProjectB, ".mcp.json"));
+
+    vm.Servers.Single(s => s.Id == _alpha.Id).Command = "alpha-changed";
+    vm.CheckTargetsCommand.Execute(null);
+    Assert.Equal(1, vm.ChangedFileCount);
+    vm.AlsoDeploy = true;
+    await vm.SaveCommand.ExecuteAsync(null);
+
+    Assert.Equal("Saved and deployed 1 place.", vm.StatusMessage);
+    Assert.Contains("alpha-changed", await File.ReadAllTextAsync(Path.Combine(ProjectA, ".mcp.json")));
+    Assert.Equal(fileB, await File.ReadAllTextAsync(Path.Combine(ProjectB, ".mcp.json")));
+    Assert.Equal(1, vm.BehindCount);
+  }
+
+  [Fact]
   public async Task Cancel_restores_saved_state()
   {
     MainWindowViewModel vm = await CreateAsync();
