@@ -28,6 +28,12 @@ public partial class TargetFolderViewModel : ViewModelBase
   public bool IsProjectTarget => !IsGlobal && IsManagedTarget;
   partial void OnSelectedClientChanged(TargetClientFlags value)
   {
+    EnableClaudeCode = value.HasFlag(TargetClientFlags.ClaudeCode);
+    EnableClaudeDesktop = value.HasFlag(TargetClientFlags.ClaudeDesktop);
+    EnableOpenCode = value.HasFlag(TargetClientFlags.OpenCode);
+    EnableCodex = value.HasFlag(TargetClientFlags.Codex);
+    EnableCursor = value.HasFlag(TargetClientFlags.Cursor);
+    EnableVsCode = value.HasFlag(TargetClientFlags.VsCode);
     OnPropertyChanged(nameof(ClientName));
     OnPropertyChanged(nameof(ConfigFilePath));
     OnPropertyChanged(nameof(PermissionSupport));
@@ -152,6 +158,10 @@ public partial class TargetFolderViewModel : ViewModelBase
 
   [ObservableProperty] private bool _enableCodex;
 
+  [ObservableProperty] private bool _enableCursor;
+
+  [ObservableProperty] private bool _enableVsCode;
+
   [ObservableProperty] private string _existingServersStatus = string.Empty;
 
   [ObservableProperty]
@@ -264,6 +274,8 @@ public partial class TargetFolderViewModel : ViewModelBase
     _enableClaudeDesktop = model.EnabledClients.HasFlag(TargetClientFlags.ClaudeDesktop);
     _enableOpenCode = model.EnabledClients.HasFlag(TargetClientFlags.OpenCode);
     _enableCodex = model.EnabledClients.HasFlag(TargetClientFlags.Codex);
+    _enableCursor = model.EnabledClients.HasFlag(TargetClientFlags.Cursor);
+    _enableVsCode = model.EnabledClients.HasFlag(TargetClientFlags.VsCode);
     _bridgeArgs = model.BridgeArgs;
     ServerSelections.CollectionChanged += OnSelectionCollectionChanged;
 
@@ -415,12 +427,13 @@ public partial class TargetFolderViewModel : ViewModelBase
       return _model.EnabledClients;
     }
 
-    if (IsManagedTarget) return SelectedClient;
     TargetClientFlags clients = TargetClientFlags.None;
     if (EnableClaudeCode) clients |= TargetClientFlags.ClaudeCode;
     if (EnableClaudeDesktop) clients |= TargetClientFlags.ClaudeDesktop;
     if (EnableOpenCode) clients |= TargetClientFlags.OpenCode;
     if (EnableCodex) clients |= TargetClientFlags.Codex;
+    if (EnableCursor) clients |= TargetClientFlags.Cursor;
+    if (EnableVsCode) clients |= TargetClientFlags.VsCode;
     return clients;
   }
 
@@ -477,6 +490,14 @@ public partial class TargetFolderViewModel : ViewModelBase
       ServerSelections.Remove(item);
     }
 
+    ApplyInheritance();
+  }
+
+  public void ReloadSelectionsFromModel()
+  {
+    _selectionOverrides.Clear();
+    foreach (Guid id in _model.EnabledServers) _selectionOverrides[id] = true;
+    foreach (Guid id in _model.DisabledServers) _selectionOverrides[id] = false;
     ApplyInheritance();
   }
 

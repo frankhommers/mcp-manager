@@ -199,50 +199,20 @@ public partial class MainWindowViewModel
         return;
       }
       SyncModels();
-      foreach (TargetFolderViewModel target in targets.Where(t => t.Model.LastAppliedAt == null))
-      {
-        ExistingTargetServers existing = await new TargetConfigSelectionService(_configExportService).ReadAsync(target.Model, _registry.Settings);
-        if (existing.Servers.Any(s => s.ManagedId is Guid id && !_registry.Servers.Any(server => server.Id == id)))
-          throw new InvalidOperationException($"Import the existing managed servers from '{target.Name}' before its first update.");
-        HashSet<Guid> managedIds = existing.Servers.Select(s => s.ManagedId).OfType<Guid>().ToHashSet();
-        foreach (ServerSelectionViewModel selection in target.ServerSelections.Where(s =>
-                   managedIds.Contains(s.ServerId) && !s.IsEnabled && !target.Model.DisabledServers.Contains(s.ServerId)))
-          selection.IsEnabled = true;
-        target.UpdateModel();
-      }
       await _registryService.SaveAsync(_registry);
-      List<TargetFolder> effective = targets.Select(t => ProfileResolver.Resolve(t.Model, _registry.Profiles)).ToList();
-      foreach (TargetFolder target in effective)
+      DeployResult result;
+      try
       {
-        int client = (int)target.EnabledClients;
-        if (client == 0 || (client & (client - 1)) != 0 || !System.IO.Path.IsPathFullyQualified(target.Path))
-          throw new InvalidOperationException($"'{target.Name}' needs one client and an absolute destination path.");
+        result = await new TargetDeployService(_configExportService).DeployAsync(
+          targets.Select(t => t.Model).ToList(), _registry, ResolveExportConflictAsync, overwriteExternal);
       }
-      Dictionary<string, string> before = [];
-      foreach (TargetFolder target in effective)
+      finally
       {
-        foreach (string path in _configExportService.GetConfigFilePaths(target, _registry.Settings).Values)
-          before[System.IO.Path.GetFullPath(path)] = TargetSyncService.FileHash(path);
+        foreach (TargetFolderViewModel target in targets) target.ReloadSelectionsFromModel();
       }
-      if (effective.Any(t => t.EnabledClients == TargetClientFlags.ClaudeCodeGlobal))
-      {
-        string permissions = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "settings.json");
-        before[permissions] = TargetSyncService.FileHash(permissions);
-      }
-      Dictionary<string, string>? configs = await _configExportService.PrepareExportAsync(
-        effective, _registry.Servers, _registry.Settings, ResolveExportConflictAsync);
-      if (configs == null) { StatusMessage = "Update cancelled. No target files changed."; return; }
-      if (before.Any(p => TargetSyncService.FileHash(p.Key) != p.Value))
-        throw new InvalidOperationException("A configuration changed during preparation. Check targets and try again.");
-      await _configExportService.WriteConfigsAsync(configs);
+      if (result.Cancelled) { StatusMessage = "Update cancelled. No target files changed."; return; }
       foreach (TargetFolderViewModel target in targets)
       {
-        HashSet<string> paths = _configExportService.GetConfigFilePaths(target.Model, _registry.Settings)
-          .Values.Select(System.IO.Path.GetFullPath).ToHashSet();
-        if (target.Model.EnabledClients == TargetClientFlags.ClaudeCodeGlobal)
-          paths.Add(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "settings.json"));
-        TargetSyncService.RecordApplied(target.Model, configs.Where(p => paths.Contains(p.Key))
-          .ToDictionary(p => p.Key, p => p.Value));
         target.HasExternalChanges = false;
         try
         {
