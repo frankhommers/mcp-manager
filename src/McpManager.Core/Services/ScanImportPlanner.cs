@@ -19,7 +19,7 @@ public class ScanImportPlanner(IConfigImportService importService)
       foreach (ExistingTargetServer found in distinct)
       {
         McpServer imported = importService.ImportServer(found);
-        McpServer? known = FindInLibrary(library, found, imported);
+        McpServer? known = FindInLibrary(library, found);
         if (known == null && firstUnknown.TryGetValue(found.Name, out McpServer? first))
         {
           known = first;
@@ -84,7 +84,7 @@ public class ScanImportPlanner(IConfigImportService importService)
   private static IEnumerable<ScanServerMatch> FolderMatches(ScannedFolder folder, IReadOnlyList<ScanServerMatch> matches) =>
     matches.Where(m => string.Equals(m.FolderPath, folder.Path, StringComparison.Ordinal));
 
-  private static McpServer? FindInLibrary(IReadOnlyList<McpServer> library, ExistingTargetServer found, McpServer imported)
+  private static McpServer? FindInLibrary(IReadOnlyList<McpServer> library, ExistingTargetServer found)
   {
     if (found.ManagedId is Guid id)
     {
