@@ -22,6 +22,7 @@ public partial class MainWindowViewModel
   [ObservableProperty] private MatrixViewModel _matrix = new([], []);
   [ObservableProperty] private ProfileViewModel? _selectedProfile;
 
+  private const string DeployFailedText = "Deploy failed";
   private int _checkVersion;
   private bool _checking;
 
@@ -268,15 +269,15 @@ public partial class MainWindowViewModel
     }
     catch (Exception ex)
     {
-      foreach (TargetFolderViewModel target in targets) target.SyncStatus = $"Deploy failed: {ex.Message}";
-      StatusMessage = $"Deploy failed: {ex.Message}";
+      foreach (TargetFolderViewModel target in targets) target.SyncStatus = $"{DeployFailedText}: {ex.Message}";
+      StatusMessage = $"{DeployFailedText}: {ex.Message}";
       return false;
     }
     finally
     {
       IsLoading = false;
       CheckTargets();
-      _ = RefreshDiskAsync();
+      _ = ReloadDiskAsync();
     }
   }
 }

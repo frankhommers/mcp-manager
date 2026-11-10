@@ -41,6 +41,47 @@ public class DiskActionsTests : IDisposable
   }
 
   [Fact]
+  public async Task Reload_after_save_keeps_the_save_status_when_problems_are_unchanged()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "node" } } }""");
+    File.WriteAllText(Path.Combine(App, "opencode.jsonc"), "{ not json");
+    MainWindowViewModel vm = await CreateAsync();
+    Assert.StartsWith("1 problem on disk: ", vm.StatusMessage);
+
+    await vm.SaveCommand.ExecuteAsync(null);
+    await vm.PendingDiskWork;
+
+    Assert.Equal("Saved.", vm.StatusMessage);
+  }
+
+  [Fact]
+  public async Task New_problems_never_replace_a_deploy_failure()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "node" } } }""");
+    MainWindowViewModel vm = await CreateAsync();
+    vm.StatusMessage = "Deploy failed: boom";
+    File.WriteAllText(Path.Combine(App, "opencode.jsonc"), "{ not json");
+
+    await vm.RefreshDiskCommand.ExecuteAsync(null);
+
+    Assert.Equal("Deploy failed: boom", vm.StatusMessage);
+  }
+
+  [Fact]
+  public async Task Problems_status_clears_when_the_problems_are_gone()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "node" } } }""");
+    File.WriteAllText(Path.Combine(App, "opencode.jsonc"), "{ not json");
+    MainWindowViewModel vm = await CreateAsync();
+    Assert.StartsWith("1 problem on disk: ", vm.StatusMessage);
+    File.Delete(Path.Combine(App, "opencode.jsonc"));
+
+    await vm.RefreshDiskCommand.ExecuteAsync(null);
+
+    Assert.Equal(string.Empty, vm.StatusMessage);
+  }
+
+  [Fact]
   public async Task Editing_candidate_promotes_it_and_marks_dirty()
   {
     WriteApp("""{ "mcpServers": { "alpha": { "command": "node" } } }""");

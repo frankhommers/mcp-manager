@@ -21,6 +21,8 @@ public partial class MainWindowViewModel
   private string? _candidatePath;
   private int _loadVersion;
   private int _rematchVersion;
+  private HashSet<string> _shownProblems = [];
+  private string? _problemsStatus;
 
   public Func<DiffViewModel, Task<DiffChoice?>> PromptResolveDifferenceAsync { get; set; } =
     ShowResolveDifferenceDialogAsync;
@@ -28,14 +30,16 @@ public partial class MainWindowViewModel
   internal Task PendingDiskWork { get; private set; } = Task.CompletedTask;
 
   [RelayCommand]
-  private Task RefreshDiskAsync() => TrackDiskWork(LoadDiskAsync());
+  private Task RefreshDiskAsync() => TrackDiskWork(LoadDiskAsync(announceProblems: true));
+
+  private Task ReloadDiskAsync() => TrackDiskWork(LoadDiskAsync(announceProblems: false));
 
   private Task RematchDiskAsync() => TrackDiskWork(RematchCurrentDiskAsync());
 
   private Task TrackDiskWork(Task work) =>
     PendingDiskWork = PendingDiskWork.IsCompleted ? work : Task.WhenAll(PendingDiskWork, work);
 
-  private async Task LoadDiskAsync()
+  private async Task LoadDiskAsync(bool announceProblems)
   {
     if (_diskService is not { } service || _registry == null)
     {
@@ -65,12 +69,7 @@ public partial class MainWindowViewModel
         _rematchVersion++;
         _disk = snapshot;
         RebuildMatrix();
-        if (snapshot.Problems.Count > 0)
-        {
-          string problems = snapshot.Problems.Count == 1 ? "problem" : "problems";
-          StatusMessage = $"{snapshot.Problems.Count} {problems} on disk: {snapshot.Problems[0]}";
-        }
-
+        ShowProblems(snapshot.Problems, announceProblems);
         return;
       }
     }
@@ -81,6 +80,32 @@ public partial class MainWindowViewModel
         StatusMessage = $"Could not read configs: {ex.Message}";
       }
     }
+  }
+
+  private void ShowProblems(IReadOnlyList<string> problems, bool announce)
+  {
+    if (problems.Count == 0)
+    {
+      if (_problemsStatus != null && StatusMessage == _problemsStatus)
+      {
+        StatusMessage = string.Empty;
+      }
+
+      _problemsStatus = null;
+      _shownProblems = [];
+      return;
+    }
+
+    if ((!announce && _shownProblems.SetEquals(problems))
+        || StatusMessage.Contains(DeployFailedText, StringComparison.Ordinal))
+    {
+      return;
+    }
+
+    _shownProblems = [.. problems];
+    string noun = problems.Count == 1 ? "problem" : "problems";
+    _problemsStatus = $"{problems.Count} {noun} on disk: {problems[0]}";
+    StatusMessage = _problemsStatus;
   }
 
   private async Task RematchCurrentDiskAsync()

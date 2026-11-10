@@ -109,7 +109,7 @@ public partial class MainWindowViewModel
     }
 
     CheckTargets();
-    _ = RefreshDiskAsync();
+    _ = ReloadDiskAsync();
   }
 
   [RelayCommand]
