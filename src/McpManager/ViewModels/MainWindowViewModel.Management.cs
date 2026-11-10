@@ -43,9 +43,14 @@ public partial class MainWindowViewModel
   {
     if (_suppressMatrixRebuild) return;
     MatrixViewModel previous = Matrix;
-    _uiState ??= UiStateStore.NextTo(_registryService.RegistryFilePath).Load();
+    if (_registry != null)
+    {
+      _uiState ??= UiStateStore.NextTo(_registryService.RegistryFilePath).Load();
+    }
+
+    Guid? lastProjectId = _uiState?.LastProjectId;
     IReadOnlyList<string> scanRoots = _registry == null ? [] : RegistryService.GetDefaultScanRoots(_registry.Settings);
-    MatrixViewModel matrix = new(Servers, TargetFolders, _candidatePath == null ? _uiState.LastProjectId : null, _disk,
+    MatrixViewModel matrix = new(Servers, TargetFolders, _candidatePath == null ? lastProjectId : null, _disk,
       scanRoots, _candidatePath, _addedFolderPaths)
     {
       ServerFilter = Matrix.ServerFilter,
@@ -53,7 +58,7 @@ public partial class MainWindowViewModel
     if (_candidatePath != null && matrix.SelectedChoice?.Kind != ProjectChoiceKind.Found)
     {
       _candidatePath = null;
-      matrix.SelectedChoice = matrix.Choices.FirstOrDefault(c => c.Column?.Place.Id == _uiState.LastProjectId)
+      matrix.SelectedChoice = matrix.Choices.FirstOrDefault(c => c.Column?.Place.Id == lastProjectId)
         ?? matrix.SelectedChoice;
     }
 
@@ -86,6 +91,11 @@ public partial class MainWindowViewModel
 
   private void RememberProject(Guid? projectId)
   {
+    if (_registry == null)
+    {
+      return;
+    }
+
     _uiState ??= UiStateStore.NextTo(_registryService.RegistryFilePath).Load();
     if (_uiState.LastProjectId == projectId)
     {

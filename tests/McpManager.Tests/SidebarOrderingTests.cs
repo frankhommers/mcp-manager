@@ -1,14 +1,19 @@
 using McpManager.Core.Models;
+using McpManager.Core.Services;
 using McpManager.ViewModels;
 
 namespace McpManager.Tests;
 
-public class SidebarOrderingTests
+public class SidebarOrderingTests : IDisposable
 {
+  private readonly string _tmp = Directory.CreateTempSubdirectory("mcp-sidebar-").FullName;
+
+  private string WorkspacePath => Path.Combine(_tmp, "workspace.json");
+
   [Fact]
   public void Sidebar_sorts_by_display_name_and_tracks_renames_without_reordering_source()
   {
-    MainWindowViewModel vm = new();
+    MainWindowViewModel vm = Create();
     McpServerViewModel zulu = new(new McpServer { Name = "first-added", DisplayName = "Zulu" });
     McpServerViewModel alpha = new(new McpServer { Name = "second-added", DisplayName = "alpha" });
     McpServerViewModel fallback = new(new McpServer { Name = "Bravo" });
@@ -36,7 +41,7 @@ public class SidebarOrderingTests
   [Fact]
   public void Places_list_hides_export_destinations_and_sorts_global_then_project_places()
   {
-    MainWindowViewModel vm = new();
+    MainWindowViewModel vm = Create();
     TargetFolderViewModel projectZulu = new(new TargetFolder { Name = "Zulu" }, []);
     TargetFolderViewModel globalZulu = new(new TargetFolder { Name = "Zulu", IsGlobal = true }, []);
     TargetFolderViewModel projectAlpha = new(new TargetFolder { Name = "alpha" }, []);
@@ -51,4 +56,37 @@ public class SidebarOrderingTests
     vm.TargetFolders.Remove(projectAlpha);
     Assert.DoesNotContain(projectAlpha, vm.SidebarTargets);
   }
+
+  [Fact]
+  public async Task Ui_state_is_read_only_once_the_registry_is_loaded()
+  {
+    TargetFolder alpha = new() { Name = "alpha", Path = Path.Combine(_tmp, "alpha") };
+    TargetFolder zulu = new() { Name = "zulu", Path = Path.Combine(_tmp, "zulu") };
+    RegistryService registryService = new(WorkspacePath);
+    await registryService.SaveAsync(new McpRegistry
+    {
+      TargetFolders = [alpha, zulu],
+      Settings = new GlobalSettings { CodexConfigPath = Path.Combine(_tmp, "global.toml") },
+    });
+    MainWindowViewModel vm = Create(registryService);
+    vm.Servers.Add(new McpServerViewModel(new McpServer { Name = "early" }));
+    UiStateStore.NextTo(WorkspacePath).Save(new UiState { LastProjectId = zulu.Id });
+
+    await vm.InitializeAsync();
+
+    Assert.Equal(zulu.Id, vm.Matrix.SelectedChoice?.Column?.Place.Id);
+  }
+
+  private MainWindowViewModel Create(RegistryService? registryService = null) =>
+    new(registryService ?? new RegistryService(WorkspacePath), new ConfigExportService(), new ConfigImportService(),
+      new HttpMcpTester(), new StdioMcpTester(), new TransportDetectionService(), new ShellStub());
+
+  private sealed class ShellStub : IShellEnvironmentService
+  {
+    public string? ResolvedPath => null;
+
+    public Task ResolveAsync() => Task.CompletedTask;
+  }
+
+  public void Dispose() => Directory.Delete(_tmp, recursive: true);
 }
