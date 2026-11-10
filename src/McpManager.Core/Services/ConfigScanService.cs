@@ -75,6 +75,12 @@ public class ConfigScanService(
     return results;
   }
 
+  public Task<ScannedFolder> ReadFolderAsync(string path, GlobalSettings settings) =>
+    ReadAsync(new TargetFolder { Path = path, EnabledClients = DetectClients(path) }, settings, isGlobal: false);
+
+  public Task<ScannedFolder> ReadPlaceAsync(TargetFolder place, GlobalSettings settings) =>
+    ReadAsync(place, settings, place.IsGlobal);
+
   private async Task<ScannedFolder> ReadAsync(TargetFolder target, GlobalSettings settings, bool isGlobal)
   {
     ExistingTargetServers existing = await _selectionService.ReadAsync(target, settings).ConfigureAwait(false);

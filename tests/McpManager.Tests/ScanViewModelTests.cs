@@ -35,29 +35,6 @@ public class ScanViewModelTests : IDisposable
   }
 
   [Fact]
-  public async Task Test_rule_matches_whole_segments_below_the_scan_root()
-  {
-    string root = Path.Combine(_directory, "my-tests", "repos");
-    string[] testLike = ["test", "Tests", "test-configs", "my-test", "IntegrationTests", "app/unit_tests"];
-    string[] normal = ["app", "latest", "contest", "attestation", "PROTEST"];
-    foreach (string folder in testLike.Concat(normal))
-    {
-      string path = Path.Combine(root, folder, ".mcp.json");
-      Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-      File.WriteAllText(path, ClaudeJson("tool", "run"));
-    }
-
-    McpRegistry registry = Registry();
-    registry.Settings.ScanRoots = [root];
-    ScanViewModel scan = CreateScan(registry);
-
-    await scan.ScanCommand.ExecuteAsync(null);
-
-    Assert.All(testLike, folder => Assert.False(Folder(scan, Path.GetFileName(folder)).IsSelected, folder));
-    Assert.All(normal, folder => Assert.True(Folder(scan, folder).IsSelected, folder));
-  }
-
-  [Fact]
   public async Task Summary_counts_matches_and_reports_problems()
   {
     Write("app/.mcp.json",

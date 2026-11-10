@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using McpManager.Core.Models;
+using McpManager.Core.Services;
 
 namespace McpManager.ViewModels;
 
 public partial class ScannedFolderViewModel : ViewModelBase
 {
   private const string SummarySeparator = " · ";
-
-  private static readonly string[] TestWords = ["tests", "test"];
 
   [ObservableProperty] private bool _isSelected;
 
@@ -27,7 +26,7 @@ public partial class ScannedFolderViewModel : ViewModelBase
     CanSelect = error == null;
     if (existing == null)
     {
-      bool looksLikeTest = !folder.IsGlobal && LooksLikeTest(folder.Path, scanRoots);
+      bool looksLikeTest = !folder.IsGlobal && ProjectFolderRules.LooksLikeTest(folder.Path, scanRoots);
       Note = looksLikeTest ? "Looks like test data" : string.Empty;
       _isSelected = !looksLikeTest;
     }
@@ -99,24 +98,6 @@ public partial class ScannedFolderViewModel : ViewModelBase
       parts.Add($"{count} {label}");
     }
   }
-
-  private static bool LooksLikeTest(string path, IEnumerable<string> scanRoots)
-  {
-    string relative = scanRoots
-      .Select(root => System.IO.Path.GetRelativePath(root, path))
-      .Where(r => r != ".." && !r.StartsWith(".." + System.IO.Path.DirectorySeparatorChar, StringComparison.Ordinal)
-        && !System.IO.Path.IsPathRooted(r))
-      .MinBy(r => r.Length) ?? path;
-    return relative.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries).Any(IsTestSegment);
-  }
-
-  private static bool IsTestSegment(string segment) => TestWords.Any(word =>
-    (segment.StartsWith(word, StringComparison.OrdinalIgnoreCase) && IsBoundary(segment, word.Length))
-    || (segment.EndsWith(word, StringComparison.OrdinalIgnoreCase) && IsBoundary(segment, segment.Length - word.Length)));
-
-  private static bool IsBoundary(string segment, int index) =>
-    index <= 0 || index >= segment.Length || !char.IsLetter(segment[index]) || !char.IsLetter(segment[index - 1])
-    || (char.IsLower(segment[index - 1]) && char.IsUpper(segment[index]));
 
   internal static string RelativeFile(ScannedFolder folder, string file) =>
     folder.IsGlobal ? System.IO.Path.GetFileName(file) : System.IO.Path.GetRelativePath(folder.Path, file);
