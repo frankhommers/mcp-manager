@@ -125,11 +125,13 @@ For OpenCode, `<folder>/.opencode/opencode.json` is used when it exists, for bot
 The Overview reads your project folders itself, so there is no separate scan step. Folders are looked for in the
 folders set under **Preferences** (default `~/Repos`), up to four levels deep. The project picker lists them under
 **Found on disk**; **Other folder…** adds one that is not in that list. Choosing a folder that is not a place yet
-makes it one. Reading never writes to config files; changes are kept by a Save.
+shows it as a candidate; the first change you make there makes it a project. A chosen folder without any config
+becomes a project right away, so you can pick its harnesses. Reading never writes to config files; changes are
+kept by a Save.
 
 Servers found in a project's configs that are not in the library appear as **Found in your configs, not in your
 library** rows. **+ Library** adds one to the library. An orange dot in a cell means the config on disk differs
-from the library; it opens the diff screen, where you choose **Keep library**, **Put this version in the
+from the library; it opens a comparison dialog, where you choose **Keep library**, **Put this version in the
 library** or **Import as separate server**.
 
 ### Save and Deploy
