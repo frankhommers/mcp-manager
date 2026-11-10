@@ -301,6 +301,26 @@ public class MatrixViewModelTests
   }
 
   [Fact]
+  public void Explicit_candidates_under_a_test_folder_are_offered_and_selected()
+  {
+    DiskSnapshot disk = new(
+      [
+        Folder("/r/tests/app", TargetClientFlags.ClaudeCode), Folder("/r/tests/pinned", TargetClientFlags.ClaudeCode),
+        Folder("/r/tests/hidden", TargetClientFlags.ClaudeCode),
+      ],
+      [], []);
+
+    MatrixViewModel matrix = new([], [], null, disk, ["/r"], "/r/tests/app/", ["/r/tests/pinned"]);
+
+    Assert.Equal(ProjectChoiceKind.Found, matrix.SelectedChoice?.Kind);
+    Assert.Equal("/r/tests/app", matrix.SelectedChoice?.Path);
+    Assert.True(Assert.Single(matrix.Columns).IsCandidate);
+    Assert.Equal(
+      ["app", "pinned"],
+      matrix.Choices.Where(c => c.Kind == ProjectChoiceKind.Found).Select(c => c.Header).ToList());
+  }
+
+  [Fact]
   public void Unknown_rows_only_for_visible_columns()
   {
     McpServer known = new() { Name = "known" };

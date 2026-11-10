@@ -16,9 +16,11 @@ public partial class MainWindowViewModel
   private readonly ScanImportPlanner _planner;
   private readonly ConfigScanService _scanService;
   private readonly DiskSnapshotService? _diskService;
+  private readonly List<string> _addedFolderPaths = [];
   private DiskSnapshot _disk = DiskSnapshot.Empty;
   private string? _candidatePath;
-  private int _diskVersion;
+  private int _loadVersion;
+  private int _rematchVersion;
 
   public Func<DiffViewModel, Task<DiffChoice?>> PromptResolveDifferenceAsync { get; set; } =
     ShowResolveDifferenceDialogAsync;
@@ -26,18 +28,14 @@ public partial class MainWindowViewModel
   internal Task PendingDiskWork { get; private set; } = Task.CompletedTask;
 
   [RelayCommand]
-  private Task RefreshDiskAsync() => PendingDiskWork = UpdateDiskAsync(
-    (service, registry) => service.LoadAsync(registry), reportProblems: true);
+  private Task RefreshDiskAsync() => TrackDiskWork(LoadDiskAsync());
 
-  private Task RematchDiskAsync()
-  {
-    DiskSnapshot disk = _disk;
-    return PendingDiskWork = UpdateDiskAsync(
-      (service, registry) => Task.FromResult(service.Rematch(disk, registry)), reportProblems: false);
-  }
+  private Task RematchDiskAsync() => TrackDiskWork(RematchCurrentDiskAsync());
 
-  private async Task UpdateDiskAsync(
-    Func<DiskSnapshotService, McpRegistry, Task<DiskSnapshot>> load, bool reportProblems)
+  private Task TrackDiskWork(Task work) =>
+    PendingDiskWork = PendingDiskWork.IsCompleted ? work : Task.WhenAll(PendingDiskWork, work);
+
+  private async Task LoadDiskAsync()
   {
     if (_diskService is not { } service || _registry == null)
     {
@@ -45,16 +43,65 @@ public partial class MainWindowViewModel
     }
 
     SyncModels();
-    int version = ++_diskVersion;
-    DiskSnapshot snapshot;
+    int load = ++_loadVersion;
+    List<string> added = [.. _addedFolderPaths];
     try
     {
-      McpRegistry clone = RegistryService.Deserialize(RegistryService.Serialize(_registry));
-      snapshot = await Task.Run(() => load(service, clone));
+      McpRegistry loadRegistry = CloneRegistry(_registry);
+      DiskSnapshot loaded = await Task.Run(async () => WithFolders(
+        await service.LoadAsync(loadRegistry), await ReadFoldersAsync(added, loadRegistry.Settings)));
+      while (load == _loadVersion && _registry != null)
+      {
+        int rematch = _rematchVersion;
+        DiskSnapshot merged = WithFolders(loaded, _disk.Folders.Where(f => IsAddedFolder(f.Path)));
+        SyncModels();
+        McpRegistry current = CloneRegistry(_registry);
+        DiskSnapshot snapshot = await Task.Run(() => service.Rematch(merged, current));
+        if (load != _loadVersion || rematch != _rematchVersion)
+        {
+          continue;
+        }
+
+        _rematchVersion++;
+        _disk = snapshot;
+        RebuildMatrix();
+        if (snapshot.Problems.Count > 0)
+        {
+          string folders = snapshot.Problems.Count == 1 ? "folder" : "folders";
+          StatusMessage = $"Could not compare {snapshot.Problems.Count} {folders}: {snapshot.Problems[0]}";
+        }
+
+        return;
+      }
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
     {
-      if (version == _diskVersion)
+      if (load == _loadVersion)
+      {
+        StatusMessage = $"Could not read configs: {ex.Message}";
+      }
+    }
+  }
+
+  private async Task RematchCurrentDiskAsync()
+  {
+    if (_diskService is not { } service || _registry == null)
+    {
+      return;
+    }
+
+    SyncModels();
+    int rematch = ++_rematchVersion;
+    DiskSnapshot disk = _disk;
+    DiskSnapshot snapshot;
+    try
+    {
+      McpRegistry current = CloneRegistry(_registry);
+      snapshot = await Task.Run(() => service.Rematch(disk, current));
+    }
+    catch (InvalidDataException ex)
+    {
+      if (rematch == _rematchVersion)
       {
         StatusMessage = $"Could not read configs: {ex.Message}";
       }
@@ -62,19 +109,38 @@ public partial class MainWindowViewModel
       return;
     }
 
-    if (version != _diskVersion)
+    if (rematch != _rematchVersion)
     {
       return;
     }
 
     _disk = snapshot;
     RebuildMatrix();
-    if (reportProblems && snapshot.Problems.Count > 0)
-    {
-      string folders = snapshot.Problems.Count == 1 ? "folder" : "folders";
-      StatusMessage = $"Could not compare {snapshot.Problems.Count} {folders}: {snapshot.Problems[0]}";
-    }
   }
+
+  private async Task<List<ScannedFolder>> ReadFoldersAsync(IEnumerable<string> paths, GlobalSettings settings)
+  {
+    List<ScannedFolder> folders = [];
+    foreach (string path in paths.Where(Directory.Exists))
+    {
+      folders.Add(await _scanService.ReadFolderAsync(path, settings).ConfigureAwait(false));
+    }
+
+    return folders;
+  }
+
+  private static DiskSnapshot WithFolders(DiskSnapshot snapshot, IEnumerable<ScannedFolder> extra)
+  {
+    List<ScannedFolder> missing = extra
+      .Where(f => !snapshot.Folders.Any(e => !e.IsGlobal && ProjectFolderRules.PathsEqual(e.Path, f.Path)))
+      .ToList();
+    return missing.Count == 0 ? snapshot : snapshot with { Folders = [.. snapshot.Folders, .. missing] };
+  }
+
+  private bool IsAddedFolder(string path) => _addedFolderPaths.Any(p => ProjectFolderRules.PathsEqual(p, path));
+
+  private static McpRegistry CloneRegistry(McpRegistry registry) =>
+    RegistryService.Deserialize(RegistryService.Serialize(registry));
 
   [RelayCommand]
   private async Task ResolveDifferenceAsync(MatrixCellViewModel cell)
@@ -103,8 +169,10 @@ public partial class MainWindowViewModel
       return;
     }
 
+    ScanChoice scanChoice = ScanViewModel.ToScanChoice(choice);
     SyncModels();
-    ScanServerMatch? live = _planner.Match([folder], _registry).FirstOrDefault(m =>
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], _registry);
+    ScanServerMatch? live = matches.FirstOrDefault(m =>
       string.Equals(m.FolderPath, match.FolderPath, StringComparison.Ordinal)
       && string.Equals(m.Found.Name, match.Found.Name, StringComparison.Ordinal)
       && m.Found.Client == match.Found.Client);
@@ -114,19 +182,16 @@ public partial class MainWindowViewModel
       return;
     }
 
-    TargetFolder place;
+    List<ScanServerMatch> applied = ScanImportPlanner.FindPlace(_registry, folder) == null
+      ? [.. matches.Where(m => !ReferenceEquals(m, live) && m.Kind == ScanMatchKind.Known && m.Library != null
+          && _registry.Servers.Any(s => s.Id == m.Library.Id)), live]
+      : [live];
     try
     {
-      if (ScanImportPlanner.FindPlace(_registry, folder) == null)
+      _planner.Apply(_registry, [folder], applied, new Dictionary<ScanServerMatch, ScanChoice>
       {
-        _planner.PromoteFolder(_registry, folder);
-      }
-
-      _planner.Apply(_registry, [folder], [live], new Dictionary<ScanServerMatch, ScanChoice>
-      {
-        [live] = ScanViewModel.ToScanChoice(choice),
+        [live] = scanChoice,
       });
-      place = ScanImportPlanner.FindPlace(_registry, folder)!;
     }
     catch (ArgumentException ex)
     {
@@ -134,6 +199,7 @@ public partial class MainWindowViewModel
       return;
     }
 
+    TargetFolder place = ScanImportPlanner.FindPlace(_registry, folder)!;
     ReloadAfterRegistryChange(place.IsGlobal ? CurrentProjectId() : place.Id,
       $"Updated {match.Found.Name}. Save to keep it.");
   }
@@ -224,10 +290,16 @@ public partial class MainWindowViewModel
 
     if (folder.Clients != TargetClientFlags.None)
     {
-      if (!_disk.Folders.Any(f => !f.IsGlobal && ProjectFolderRules.PathsEqual(f.Path, folder.Path)))
+      if (!IsAddedFolder(folder.Path))
       {
-        _diskVersion++;
-        _disk = _diskService.Rematch(_disk with { Folders = [.. _disk.Folders, folder] }, _registry);
+        _addedFolderPaths.Add(folder.Path);
+      }
+
+      DiskSnapshot withFolder = WithFolders(_disk, [folder]);
+      if (!ReferenceEquals(withFolder, _disk))
+      {
+        _rematchVersion++;
+        _disk = _diskService.Rematch(withFolder, _registry);
       }
 
       _candidatePath = folder.Path;

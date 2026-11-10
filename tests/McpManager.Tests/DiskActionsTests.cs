@@ -92,13 +92,61 @@ public class DiskActionsTests : IDisposable
     Assert.Equal("Updated alpha. Save to keep it.", vm.StatusMessage);
   }
 
+  [Fact]
+  public async Task Rematch_during_a_refresh_keeps_the_loaded_folders()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "node" }, "beta": { "command": "beta-command" } } }""");
+    GatedPlanner planner = new();
+    MainWindowViewModel vm = await CreateAsync(planner);
+    vm.Matrix.SelectedChoice = vm.Matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found);
+    string other = Path.Combine(Root, "other");
+    Directory.CreateDirectory(other);
+    File.WriteAllText(Path.Combine(other, ".mcp.json"), """{ "mcpServers": { "alpha": { "command": "node" } } }""");
+    planner.Gate.Reset();
+
+    Task refresh = vm.RefreshDiskCommand.ExecuteAsync(null);
+    vm.AddUnknownToLibraryCommand.Execute(Assert.Single(vm.Matrix.UnknownRows));
+    Assert.False(refresh.IsCompleted);
+    planner.Gate.Set();
+    await refresh;
+    await vm.PendingDiskWork;
+
+    Assert.Contains(vm.Matrix.Choices, c => c.Kind == ProjectChoiceKind.Found && c.Path == other);
+    Assert.Equal(App, vm.Matrix.SelectedChoice?.Path);
+    Assert.Empty(vm.Matrix.UnknownRows);
+    Assert.Contains(vm.Servers, s => s.Name == "beta");
+  }
+
+  [Fact]
+  public async Task Failed_resolve_leaves_the_registry_unchanged()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "deno" } } }""");
+    Directory.CreateDirectory(Path.Combine(App, ".cursor"));
+    File.WriteAllText(
+      Path.Combine(App, ".cursor", "mcp.json"), """{ "mcpServers": { "alpha": { "command": "node" } } }""");
+    MainWindowViewModel vm = await CreateAsync();
+    vm.Matrix.SelectedChoice = vm.Matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found);
+    int places = vm.TargetFolders.Count;
+    vm.PromptResolveDifferenceAsync = _ => Task.FromResult<DiffChoice?>(DiffChoice.UseFoundVersion);
+
+    await vm.ResolveDifferenceCommand.ExecuteAsync(
+      vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
+
+    Assert.Contains("would be changed", vm.StatusMessage);
+    Assert.Equal("node", vm.Servers.Single(s => s.Id == _alpha.Id).Model.Command);
+    vm.CheckTargetsCommand.Execute(null);
+    Assert.False(vm.IsDirty);
+    Assert.Equal(places, vm.TargetFolders.Count);
+    Assert.Equal(2, vm.Servers.Count);
+  }
+
   private void WriteApp(string json)
   {
     Directory.CreateDirectory(App);
     File.WriteAllText(Path.Combine(App, ".mcp.json"), json);
   }
 
-  private async Task<MainWindowViewModel> CreateAsync()
+  private async Task<MainWindowViewModel> CreateAsync(ScanImportPlanner? diskPlanner = null)
   {
     Directory.CreateDirectory(Home);
     RegistryService registryService = new(Path.Combine(_tmp, "workspace.json"));
@@ -112,10 +160,22 @@ public class DiskActionsTests : IDisposable
       new HttpMcpTester(), new StdioMcpTester(), new TransportDetectionService(), new ShellStub(),
       diskService: new DiskSnapshotService(
         new ConfigScanService(exportService, _ => [], homeDirectory: Home),
-        new ScanImportPlanner(new ConfigImportService(), exportService)));
+        diskPlanner ?? new ScanImportPlanner(new ConfigImportService(), exportService)));
     await vm.InitializeAsync();
     await vm.PendingDiskWork;
     return vm;
+  }
+
+  private sealed class GatedPlanner() : ScanImportPlanner(new ConfigImportService(), new ConfigExportService())
+  {
+    public ManualResetEventSlim Gate { get; } = new(true);
+
+    public override IReadOnlyList<ScanServerMatch> Match(IEnumerable<ScannedFolder> folders, McpRegistry registry,
+      ICollection<string>? skipped = null)
+    {
+      Assert.True(Gate.Wait(TimeSpan.FromSeconds(10)));
+      return base.Match(folders, registry, skipped);
+    }
   }
 
   private sealed class ShellStub : IShellEnvironmentService

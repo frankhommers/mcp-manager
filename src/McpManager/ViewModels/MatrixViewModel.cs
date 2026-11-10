@@ -29,13 +29,20 @@ public partial class MatrixViewModel : ViewModelBase, IDisposable
 
   public MatrixViewModel(
     IEnumerable<McpServerViewModel> servers, IEnumerable<TargetFolderViewModel> places, Guid? selectedProjectId = null,
-    DiskSnapshot? disk = null, IReadOnlyList<string>? scanRoots = null, string? selectedCandidatePath = null)
+    DiskSnapshot? disk = null, IReadOnlyList<string>? scanRoots = null, string? selectedCandidatePath = null,
+    IReadOnlyCollection<string>? pinnedPaths = null)
   {
     _servers = servers.ToList();
     _disk = disk ?? DiskSnapshot.Empty;
     _allColumns = places.Where(p => p.IsManagedTarget).Select(p => new PlaceColumnViewModel(p)).ToList();
     _allColumns.Sort(CompareColumns);
-    _foundChoices = FoundChoices(scanRoots ?? []);
+    List<string> pinned = pinnedPaths == null ? [] : [.. pinnedPaths];
+    if (selectedCandidatePath != null)
+    {
+      pinned.Add(selectedCandidatePath);
+    }
+
+    _foundChoices = FoundChoices(scanRoots ?? [], pinned);
     foreach (McpServerViewModel server in _servers)
     {
       server.PropertyChanged += OnServerChanged;
@@ -165,13 +172,14 @@ public partial class MatrixViewModel : ViewModelBase, IDisposable
     SelectedProjectChanged?.Invoke(this, newValue.Column?.Place.Id);
   }
 
-  private List<ProjectChoiceViewModel> FoundChoices(IReadOnlyList<string> scanRoots)
+  private List<ProjectChoiceViewModel> FoundChoices(IReadOnlyList<string> scanRoots, IReadOnlyList<string> pinned)
   {
     HashSet<ScannedFolder> placed = _allColumns.Select(c => _disk.FolderFor(c.Place.Model)).OfType<ScannedFolder>()
       .ToHashSet();
     return _disk.Folders
       .Where(f => !f.IsGlobal && f.Clients != TargetClientFlags.None && !placed.Contains(f)
-        && !ProjectFolderRules.LooksLikeTest(f.Path, scanRoots))
+        && (!ProjectFolderRules.LooksLikeTest(f.Path, scanRoots)
+          || pinned.Any(p => ProjectFolderRules.PathsEqual(p, f.Path))))
       .Select(ProjectChoiceViewModel.ForFolder)
       .OrderBy(c => c.Header, StringComparer.CurrentCultureIgnoreCase)
       .ToList();

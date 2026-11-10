@@ -47,7 +47,7 @@ public partial class MainWindowViewModel
     _uiState ??= UiStateStore.NextTo(_registryService.RegistryFilePath).Load();
     IReadOnlyList<string> scanRoots = _registry == null ? [] : RegistryService.GetDefaultScanRoots(_registry.Settings);
     MatrixViewModel matrix = new(Servers, TargetFolders, _candidatePath == null ? _uiState.LastProjectId : null, _disk,
-      scanRoots, _candidatePath)
+      scanRoots, _candidatePath, _addedFolderPaths)
     {
       ServerFilter = Matrix.ServerFilter,
     };
