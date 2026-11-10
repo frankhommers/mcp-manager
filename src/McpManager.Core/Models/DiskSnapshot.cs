@@ -16,4 +16,8 @@ public sealed record DiskSnapshot(
 
   public IReadOnlyList<ScanServerMatch> MatchesIn(ScannedFolder folder) =>
     Matches.Where(m => string.Equals(m.FolderPath, folder.Path, StringComparison.Ordinal)).ToList();
+
+  public IReadOnlyList<ScanServerMatch> MatchesFor(TargetFolder place) => FolderFor(place) is { } folder
+    ? MatchesIn(folder).Where(m => (m.Found.Client & place.EnabledClients) != 0).ToList()
+    : [];
 }

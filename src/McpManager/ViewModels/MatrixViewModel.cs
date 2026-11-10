@@ -133,7 +133,7 @@ public partial class MatrixViewModel : ViewModelBase, IDisposable
     }
 
     List<IReadOnlyList<ScanServerMatch>> matches = Columns
-      .Select(c => FolderOf(c) is { } folder ? _disk.MatchesIn(folder) : [])
+      .Select(c => c.IsCandidate ? _disk.MatchesIn(CandidateFolder(c)) : _disk.MatchesFor(c.Place.Model))
       .ToList();
     Rows.Clear();
     foreach (McpServerViewModel server in _servers
@@ -265,9 +265,8 @@ public partial class MatrixViewModel : ViewModelBase, IDisposable
     }
   }
 
-  private ScannedFolder? FolderOf(PlaceColumnViewModel column) => column.IsCandidate
-    ? _candidates.First(pair => pair.Value == column).Key
-    : _disk.FolderFor(column.Place.Model);
+  private ScannedFolder CandidateFolder(PlaceColumnViewModel candidate) =>
+    _candidates.First(pair => pair.Value == candidate).Key;
 
   private static ScanServerMatch? DifferenceFor(IReadOnlyList<ScanServerMatch> matches, McpServerViewModel server) =>
     matches.FirstOrDefault(m => m.Kind == ScanMatchKind.Differs && m.Library?.Id == server.Id);

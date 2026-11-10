@@ -106,20 +106,21 @@ public class ScanImportPlanner(IConfigImportService importService, IConfigExport
 
   public McpServer AddToLibrary(McpRegistry registry, IReadOnlyList<ScannedFolder> folders, string serverName)
   {
-    List<ScanServerMatch> occurrences = Match(folders, registry)
+    List<(ScanServerMatch Match, TargetFolder? Place)> occurrences = Match(folders, registry)
       .Where(m => m.Found.Name == serverName && (m.Library == null || !InRegistry(registry, m.Library)))
+      .Select(m => (Match: m, Place: FindPlace(registry,
+        folders.First(f => string.Equals(f.Path, m.FolderPath, StringComparison.Ordinal)))))
+      .Where(o => o.Place == null || (o.Place.EnabledClients & o.Match.Found.Client) != 0)
       .ToList();
     if (occurrences.Count == 0)
     {
       throw new ArgumentException($"{serverName} was not found in your configs.");
     }
 
-    ScanServerMatch first = occurrences[0];
+    ScanServerMatch first = occurrences[0].Match;
     McpServer server = EnsureInLibrary(registry, first.Imported);
-    foreach (ScanServerMatch occurrence in occurrences)
+    foreach ((ScanServerMatch occurrence, TargetFolder? place) in occurrences)
     {
-      ScannedFolder folder = folders.First(f => string.Equals(f.Path, occurrence.FolderPath, StringComparison.Ordinal));
-      TargetFolder? place = FindPlace(registry, folder);
       if (place == null || !occurrence.Found.IsEnabled
           || ServerDiffService.Compare(first.Imported, occurrence.Imported).HasDifferences)
       {

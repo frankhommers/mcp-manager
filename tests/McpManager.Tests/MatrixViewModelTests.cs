@@ -15,9 +15,10 @@ public class MatrixViewModelTests
     new(path, global, clients, [], [], false);
 
   private static ScanServerMatch Match(
-    string folder, string name, ScanMatchKind kind, McpServer? library, bool enabled = true) =>
+    string folder, string name, ScanMatchKind kind, McpServer? library, bool enabled = true,
+    TargetClientFlags client = TargetClientFlags.ClaudeCode) =>
     new(
-      folder, new ExistingTargetServer(name, null, enabled, TargetClientFlags.ClaudeCode, folder + "/.mcp.json", "{}"),
+      folder, new ExistingTargetServer(name, null, enabled, client, folder + "/.mcp.json", "{}"),
       new McpServer { Name = name }, library, kind, null);
 
   private static List<TargetFolderViewModel> ProjectPlaces(MatrixViewModel matrix) =>
@@ -334,8 +335,8 @@ public class MatrixViewModelTests
         Folder("/r/other", TargetClientFlags.ClaudeCode),
       ],
       [
-        Match("/home/.codex", "jira", ScanMatchKind.Unknown, null),
-        Match("/home/.codex", "known", ScanMatchKind.Known, known),
+        Match("/home/.codex", "jira", ScanMatchKind.Unknown, null, client: TargetClientFlags.Codex),
+        Match("/home/.codex", "known", ScanMatchKind.Known, known, client: TargetClientFlags.Codex),
         Match("/r/other", "old", ScanMatchKind.Unknown, null),
         Match("/r/other", "jira", ScanMatchKind.Unknown, null),
       ],
@@ -373,7 +374,7 @@ public class MatrixViewModelTests
     DiskSnapshot disk = new(
       [Folder("/home/.codex", TargetClientFlags.Codex, true), Folder("/r/deleted", TargetClientFlags.ClaudeCode)],
       [
-        Match("/home/.codex", "gone", ScanMatchKind.Differs, gone),
+        Match("/home/.codex", "gone", ScanMatchKind.Differs, gone, client: TargetClientFlags.Codex),
         Match("/r/deleted", "gone", ScanMatchKind.Known, gone),
       ],
       []);
@@ -391,5 +392,26 @@ public class MatrixViewModelTests
     Assert.All(matrix.Columns[1].Place.ServerSelections, s => Assert.False(s.IsEnabled));
     Assert.All(matrix.Rows.SelectMany(r => r.Cells), c => Assert.False(c.HasDifference));
     Assert.Equal([true, true], matrix.UnknownRows.Single().FoundIn);
+  }
+
+  [Fact]
+  public void Existing_project_ignores_entries_of_harnesses_it_does_not_use()
+  {
+    McpServer alpha = new() { Name = "alpha" };
+    List<McpServer> servers = [alpha];
+    TargetFolderViewModel project = Place(servers, "P", TargetClientFlags.ClaudeCode, path: "/r/p");
+    DiskSnapshot disk = new(
+      [Folder("/r/p", TargetClientFlags.ClaudeCode | TargetClientFlags.Cursor)],
+      [
+        Match("/r/p", "alpha", ScanMatchKind.Differs, alpha, client: TargetClientFlags.Cursor),
+        Match("/r/p", "cursor-only", ScanMatchKind.Unknown, null, client: TargetClientFlags.Cursor),
+        Match("/r/p", "claude-only", ScanMatchKind.Unknown, null),
+      ],
+      []);
+
+    MatrixViewModel matrix = new([Server(alpha)], [project], project.Id, disk, ["/r"]);
+
+    Assert.False(matrix.Rows.Single().Cells.Single().HasDifference);
+    Assert.Equal(["claude-only"], matrix.UnknownRows.Select(r => r.Name).ToList());
   }
 }

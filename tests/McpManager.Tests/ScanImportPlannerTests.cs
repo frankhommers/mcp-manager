@@ -604,6 +604,24 @@ public class ScanImportPlannerTests
   }
 
   [Fact]
+  public void Add_to_library_does_not_enable_a_place_that_does_not_use_the_harness()
+  {
+    McpRegistry registry = new();
+    TargetFolder place = new() { Name = "a", Path = "/p/a", EnabledClients = TargetClientFlags.ClaudeCode };
+    registry.TargetFolders.Add(place);
+    ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode | TargetClientFlags.Cursor, false,
+      Found("jira", "run", "tok-a", client: TargetClientFlags.Cursor));
+    ScannedFolder b = Folder("/p/b", TargetClientFlags.ClaudeCode, false, Found("jira", "run", "tok-b"));
+
+    McpServer server = _planner.AddToLibrary(registry, [a, b], "jira");
+
+    Assert.Equal("tok-b", server.EnvironmentVariables["TOKEN"]);
+    Assert.Empty(place.EnabledServers);
+    Assert.Empty(place.AdoptedServerNames);
+    Assert.Equal(TargetClientFlags.ClaudeCode, place.EnabledClients);
+  }
+
+  [Fact]
   public void Add_to_library_unknown_name_throws()
   {
     ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("jira", "run", "tok-a"));

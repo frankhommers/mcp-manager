@@ -197,24 +197,29 @@ public partial class MainWindowViewModel
 
     ScanChoice scanChoice = ToScanChoice(choice);
     SyncModels();
-    IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], _registry);
+    TargetFolder? existing = ScanImportPlanner.FindPlace(_registry, folder);
+    ScannedFolder applied = existing == null
+      ? folder
+      : folder with { Clients = folder.Clients & existing.EnabledClients };
+    IReadOnlyList<ScanServerMatch> matches = _planner.Match([applied], _registry);
     ScanServerMatch? live = matches.FirstOrDefault(m =>
       string.Equals(m.FolderPath, match.FolderPath, StringComparison.Ordinal)
       && string.Equals(m.Found.Name, match.Found.Name, StringComparison.Ordinal)
-      && m.Found.Client == match.Found.Client);
+      && m.Found.Client == match.Found.Client
+      && (m.Found.Client & applied.Clients) != 0);
     if (live == null)
     {
       StatusMessage = $"{match.Found.Name} is no longer in {folderName}. Refresh and try again.";
       return;
     }
 
-    List<ScanServerMatch> applied = ScanImportPlanner.FindPlace(_registry, folder) == null
+    List<ScanServerMatch> chosen = existing == null
       ? [.. matches.Where(m => !ReferenceEquals(m, live) && m.Kind == ScanMatchKind.Known && m.Library != null
           && _registry.Servers.Any(s => s.Id == m.Library.Id)), live]
       : [live];
     try
     {
-      _planner.Apply(_registry, [folder], applied, new Dictionary<ScanServerMatch, ScanChoice>
+      _planner.Apply(_registry, [applied], chosen, new Dictionary<ScanServerMatch, ScanChoice>
       {
         [live] = scanChoice,
       });
@@ -225,7 +230,7 @@ public partial class MainWindowViewModel
       return;
     }
 
-    TargetFolder place = ScanImportPlanner.FindPlace(_registry, folder)!;
+    TargetFolder place = ScanImportPlanner.FindPlace(_registry, applied)!;
     ReloadAfterRegistryChange(place.IsGlobal ? CurrentProjectId() : place.Id,
       $"Updated {match.Found.Name}. Save to keep it.");
   }

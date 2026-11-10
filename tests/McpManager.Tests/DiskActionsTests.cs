@@ -194,19 +194,43 @@ public class DiskActionsTests : IDisposable
     Assert.Equal(2, vm.Servers.Count);
   }
 
+  [Fact]
+  public async Task Resolving_on_an_existing_project_keeps_its_harnesses()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "deno" } } }""");
+    Directory.CreateDirectory(Path.Combine(App, ".cursor"));
+    File.WriteAllText(
+      Path.Combine(App, ".cursor", "mcp.json"), """{ "mcpServers": { "beta": { "command": "beta-command" } } }""");
+    TargetFolder project = new() { Name = "app", Path = App, EnabledClients = TargetClientFlags.ClaudeCode };
+    MainWindowViewModel vm = await CreateAsync(place: project);
+    Assert.Equal(project.Id, vm.Matrix.SelectedChoice?.Column?.Place.Id);
+    Assert.Empty(vm.Matrix.UnknownRows);
+    vm.PromptResolveDifferenceAsync = _ => Task.FromResult<DiffChoice?>(DiffChoice.KeepLibrary);
+
+    await vm.ResolveDifferenceCommand.ExecuteAsync(
+      vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
+    await vm.PendingDiskWork;
+
+    TargetFolderViewModel place = vm.TargetFolders.Single(t => t.Path == App);
+    Assert.Equal(TargetClientFlags.ClaudeCode, place.Model.EnabledClients);
+    Assert.Contains(_alpha.Id, place.Model.EnabledServers);
+  }
+
   private void WriteApp(string json)
   {
     Directory.CreateDirectory(App);
     File.WriteAllText(Path.Combine(App, ".mcp.json"), json);
   }
 
-  private async Task<MainWindowViewModel> CreateAsync(ScanImportPlanner? diskPlanner = null)
+  private async Task<MainWindowViewModel> CreateAsync(
+    ScanImportPlanner? diskPlanner = null, TargetFolder? place = null)
   {
     Directory.CreateDirectory(Home);
     RegistryService registryService = new(Path.Combine(_tmp, "workspace.json"));
     await registryService.SaveAsync(new McpRegistry
     {
       Servers = [_alpha, _gamma],
+      TargetFolders = place == null ? [] : [place],
       Settings = new GlobalSettings { ScanRoots = [Root], CodexConfigPath = Path.Combine(_tmp, "global.toml") },
     });
     ConfigExportService diskExportService = new();
