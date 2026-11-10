@@ -64,6 +64,9 @@ public class DiskSnapshotServiceTests : IDisposable
     Assert.Equal(2, snapshot.Folders.Count);
     Assert.All(snapshot.Matches, m => Assert.Equal(good, m.FolderPath));
     Assert.NotEmpty(snapshot.Matches);
+    string problem = Assert.Single(snapshot.Problems);
+    Assert.StartsWith(bad, problem);
+    Assert.Contains("boom", problem);
   }
 
   [Fact]

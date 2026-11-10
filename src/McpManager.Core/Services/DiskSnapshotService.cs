@@ -21,15 +21,16 @@ public class DiskSnapshotService(ConfigScanService scanService, ScanImportPlanne
       folders.Add(await scanService.ReadPlaceAsync(place, registry.Settings).ConfigureAwait(false));
     }
 
-    return new DiskSnapshot(folders, MatchAll(folders, registry));
+    return MatchAll(folders, registry);
   }
 
   public DiskSnapshot Rematch(DiskSnapshot snapshot, McpRegistry registry) =>
-    new(snapshot.Folders, MatchAll(snapshot.Folders, registry));
+    MatchAll(snapshot.Folders, registry);
 
-  private List<ScanServerMatch> MatchAll(IReadOnlyList<ScannedFolder> folders, McpRegistry registry)
+  private DiskSnapshot MatchAll(IReadOnlyList<ScannedFolder> folders, McpRegistry registry)
   {
     List<ScanServerMatch> matches = [];
+    List<string> problems = [];
     foreach (ScannedFolder folder in folders)
     {
       try
@@ -38,9 +39,10 @@ public class DiskSnapshotService(ConfigScanService scanService, ScanImportPlanne
       }
       catch (Exception ex) when (ex is not OperationCanceledException)
       {
+        problems.Add($"{folder.Path}: {ex.Message}");
       }
     }
 
-    return matches;
+    return new DiskSnapshot(folders, matches, problems);
   }
 }
