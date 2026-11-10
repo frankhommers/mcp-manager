@@ -269,6 +269,7 @@ public class DiskActionsTests : IDisposable
 
       Assert.Same(open, await Task.WhenAny(open, Task.Delay(TimeSpan.FromSeconds(5))));
       Assert.False(vm.PendingDiskWork.IsCompleted);
+      Assert.Equal(other, vm.Matrix.SelectedChoice?.Path);
     }
     finally
     {

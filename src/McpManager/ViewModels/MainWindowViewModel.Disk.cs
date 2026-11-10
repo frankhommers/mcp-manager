@@ -337,15 +337,15 @@ public partial class MainWindowViewModel
       }
 
       DiskSnapshot withFolder = WithFolders(_disk, [folder]);
+      bool added = !ReferenceEquals(withFolder, _disk);
+      _disk = withFolder;
       _candidatePath = folder.Path;
-      if (ReferenceEquals(withFolder, _disk))
+      RebuildMatrix();
+      if (added)
       {
-        RebuildMatrix();
-        return;
+        _ = RematchDiskAsync();
       }
 
-      _disk = withFolder;
-      _ = RematchDiskAsync();
       return;
     }
 
