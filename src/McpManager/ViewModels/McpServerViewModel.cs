@@ -14,6 +14,8 @@ public partial class McpServerViewModel : ViewModelBase
 
   public Guid Id => _model.Id;
 
+  public McpServer Model => _model;
+
   [ObservableProperty]
   [NotifyPropertyChangedFor(nameof(ListName))]
   private string _name;

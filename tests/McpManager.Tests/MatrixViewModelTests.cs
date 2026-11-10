@@ -11,6 +11,18 @@ public class MatrixViewModelTests
 
   private static McpServerViewModel Server(McpServer model) => new(model);
 
+  private static ScannedFolder Folder(string path, TargetClientFlags clients, bool global = false) =>
+    new(path, global, clients, [], [], false);
+
+  private static ScanServerMatch Match(
+    string folder, string name, ScanMatchKind kind, McpServer? library, bool enabled = true) =>
+    new(
+      folder, new ExistingTargetServer(name, null, enabled, TargetClientFlags.ClaudeCode, folder + "/.mcp.json", "{}"),
+      new McpServer { Name = name }, library, kind, null);
+
+  private static List<TargetFolderViewModel> ProjectPlaces(MatrixViewModel matrix) =>
+    matrix.Choices.Where(c => c.Kind == ProjectChoiceKind.Project).Select(c => c.Column!.Place).ToList();
+
   [Fact]
   public void Columns_are_globals_plus_selected_project()
   {
@@ -25,7 +37,7 @@ public class MatrixViewModelTests
     MatrixViewModel matrix = new(
       servers.Select(s => Server(s)), [project, clipboard, projectAlpha, quick, globalOpenCode, globalClaude]);
 
-    Assert.Equal([projectAlpha, project], matrix.Projects.Select(c => c.Place).ToList());
+    Assert.Equal([projectAlpha, project], ProjectPlaces(matrix));
     Assert.Equal([globalClaude, globalOpenCode, projectAlpha], matrix.Columns.Select(c => c.Place).ToList());
     Assert.Equal(["Claude Desktop", "OpenCode", "alpha"], matrix.Columns.Select(c => c.Header).ToList());
     Assert.Equal(["Global", "Global", "Project"], matrix.Columns.Select(c => c.GroupLabel).ToList());
@@ -43,16 +55,16 @@ public class MatrixViewModelTests
     matrix.SelectedProjectChanged += (_, id) => reported.Add(id);
 
     Assert.Equal([global, two], matrix.Columns.Select(c => c.Place).ToList());
-    matrix.SelectedProject = matrix.Projects.Single(p => p.Place == one);
+    matrix.SelectedChoice = matrix.Choices.Single(p => p.Column?.Place == one);
     Assert.Equal([global, one], matrix.Columns.Select(c => c.Place).ToList());
     Assert.Equal([one.Id], reported);
     foreach (MatrixRowViewModel row in matrix.Rows)
     {
       Assert.Equal(2, row.Cells.Count);
-      Assert.Equal(row.Server.Id, row.Cells[1].ServerId);
+      Assert.Equal(row.Server.Id, row.Cells[1].Selection.ServerId);
     }
 
-    matrix.Rows[0].Cells[1].IsEnabled = true;
+    matrix.Rows[0].Cells[1].Selection.IsEnabled = true;
     Assert.True(one.ServerSelections.Single(s => s.ServerId == matrix.Rows[0].Server.Id).IsEnabled);
 
     matrix.ServerFilter = "NEED";
@@ -66,14 +78,14 @@ public class MatrixViewModelTests
     TargetFolderViewModel one = Place(servers, "Bbb", TargetClientFlags.ClaudeCode, path: "/b");
     TargetFolderViewModel two = Place(servers, "Ccc", TargetClientFlags.Codex, path: "/c");
     MatrixViewModel matrix = new([], [one, two], Guid.NewGuid());
-    Assert.Same(one, matrix.SelectedProject?.Place);
+    Assert.Same(one, matrix.SelectedChoice?.Column?.Place);
     List<Guid?> reported = [];
     matrix.SelectedProjectChanged += (_, id) => reported.Add(id);
 
     one.Name = "Zzz";
 
-    Assert.Equal([two, one], matrix.Projects.Select(p => p.Place).ToList());
-    Assert.Same(one, matrix.SelectedProject?.Place);
+    Assert.Equal([two, one], ProjectPlaces(matrix));
+    Assert.Same(one, matrix.SelectedChoice?.Column?.Place);
     Assert.Empty(reported);
   }
 
@@ -84,7 +96,8 @@ public class MatrixViewModelTests
     MatrixViewModel matrix = new([], [global]);
 
     Assert.False(matrix.HasProjects);
-    Assert.Null(matrix.SelectedProject);
+    Assert.Null(matrix.SelectedChoice);
+    Assert.Equal(["Other folder…"], matrix.Choices.Select(c => c.Header).ToList());
     Assert.Equal([global], matrix.Columns.Select(c => c.Place).ToList());
   }
 
@@ -99,8 +112,8 @@ public class MatrixViewModelTests
     MatrixViewModel matrix = new([], [claude, both, many]);
 
     Assert.Equal(["CC"], matrix.Columns.Single(c => c.Place == claude).Chips);
-    Assert.Equal(["CC", "OC"], matrix.Projects.Single(c => c.Place == both).Chips);
-    Assert.Equal(["CC", "CD", "OC", "CX", "CU", "VS", "WS"], matrix.Projects.Single(c => c.Place == many).Chips);
+    Assert.Equal(["CC", "OC"], matrix.Choices.Single(c => c.Column?.Place == both).Chips);
+    Assert.Equal(["CC", "CD", "OC", "CX", "CU", "VS", "WS"], matrix.Choices.Single(c => c.Column?.Place == many).Chips);
   }
 
   [Fact]
@@ -120,8 +133,8 @@ public class MatrixViewModelTests
 
     McpServerViewModel extra = Server(new McpServer { Name = "extra" });
     MatrixViewModel missing = new([extra], [place]);
-    Assert.False(missing.Rows[0].Cells[0].IsEnabled);
-    Assert.Equal(Guid.Empty, missing.Rows[0].Cells[0].ServerId);
+    Assert.False(missing.Rows[0].Cells[0].Selection.IsEnabled);
+    Assert.Equal(Guid.Empty, missing.Rows[0].Cells[0].Selection.ServerId);
   }
 
   [Fact]
@@ -131,11 +144,11 @@ public class MatrixViewModelTests
     TargetFolderViewModel place = Place([], "P", TargetClientFlags.ClaudeCode, path: "/p");
     McpServerViewModel server = Server(model);
     MatrixViewModel matrix = new([server], [place]);
-    Assert.Equal(Guid.Empty, matrix.Rows[0].Cells[0].ServerId);
+    Assert.Equal(Guid.Empty, matrix.Rows[0].Cells[0].Selection.ServerId);
 
     place.RefreshServers([model]);
 
-    ServerSelectionViewModel cell = matrix.Rows[0].Cells[0];
+    ServerSelectionViewModel cell = matrix.Rows[0].Cells[0].Selection;
     Assert.Equal(model.Id, cell.ServerId);
     Assert.Same(place.ServerSelections.Single(), cell);
   }
@@ -153,11 +166,210 @@ public class MatrixViewModelTests
     Assert.Equal(["bravo", "Zulu"], matrix.Rows.Select(r => r.Label).ToList());
 
     first.Name = "Zzz";
-    Assert.Equal([second, first], matrix.Projects.Select(c => c.Place).ToList());
-    Assert.Equal("Zzz", matrix.Projects[1].Header);
+    Assert.Equal([second, first], ProjectPlaces(matrix));
+    Assert.Equal("Zzz", matrix.Choices[1].Header);
     Assert.Equal([first], matrix.Columns.Select(c => c.Place).ToList());
 
     first.SelectedClient = TargetClientFlags.OpenCode;
     Assert.Equal(["OC"], matrix.Columns[0].Chips);
+  }
+
+  [Fact]
+  public void Choices_list_projects_header_found_and_other()
+  {
+    TargetFolderViewModel bbb = Place([], "Bbb", TargetClientFlags.ClaudeCode, path: "/r/bbb");
+    TargetFolderViewModel aaa = Place([], "Aaa", TargetClientFlags.ClaudeCode, path: "/r/aaa");
+    DiskSnapshot disk = new(
+      [
+        Folder("/r/zed", TargetClientFlags.ClaudeCode), Folder("/r/alpha", TargetClientFlags.ClaudeCode),
+        Folder("/r/tests/x", TargetClientFlags.ClaudeCode), Folder("/r/aaa/", TargetClientFlags.ClaudeCode),
+        Folder("/r/empty", TargetClientFlags.None), Folder("/home/.codex", TargetClientFlags.Codex, true),
+      ],
+      [], []);
+
+    MatrixViewModel matrix = new([], [bbb, aaa], disk: disk, scanRoots: ["/r"]);
+
+    Assert.Equal(
+      ["Aaa", "Bbb", "Found on disk", "alpha", "zed", "Other folder…"],
+      matrix.Choices.Select(c => c.Header).ToList());
+    Assert.Equal(
+      [
+        ProjectChoiceKind.Project, ProjectChoiceKind.Project, ProjectChoiceKind.Header, ProjectChoiceKind.Found,
+        ProjectChoiceKind.Found, ProjectChoiceKind.OtherFolder,
+      ],
+      matrix.Choices.Select(c => c.Kind).ToList());
+    Assert.Equal([true, true, false, true, true, true], matrix.Choices.Select(c => c.IsSelectable).ToList());
+    Assert.Equal("/r/alpha", matrix.Choices[3].Path);
+    Assert.Equal("/r/alpha", matrix.Choices[3].Folder?.Path);
+    Assert.Equal(["CC"], matrix.Choices[3].Chips);
+    Assert.Same(aaa, matrix.SelectedChoice?.Column?.Place);
+
+    matrix.SelectedChoice = matrix.Choices[2];
+    Assert.Same(aaa, matrix.SelectedChoice?.Column?.Place);
+  }
+
+  [Fact]
+  public void Other_folder_restores_selection_and_raises_event()
+  {
+    TargetFolderViewModel global = Place([], "G", TargetClientFlags.OpenCode, true, "/g");
+    TargetFolderViewModel one = Place([], "One", TargetClientFlags.ClaudeCode, path: "/one");
+    TargetFolderViewModel two = Place([], "Two", TargetClientFlags.ClaudeCode, path: "/two");
+    MatrixViewModel matrix = new([], [global, one, two], two.Id);
+    List<Guid?> reported = [];
+    int requested = 0;
+    matrix.SelectedProjectChanged += (_, id) => reported.Add(id);
+    matrix.OtherFolderRequested += (_, _) => requested++;
+
+    matrix.SelectedChoice = matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.OtherFolder);
+
+    Assert.Same(two, matrix.SelectedChoice?.Column?.Place);
+    Assert.Equal(1, requested);
+    Assert.Empty(reported);
+    Assert.Equal([global, two], matrix.Columns.Select(c => c.Place).ToList());
+  }
+
+  [Fact]
+  public void Found_folder_shows_candidate_column_with_known_ticks_and_raises_candidate_edited_once()
+  {
+    McpServer known = new() { Name = "known" };
+    McpServer differs = new() { Name = "differs" };
+    McpServer off = new() { Name = "off" };
+    List<McpServer> servers = [known, differs, off];
+    TargetFolderViewModel global = Place(servers, "G", TargetClientFlags.OpenCode, true, "/g");
+    TargetFolderViewModel project = Place(servers, "P", TargetClientFlags.ClaudeCode, path: "/r/p");
+    DiskSnapshot disk = new(
+      [Folder("/r/found", TargetClientFlags.ClaudeCode | TargetClientFlags.Codex)],
+      [
+        Match("/r/found", "known", ScanMatchKind.Known, known),
+        Match("/r/found", "differs", ScanMatchKind.Differs, differs),
+        Match("/r/found", "off", ScanMatchKind.Known, off, false),
+      ],
+      []);
+    MatrixViewModel matrix = new(servers.Select(s => Server(s)), [global, project], project.Id, disk, ["/r"]);
+    List<Guid?> reported = [];
+    List<CandidateEditedEventArgs> edits = [];
+    matrix.SelectedProjectChanged += (_, id) => reported.Add(id);
+    matrix.CandidateEdited += (_, e) => edits.Add(e);
+
+    matrix.SelectedChoice = matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found);
+
+    Assert.Equal([null], reported);
+    Assert.Equal(2, matrix.Columns.Count);
+    Assert.Same(global, matrix.Columns[0].Place);
+    PlaceColumnViewModel candidate = matrix.Columns[1];
+    Assert.True(candidate.IsCandidate);
+    Assert.Equal("Found on disk", candidate.GroupLabel);
+    Assert.Equal("found", candidate.Header);
+    Assert.Equal("/r/found", candidate.Place.Path);
+    Assert.Equal(["CC", "CX"], candidate.Chips);
+    MatrixCellViewModel knownCell = matrix.Rows.Single(r => r.Server.Id == known.Id).Cells[1];
+    MatrixCellViewModel differsCell = matrix.Rows.Single(r => r.Server.Id == differs.Id).Cells[1];
+    MatrixCellViewModel offCell = matrix.Rows.Single(r => r.Server.Id == off.Id).Cells[1];
+    Assert.True(knownCell.Selection.IsEnabled);
+    Assert.False(knownCell.HasDifference);
+    Assert.False(differsCell.Selection.IsEnabled);
+    Assert.True(differsCell.HasDifference);
+    Assert.Equal("differs", differsCell.Difference?.Found.Name);
+    Assert.False(offCell.Selection.IsEnabled);
+    Assert.False(matrix.Rows.Single(r => r.Server.Id == differs.Id).Cells[0].HasDifference);
+    Assert.Empty(edits);
+
+    knownCell.Selection.IsEnabled = false;
+    offCell.Selection.IsEnabled = true;
+
+    CandidateEditedEventArgs edit = Assert.Single(edits);
+    Assert.Equal("/r/found", edit.Folder.Path);
+    Assert.Equal(candidate.Place.ServerSelections, edit.Selections);
+
+    matrix.SelectedChoice = matrix.Choices.Single(c => c.Column?.Place == project);
+    Assert.Equal([null, project.Id], reported);
+    Assert.Equal([global, project], matrix.Columns.Select(c => c.Place).ToList());
+  }
+
+  [Fact]
+  public void Remembered_candidate_path_is_selected_when_no_project_matches()
+  {
+    TargetFolderViewModel project = Place([], "P", TargetClientFlags.ClaudeCode, path: "/r/p");
+    DiskSnapshot disk = new([Folder("/r/found", TargetClientFlags.ClaudeCode)], [], []);
+
+    MatrixViewModel byPath = new([], [project], Guid.NewGuid(), disk, ["/r"], "/r/found/");
+    MatrixViewModel byProject = new([], [project], project.Id, disk, ["/r"], "/r/found");
+
+    Assert.Equal(ProjectChoiceKind.Found, byPath.SelectedChoice?.Kind);
+    Assert.True(byPath.Columns.Single().IsCandidate);
+    Assert.Same(project, byProject.SelectedChoice?.Column?.Place);
+  }
+
+  [Fact]
+  public void Unknown_rows_only_for_visible_columns()
+  {
+    McpServer known = new() { Name = "known" };
+    List<McpServer> servers = [known];
+    TargetFolderViewModel codex = Place(servers, "Codex", TargetClientFlags.Codex, true, "/codex");
+    TargetFolderViewModel openCode = Place(servers, "OC", TargetClientFlags.OpenCode, true, "/oc");
+    TargetFolderViewModel project = Place(servers, "P", TargetClientFlags.ClaudeCode, path: "/r/p");
+    DiskSnapshot disk = new(
+      [
+        Folder("/home/.codex", TargetClientFlags.Codex, true), Folder("/r/p", TargetClientFlags.ClaudeCode),
+        Folder("/r/other", TargetClientFlags.ClaudeCode),
+      ],
+      [
+        Match("/home/.codex", "jira", ScanMatchKind.Unknown, null),
+        Match("/home/.codex", "known", ScanMatchKind.Known, known),
+        Match("/r/other", "old", ScanMatchKind.Unknown, null),
+        Match("/r/other", "jira", ScanMatchKind.Unknown, null),
+      ],
+      []);
+
+    MatrixViewModel matrix = new([Server(known)], [codex, openCode, project], project.Id, disk, ["/r"]);
+
+    Assert.Equal([codex, openCode, project], matrix.Columns.Select(c => c.Place).ToList());
+    UnknownServerRowViewModel row = Assert.Single(matrix.UnknownRows);
+    Assert.Equal("jira", row.Name);
+    Assert.Equal([true, false, false], row.FoundIn);
+    Assert.True(matrix.HasUnknownRows);
+
+    matrix.ServerFilter = "zzz";
+    Assert.Empty(matrix.UnknownRows);
+    Assert.False(matrix.HasUnknownRows);
+    matrix.ServerFilter = "JI";
+    Assert.Equal(["jira"], matrix.UnknownRows.Select(r => r.Name).ToList());
+    matrix.ServerFilter = string.Empty;
+
+    matrix.SelectedChoice = matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found);
+    Assert.Equal(["jira", "old"], matrix.UnknownRows.Select(r => r.Name).ToList());
+    Assert.Equal([true, false, true], matrix.UnknownRows[0].FoundIn);
+    Assert.Equal([false, false, true], matrix.UnknownRows[1].FoundIn);
+  }
+
+  [Fact]
+  public void Stale_snapshot_is_ignored()
+  {
+    McpServer live = new() { Name = "live" };
+    McpServer gone = new() { Name = "gone" };
+    List<McpServer> servers = [live];
+    TargetFolderViewModel codex = Place(servers, "Codex", TargetClientFlags.Codex, true, "/codex");
+    TargetFolderViewModel project = Place(servers, "P", TargetClientFlags.ClaudeCode, path: "/r/p");
+    DiskSnapshot disk = new(
+      [Folder("/home/.codex", TargetClientFlags.Codex, true), Folder("/r/deleted", TargetClientFlags.ClaudeCode)],
+      [
+        Match("/home/.codex", "gone", ScanMatchKind.Differs, gone),
+        Match("/r/deleted", "gone", ScanMatchKind.Known, gone),
+      ],
+      []);
+
+    MatrixViewModel matrix = new([Server(live)], [codex, project], project.Id, disk, ["/r"]);
+
+    Assert.All(matrix.Rows.SelectMany(r => r.Cells), c => Assert.False(c.HasDifference));
+    Assert.Equal(["gone"], matrix.UnknownRows.Select(r => r.Name).ToList());
+
+    ProjectChoiceViewModel deleted = matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found);
+    Assert.Equal("/r/deleted", deleted.Path);
+    matrix.SelectedChoice = deleted;
+
+    Assert.True(matrix.Columns[1].IsCandidate);
+    Assert.All(matrix.Columns[1].Place.ServerSelections, s => Assert.False(s.IsEnabled));
+    Assert.All(matrix.Rows.SelectMany(r => r.Cells), c => Assert.False(c.HasDifference));
+    Assert.Equal([true, true], matrix.UnknownRows.Single().FoundIn);
   }
 }

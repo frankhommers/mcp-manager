@@ -8,13 +8,13 @@
       <TextBox Text="{Binding ServerFilter}" Watermark="Filter servers" AutomationProperties.Name="Filter servers" />
       <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding HasProjects}">
         <TextBlock Text="Project" VerticalAlignment="Center" Opacity="0.75" />
-        <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Projects}"
-                  SelectedItem="{Binding SelectedProject}" AutomationProperties.Name="Project">
+        <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}"
+                  SelectedItem="{Binding SelectedChoice}" AutomationProperties.Name="Project">
           <ComboBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:PlaceColumnViewModel">
+            <DataTemplate x:DataType="vm:ProjectChoiceViewModel">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock Text="{Binding Header}" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding Place.Path}" Opacity="0.5" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Path}" Opacity="0.5" TextTrimming="CharacterEllipsis" />
               </StackPanel>
             </DataTemplate>
           </ComboBox.ItemTemplate>
@@ -80,11 +80,11 @@
                       <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:ServerSelectionViewModel">
+                      <DataTemplate x:DataType="vm:MatrixCellViewModel">
                         <Panel Width="96">
                           <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="0" Padding="0"
-                                    IsChecked="{Binding IsEnabled}"
-                                    IsEnabled="{Binding ServerId, Converter={x:Static vm:MatrixCellEnabledConverter.Instance}}" />
+                                    IsChecked="{Binding Selection.IsEnabled}"
+                                    IsEnabled="{Binding Selection.ServerId, Converter={x:Static vm:MatrixCellEnabledConverter.Instance}}" />
                         </Panel>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>

@@ -26,12 +26,15 @@ public partial class PlaceColumnViewModel : ViewModelBase
   [NotifyPropertyChangedFor(nameof(ToolTipText))]
   private PlaceStatus _status = PlaceStatus.NotDeployedYet;
 
-  public PlaceColumnViewModel(TargetFolderViewModel place)
+  public PlaceColumnViewModel(TargetFolderViewModel place, bool isCandidate = false)
   {
     Place = place;
+    IsCandidate = isCandidate;
   }
 
   public TargetFolderViewModel Place { get; }
+
+  public bool IsCandidate { get; }
 
   public void NotifyPlaceChanged()
   {
@@ -44,7 +47,7 @@ public partial class PlaceColumnViewModel : ViewModelBase
 
   public bool IsGlobal => Place.IsGlobal;
 
-  public string GroupLabel => IsGlobal ? "Global" : "Project";
+  public string GroupLabel => IsCandidate ? ProjectChoiceViewModel.FoundHeader : IsGlobal ? "Global" : "Project";
 
   public string Header
   {
