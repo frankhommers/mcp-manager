@@ -96,7 +96,6 @@ public class MatrixViewModelTests
     TargetFolderViewModel global = Place([], "G", TargetClientFlags.Codex, true, "/g");
     MatrixViewModel matrix = new([], [global]);
 
-    Assert.False(matrix.HasProjects);
     Assert.Null(matrix.SelectedChoice);
     Assert.Equal(["Other folder…"], matrix.Choices.Select(c => c.Header).ToList());
     Assert.Equal([global], matrix.Columns.Select(c => c.Place).ToList());

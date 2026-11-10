@@ -94,8 +94,6 @@ public partial class MatrixViewModel : ViewModelBase, IDisposable
 
   public ObservableCollection<ProjectChoiceViewModel> Choices { get; } = [];
 
-  public bool HasProjects => _projectChoices.Count > 0;
-
   public ObservableCollection<PlaceColumnViewModel> Columns { get; } = [];
 
   public ObservableCollection<MatrixRowViewModel> Rows { get; } = [];
@@ -216,7 +214,6 @@ public partial class MatrixViewModel : ViewModelBase, IDisposable
 
     SelectedChoice = selected != null && Choices.Contains(selected) ? selected : FirstProject();
     _syncingChoices = wasSyncing;
-    OnPropertyChanged(nameof(HasProjects));
   }
 
   private PlaceColumnViewModel CandidateFor(ScannedFolder folder)
