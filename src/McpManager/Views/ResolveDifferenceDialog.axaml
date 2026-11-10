@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:McpManager.Views"
+        xmlns:vm="using:McpManager.ViewModels"
+        x:Class="McpManager.Views.ResolveDifferenceDialog"
+        x:DataType="vm:DiffViewModel"
+        Title="Differs from your library"
+        Width="860" MinWidth="640" MaxHeight="760"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        SizeToContent="Height">
+  <Grid Margin="24" RowDefinitions="*,Auto" RowSpacing="20">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Spacing="12">
+        <TextBlock Text="Differs from your library" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Text="Keep the library version, use the version found on disk, or import it as a separate server. Nothing is written until you save."
+                   Opacity="0.75" TextWrapping="Wrap" />
+        <views:DiffView x:Name="DiffHost" />
+      </StackPanel>
+    </ScrollViewer>
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+      <Button Content="Cancel" IsCancel="True" Click="CancelButton_OnClick" />
+      <Button Content="Apply" Classes="primaryButton" IsEnabled="{Binding IsComplete}"
+              Click="ApplyButton_OnClick" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -146,7 +146,10 @@ public partial class MainWindowViewModel : ViewModelBase
     _stdioMcpTester = new StdioMcpTester();
     _transportDetectionService = new TransportDetectionService();
     _shellEnvironmentService = new ShellEnvironmentService();
-    Scan = CreateScan(new ConfigScanService(_configExportService));
+    _planner = new ScanImportPlanner(_configImportService, _configExportService);
+    _scanService = new ConfigScanService(_configExportService);
+    _diskService = new DiskSnapshotService(_scanService, _planner);
+    Scan = CreateScan(_scanService);
     InitializeSidebar();
   }
 
@@ -158,7 +161,8 @@ public partial class MainWindowViewModel : ViewModelBase
     IStdioMcpTester stdioMcpTester,
     ITransportDetectionService transportDetectionService,
     IShellEnvironmentService shellEnvironmentService,
-    ConfigScanService? scanService = null)
+    ConfigScanService? scanService = null,
+    DiskSnapshotService? diskService = null)
   {
     _registryService = registryService;
     _configExportService = configExportService;
@@ -167,7 +171,10 @@ public partial class MainWindowViewModel : ViewModelBase
     _stdioMcpTester = stdioMcpTester;
     _transportDetectionService = transportDetectionService;
     _shellEnvironmentService = shellEnvironmentService;
-    Scan = CreateScan(scanService ?? new ConfigScanService(_configExportService));
+    _planner = new ScanImportPlanner(_configImportService, _configExportService);
+    _scanService = scanService ?? new ConfigScanService(_configExportService);
+    _diskService = diskService;
+    Scan = CreateScan(_scanService);
     InitializeSidebar();
   }
 
@@ -200,6 +207,8 @@ public partial class MainWindowViewModel : ViewModelBase
       RebuildMatrix();
       IsLoading = false;
     }
+
+    _ = RefreshDiskAsync();
   }
 
   private void LoadSettings(GlobalSettings settings)

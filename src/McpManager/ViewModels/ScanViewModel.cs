@@ -258,7 +258,7 @@ public partial class ScanViewModel : ViewModelBase
     return $"{match.Found.Name} · {name}/{ScannedFolderViewModel.RelativeFile(folder, match.Found.FilePath)}";
   }
 
-  private static ScanChoice ToScanChoice(DiffChoice choice) => choice switch
+  internal static ScanChoice ToScanChoice(DiffChoice choice) => choice switch
   {
     DiffChoice.KeepLibrary => ScanChoice.KeepLibrary,
     DiffChoice.UseFoundVersion => ScanChoice.UseFoundVersion,

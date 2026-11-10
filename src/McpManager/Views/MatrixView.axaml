@@ -1,24 +1,58 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:McpManager.ViewModels"
+             xmlns:sys="using:System"
              x:Class="McpManager.Views.MatrixView"
              x:DataType="vm:MatrixViewModel">
   <StackPanel Spacing="12">
     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
       <TextBox Text="{Binding ServerFilter}" Watermark="Filter servers" AutomationProperties.Name="Filter servers" />
-      <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding HasProjects}">
+      <Grid Grid.Column="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
         <TextBlock Text="Project" VerticalAlignment="Center" Opacity="0.75" />
         <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}"
                   SelectedItem="{Binding SelectedChoice}" AutomationProperties.Name="Project">
+          <ComboBox.Styles>
+            <Style Selector="ComboBoxItem" x:DataType="vm:ProjectChoiceViewModel">
+              <Setter Property="IsEnabled" Value="{Binding IsSelectable}" />
+            </Style>
+          </ComboBox.Styles>
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="vm:ProjectChoiceViewModel">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBlock Text="{Binding Header}" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding Path}" Opacity="0.5" TextTrimming="CharacterEllipsis" />
-              </StackPanel>
+              <Panel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <StackPanel.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                      <Binding Path="Kind" Converter="{x:Static ObjectConverters.NotEqual}"
+                               ConverterParameter="{x:Static vm:ProjectChoiceKind.Header}" />
+                      <Binding Path="Kind" Converter="{x:Static ObjectConverters.NotEqual}"
+                               ConverterParameter="{x:Static vm:ProjectChoiceKind.OtherFolder}" />
+                    </MultiBinding>
+                  </StackPanel.IsVisible>
+                  <TextBlock Text="{Binding Header}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Path}" Opacity="0.5" TextTrimming="CharacterEllipsis"
+                             VerticalAlignment="Center" />
+                  <ItemsControl ItemsSource="{Binding Chips}" VerticalAlignment="Center">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" FontSize="9" Opacity="0.6" /></DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+                <TextBlock Text="{Binding Header}" FontSize="10" FontWeight="SemiBold" LetterSpacing="0.6"
+                           Opacity="0.6"
+                           IsVisible="{Binding Kind, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static vm:ProjectChoiceKind.Header}}" />
+                <TextBlock Text="{Binding Header}" FontStyle="Italic"
+                           IsVisible="{Binding Kind, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static vm:ProjectChoiceKind.OtherFolder}}" />
+              </Panel>
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
+        <Button Grid.Column="2" Width="28" Height="28" Padding="0" Content="↻"
+                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                ToolTip.Tip="Look for changes on disk" AutomationProperties.Name="Look for changes on disk"
+                Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RefreshDiskCommand}" />
       </Grid>
     </Grid>
       <Grid ColumnDefinitions="220,*">
@@ -32,6 +66,17 @@
                         Content="{Binding Label}"
                         Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SelectServerCommand}"
                         CommandParameter="{Binding Server}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Height="28" Padding="4,10,0,0" IsVisible="{Binding HasUnknownRows}"
+                     Text="Found in your configs, not in your library" FontSize="11" FontWeight="SemiBold"
+                     Opacity="0.75" TextTrimming="CharacterEllipsis" />
+          <ItemsControl ItemsSource="{Binding UnknownRows}" IsVisible="{Binding HasUnknownRows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:UnknownServerRowViewModel">
+                <TextBlock Width="220" Height="36" Padding="4,0" Text="{Binding Name}" Opacity="0.75"
+                           VerticalAlignment="Center" LineHeight="36" TextTrimming="CharacterEllipsis" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -85,10 +130,45 @@
                           <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="0" Padding="0"
                                     IsChecked="{Binding Selection.IsEnabled}"
                                     IsEnabled="{Binding Selection.ServerId, Converter={x:Static vm:MatrixCellEnabledConverter.Instance}}" />
+                          <Button HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,22,0"
+                                  Padding="3" MinWidth="0" MinHeight="0" Background="Transparent" BorderThickness="0"
+                                  IsVisible="{Binding HasDifference}"
+                                  ToolTip.Tip="Differs from your library — click to compare"
+                                  AutomationProperties.Name="Differs from your library — click to compare"
+                                  Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ResolveDifferenceCommand}"
+                                  CommandParameter="{Binding}">
+                            <Ellipse Width="8" Height="8" Fill="Orange" />
+                          </Button>
                         </Panel>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Border Height="28" IsVisible="{Binding HasUnknownRows}" />
+            <ItemsControl ItemsSource="{Binding UnknownRows}" IsVisible="{Binding HasUnknownRows}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:UnknownServerRowViewModel">
+                  <StackPanel Orientation="Horizontal" Height="36">
+                    <ItemsControl ItemsSource="{Binding FoundIn}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="sys:Boolean">
+                          <Panel Width="96">
+                            <Ellipse Width="7" Height="7" Fill="Gray" HorizontalAlignment="Center"
+                                     VerticalAlignment="Center" IsVisible="{Binding}" />
+                          </Panel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="+ Library" VerticalAlignment="Center" Padding="8,2" FontSize="12"
+                            ToolTip.Tip="Add this server to your library"
+                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).AddUnknownToLibraryCommand}"
+                            CommandParameter="{Binding}" />
+                  </StackPanel>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
