@@ -66,6 +66,22 @@ public class DiskSnapshotServiceTests : IDisposable
   }
 
   [Fact]
+  public async Task Server_that_cannot_be_imported_is_reported_as_a_problem()
+  {
+    string app = Path.Combine(_root, "app");
+    Directory.CreateDirectory(app);
+    File.WriteAllText(
+      Path.Combine(app, ".mcp.json"),
+      """{"mcpServers":{"good":{"command":"run"},"broken":{"type":"weird","command":"run"}}}""");
+
+    DiskSnapshot snapshot = await Service().LoadAsync(Registry());
+
+    string problem = Assert.Single(snapshot.Problems);
+    Assert.StartsWith($"{app}: broken: ", problem);
+    Assert.Equal("good", Assert.Single(snapshot.Matches).Found.Name);
+  }
+
+  [Fact]
   public async Task Duplicate_header_keys_do_not_break_the_load()
   {
     Directory.CreateDirectory(Path.Combine(_root, "app"));

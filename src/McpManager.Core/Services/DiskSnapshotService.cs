@@ -43,7 +43,7 @@ public class DiskSnapshotService(ConfigScanService scanService, ScanImportPlanne
 
       try
       {
-        matches.AddRange(planner.Match([folder], registry));
+        matches.AddRange(planner.Match([folder], registry, problems));
       }
       catch (Exception ex) when (ex is not OperationCanceledException)
       {
