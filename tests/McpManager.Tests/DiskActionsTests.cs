@@ -147,6 +147,24 @@ public class DiskActionsTests : IDisposable
   }
 
   [Fact]
+  public async Task Cancel_after_resolving_shows_the_difference_again()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "deno" } } }""");
+    MainWindowViewModel vm = await CreateAsync();
+    vm.Matrix.SelectedChoice = vm.Matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found);
+    vm.PromptResolveDifferenceAsync = _ => Task.FromResult<DiffChoice?>(DiffChoice.UseFoundVersion);
+    await vm.ResolveDifferenceCommand.ExecuteAsync(vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
+    await vm.PendingDiskWork;
+
+    vm.CancelCommand.Execute(null);
+    await vm.PendingDiskWork;
+    vm.Matrix.SelectedChoice = vm.Matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found);
+
+    Assert.Equal("node", vm.Servers.Single(s => s.Id == _alpha.Id).Command);
+    Assert.True(vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1].HasDifference);
+  }
+
+  [Fact]
   public async Task Rematch_during_a_refresh_keeps_the_loaded_folders()
   {
     WriteApp("""{ "mcpServers": { "alpha": { "command": "node" }, "beta": { "command": "beta-command" } } }""");

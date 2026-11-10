@@ -146,6 +146,7 @@ public partial class MainWindowViewModel
     }
 
     RebuildMatrix();
+    _ = RematchDiskAsync();
     StatusMessage = "Changes discarded.";
   }
 
