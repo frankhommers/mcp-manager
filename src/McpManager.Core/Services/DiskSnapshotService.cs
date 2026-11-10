@@ -24,6 +24,9 @@ public class DiskSnapshotService(ConfigScanService scanService, ScanImportPlanne
     return MatchAll(folders, registry);
   }
 
+  public Task<ScannedFolder> ReadFolderAsync(string path, GlobalSettings settings) =>
+    scanService.ReadFolderAsync(path, settings);
+
   public DiskSnapshot Rematch(DiskSnapshot snapshot, McpRegistry registry) =>
     MatchAll(snapshot.Folders, registry);
 

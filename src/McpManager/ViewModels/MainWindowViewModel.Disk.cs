@@ -15,7 +15,6 @@ namespace McpManager.ViewModels;
 public partial class MainWindowViewModel
 {
   private readonly ScanImportPlanner _planner;
-  private readonly ConfigScanService _scanService;
   private readonly DiskSnapshotService? _diskService;
   private readonly List<string> _addedFolderPaths = [];
   private DiskSnapshot _disk = DiskSnapshot.Empty;
@@ -50,7 +49,7 @@ public partial class MainWindowViewModel
     {
       McpRegistry loadRegistry = CloneRegistry(_registry);
       DiskSnapshot loaded = await Task.Run(async () => WithFolders(
-        await service.LoadAsync(loadRegistry), await ReadFoldersAsync(added, loadRegistry.Settings)));
+        await service.LoadAsync(loadRegistry), await ReadFoldersAsync(service, added, loadRegistry.Settings)));
       while (load == _loadVersion && _registry != null)
       {
         int rematch = _rematchVersion;
@@ -119,12 +118,13 @@ public partial class MainWindowViewModel
     RebuildMatrix();
   }
 
-  private async Task<List<ScannedFolder>> ReadFoldersAsync(IEnumerable<string> paths, GlobalSettings settings)
+  private static async Task<List<ScannedFolder>> ReadFoldersAsync(
+    DiskSnapshotService service, IEnumerable<string> paths, GlobalSettings settings)
   {
     List<ScannedFolder> folders = [];
     foreach (string path in paths.Where(Directory.Exists))
     {
-      folders.Add(await _scanService.ReadFolderAsync(path, settings).ConfigureAwait(false));
+      folders.Add(await service.ReadFolderAsync(path, settings).ConfigureAwait(false));
     }
 
     return folders;
@@ -273,7 +273,7 @@ public partial class MainWindowViewModel
     ScannedFolder folder;
     try
     {
-      folder = await _scanService.ReadFolderAsync(picked[0].Path.LocalPath, _registry.Settings);
+      folder = await _diskService.ReadFolderAsync(picked[0].Path.LocalPath, _registry.Settings);
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
     {

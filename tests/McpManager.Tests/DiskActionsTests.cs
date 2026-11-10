@@ -168,12 +168,12 @@ public class DiskActionsTests : IDisposable
       Servers = [_alpha, _gamma],
       Settings = new GlobalSettings { ScanRoots = [Root], CodexConfigPath = Path.Combine(_tmp, "global.toml") },
     });
-    ConfigExportService exportService = new();
-    MainWindowViewModel vm = new(registryService, exportService, new ConfigImportService(),
+    ConfigExportService diskExportService = new();
+    MainWindowViewModel vm = new(registryService, new ConfigExportService(), new ConfigImportService(),
       new HttpMcpTester(), new StdioMcpTester(), new TransportDetectionService(), new ShellStub(),
       diskService: new DiskSnapshotService(
-        new ConfigScanService(exportService, _ => [], homeDirectory: Home),
-        diskPlanner ?? new ScanImportPlanner(new ConfigImportService(), exportService)));
+        new ConfigScanService(diskExportService, _ => [], homeDirectory: Home),
+        diskPlanner ?? new ScanImportPlanner(new ConfigImportService(), diskExportService)));
     await vm.InitializeAsync();
     await vm.PendingDiskWork;
     return vm;
