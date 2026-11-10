@@ -246,7 +246,8 @@ public partial class MainWindowViewModel
     SyncModels();
     try
     {
-      _planner.AddToLibrary(_registry, _disk.Folders, row.Name);
+      _planner.AddToLibrary(
+        _registry, [.. _disk.Folders.Where(f => f.Servers.Any(s => s.Name == row.Name))], row.Name);
     }
     catch (ArgumentException ex)
     {
@@ -288,14 +289,22 @@ public partial class MainWindowViewModel
   private async Task PickOtherFolderAsync()
   {
     Window? window = GetMainWindow();
-    if (window == null || _registry == null || _diskService == null)
+    if (window == null || _registry == null)
     {
       return;
     }
 
     IReadOnlyList<IStorageFolder> picked = await window.StorageProvider.OpenFolderPickerAsync(
       new FolderPickerOpenOptions { Title = "Select Project Folder", AllowMultiple = false });
-    if (picked.Count == 0)
+    if (picked.Count > 0)
+    {
+      await OpenFolderAsync(picked[0].Path.LocalPath);
+    }
+  }
+
+  internal async Task OpenFolderAsync(string path)
+  {
+    if (_registry == null || _diskService == null)
     {
       return;
     }
@@ -303,7 +312,7 @@ public partial class MainWindowViewModel
     ScannedFolder folder;
     try
     {
-      folder = await _diskService.ReadFolderAsync(picked[0].Path.LocalPath, _registry.Settings);
+      folder = await _diskService.ReadFolderAsync(path, _registry.Settings);
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
     {
@@ -327,14 +336,15 @@ public partial class MainWindowViewModel
       }
 
       DiskSnapshot withFolder = WithFolders(_disk, [folder]);
-      if (!ReferenceEquals(withFolder, _disk))
+      _candidatePath = folder.Path;
+      if (ReferenceEquals(withFolder, _disk))
       {
-        _rematchVersion++;
-        _disk = _diskService.Rematch(withFolder, _registry);
+        RebuildMatrix();
+        return;
       }
 
-      _candidatePath = folder.Path;
-      RebuildMatrix();
+      _disk = withFolder;
+      _ = RematchDiskAsync();
       return;
     }
 

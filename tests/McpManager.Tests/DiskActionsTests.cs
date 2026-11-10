@@ -216,6 +216,51 @@ public class DiskActionsTests : IDisposable
     Assert.Contains(_alpha.Id, place.Model.EnabledServers);
   }
 
+  [Fact]
+  public async Task Add_to_library_only_reads_folders_that_contain_the_server()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "node" }, "beta": { "command": "beta-command" } } }""");
+    string other = Path.Combine(Root, "other");
+    Directory.CreateDirectory(other);
+    File.WriteAllText(Path.Combine(other, ".mcp.json"), """{ "mcpServers": { "alpha": { "command": "node" } } }""");
+    RecordingImportService imports = new();
+    MainWindowViewModel vm = await CreateAsync(importService: imports);
+    vm.Matrix.SelectedChoice = vm.Matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found && c.Path == App);
+    imports.Sources.Clear();
+
+    vm.AddUnknownToLibraryCommand.Execute(Assert.Single(vm.Matrix.UnknownRows));
+    await vm.PendingDiskWork;
+
+    Assert.Contains(vm.Servers, s => s.Name == "beta");
+    Assert.DoesNotContain(imports.Sources, s => s.FilePath.StartsWith(other, StringComparison.Ordinal));
+  }
+
+  [Fact]
+  public async Task Opening_another_folder_matches_it_in_the_background()
+  {
+    string other = Path.Combine(_tmp, "elsewhere");
+    Directory.CreateDirectory(other);
+    File.WriteAllText(Path.Combine(other, ".mcp.json"), """{ "mcpServers": { "alpha": { "command": "node" } } }""");
+    GatedPlanner planner = new();
+    MainWindowViewModel vm = await CreateAsync(planner);
+    planner.Gate.Reset();
+    try
+    {
+      Task open = vm.OpenFolderAsync(other);
+
+      Assert.Same(open, await Task.WhenAny(open, Task.Delay(TimeSpan.FromSeconds(5))));
+      Assert.False(vm.PendingDiskWork.IsCompleted);
+    }
+    finally
+    {
+      planner.Gate.Set();
+    }
+
+    await vm.PendingDiskWork;
+    Assert.Equal(other, vm.Matrix.SelectedChoice?.Path);
+    Assert.Contains(_alpha.Id, vm.Matrix.Columns[^1].Place.Model.EnabledServers);
+  }
+
   private void WriteApp(string json)
   {
     Directory.CreateDirectory(App);
@@ -223,7 +268,7 @@ public class DiskActionsTests : IDisposable
   }
 
   private async Task<MainWindowViewModel> CreateAsync(
-    ScanImportPlanner? diskPlanner = null, TargetFolder? place = null)
+    ScanImportPlanner? diskPlanner = null, TargetFolder? place = null, IConfigImportService? importService = null)
   {
     Directory.CreateDirectory(Home);
     RegistryService registryService = new(Path.Combine(_tmp, "workspace.json"));
@@ -234,7 +279,7 @@ public class DiskActionsTests : IDisposable
       Settings = new GlobalSettings { ScanRoots = [Root], CodexConfigPath = Path.Combine(_tmp, "global.toml") },
     });
     ConfigExportService diskExportService = new();
-    MainWindowViewModel vm = new(registryService, new ConfigExportService(), new ConfigImportService(),
+    MainWindowViewModel vm = new(registryService, new ConfigExportService(), importService ?? new ConfigImportService(),
       new HttpMcpTester(), new StdioMcpTester(), new TransportDetectionService(), new ShellStub(),
       diskService: new DiskSnapshotService(
         new ConfigScanService(diskExportService, _ => [], homeDirectory: Home),
@@ -254,6 +299,28 @@ public class DiskActionsTests : IDisposable
       Assert.True(Gate.Wait(TimeSpan.FromSeconds(10)));
       return base.Match(folders, registry, skipped);
     }
+  }
+
+  private sealed class RecordingImportService : IConfigImportService
+  {
+    private readonly ConfigImportService _inner = new();
+
+    public List<ExistingTargetServer> Sources { get; } = [];
+
+    public McpServer ImportServer(ExistingTargetServer source)
+    {
+      Sources.Add(source);
+      return _inner.ImportServer(source);
+    }
+
+    public Task<List<McpServer>> ImportFromClaudeCodeAsync(string filePath) =>
+      _inner.ImportFromClaudeCodeAsync(filePath);
+
+    public Task<List<McpServer>> ImportFromOpenCodeAsync(string filePath) => _inner.ImportFromOpenCodeAsync(filePath);
+
+    public Task<List<McpServer>> ImportFromCodexAsync(string filePath) => _inner.ImportFromCodexAsync(filePath);
+
+    public Task<List<McpServer>> ImportAutoDetectAsync(string filePath) => _inner.ImportAutoDetectAsync(filePath);
   }
 
   private sealed class ShellStub : IShellEnvironmentService
