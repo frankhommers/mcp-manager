@@ -32,7 +32,6 @@ public partial class MainWindowViewModel
       SelectedServer = null;
       SelectedTarget = null;
       ShowSettings = false;
-      ShowScan = false;
     }
     NotifyPageChanged();
   }

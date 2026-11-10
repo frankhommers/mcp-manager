@@ -8,7 +8,7 @@ A cross-platform desktop application for managing Model Context Protocol (MCP) s
 - **Servers × Places Overview**: One matrix of servers and places; one checkbox includes a server in a place
 - **Places**: Deploy to global harnesses (Claude Code, Claude Desktop, OpenCode, Codex, Cursor, VS Code, Windsurf)
   or to project folders with one or more harnesses
-- **Scan**: Turn existing project configs into places without touching the files
+- **Disk State**: The matrix shows what is in your project configs, with unknown servers and differences, without touching the files
 - **Save and Deploy**: Store changes in MCP Manager, then deploy them to the harness config files when you choose
 - **Diff Screen**: Field-level comparison with masked secrets for reviews, conflicts and external changes
 - **Per-Place Tool Permissions**: Control which tools are always-allowed per server per place
@@ -117,17 +117,20 @@ A project place can cover several harnesses in the same folder (Claude Code, Ope
 Tick them in the place editor. Every harness of a place gets the same servers; each config file is deployed and
 checked for external changes on its own. The place editor lists every config file it writes.
 
-For OpenCode, `<folder>/.opencode/opencode.json` is used when it exists, for both scan and deploy. Otherwise
+For OpenCode, `<folder>/.opencode/opencode.json` is used when it exists, for both reading and deploy. Otherwise
 `opencode.jsonc` or `opencode.json` in the folder root is used.
 
-### Scan
+### Matrix shows disk
 
-**Scan** on the Overview searches the scan roots (set them in **Preferences**; default `~/Repos`) up to four levels
-deep for harness config files and lists one row per folder with its harnesses and servers. Folders that are not
-places yet are pre-selected; folders that look like test data are not. **Add selected** creates places with the
-servers found. Unknown servers are imported into the library. Servers whose definition differs from the library
-are shown one by one in the diff screen, where you choose **Keep library**, **Put this version in the library**
-or **Import as separate server**. Scanning never writes to config files; adding is a Save.
+The Overview reads your project folders itself, so there is no separate scan step. Folders are looked for in the
+folders set under **Preferences** (default `~/Repos`), up to four levels deep. The project picker lists them under
+**Found on disk**; **Other folder…** adds one that is not in that list. Choosing a folder that is not a place yet
+makes it one. Reading never writes to config files; changes are kept by a Save.
+
+Servers found in a project's configs that are not in the library appear as **Found in your configs, not in your
+library** rows. **+ Library** adds one to the library. An orange dot in a cell means the config on disk differs
+from the library; it opens the diff screen, where you choose **Keep library**, **Put this version in the
+library** or **Import as separate server**.
 
 ### Save and Deploy
 
@@ -145,7 +148,7 @@ Save with Also deploy on a change that affects it. Deploys are refused while the
 
 ### Diff screen
 
-Reviews, scan differences, conflicts and external changes all use the same diff screen. Each server is compared
+Reviews, differences found on disk, conflicts and external changes all use the same diff screen. Each server is compared
 field by field (command, args, URL, type, every environment variable and header, tool permissions); equal fields
 are dimmed, additions are green and removals are red. Values that look like secrets (keys containing TOKEN, KEY,
 SECRET, PASSWORD or AUTH, and Authorization headers) are masked with their last four characters; click **Show**
@@ -167,7 +170,7 @@ is kept).
 
 - Unmanaged server entries and unrelated harness settings are preserved by the existing JSON/TOML merge.
 - Same-name unmanaged entries require a choice: replace, keep existing, or cancel the batch. Servers adopted by
-  a scan replace their same-name entries without asking, because the scan already asked.
+  the diff screen replace their same-name entries without asking, because it already asked.
 - Existing managed servers missing from the library must be imported before a place's first deploy.
 - Multiple places writing the same file are rejected before writing.
 

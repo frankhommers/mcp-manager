@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -169,7 +170,7 @@ public partial class MainWindowViewModel
       return;
     }
 
-    ScanChoice scanChoice = ScanViewModel.ToScanChoice(choice);
+    ScanChoice scanChoice = ToScanChoice(choice);
     SyncModels();
     IReadOnlyList<ScanServerMatch> matches = _planner.Match([folder], _registry);
     ScanServerMatch? live = matches.FirstOrDefault(m =>
@@ -324,7 +325,6 @@ public partial class MainWindowViewModel
         SelectedServer = null;
         SelectedTarget = null;
         ShowSettings = false;
-        ShowScan = false;
         RefreshFromRegistry();
         AttachManagement();
       });
@@ -352,5 +352,90 @@ public partial class MainWindowViewModel
   {
     Window? window = GetMainWindow();
     return window == null ? null : await new Views.ResolveDifferenceDialog(diff).ShowDialog<DiffChoice?>(window);
+  }
+
+  private static ScanChoice ToScanChoice(DiffChoice choice) => choice switch
+  {
+    DiffChoice.KeepLibrary => ScanChoice.KeepLibrary,
+    DiffChoice.UseFoundVersion => ScanChoice.UseFoundVersion,
+    DiffChoice.ImportSeparately => ScanChoice.ImportSeparately,
+    _ => throw new ArgumentOutOfRangeException(nameof(choice), choice, null),
+  };
+
+  public ObservableCollection<string> ScanRoots { get; } = [];
+
+  public bool HasScanRoots => ScanRoots.Count > 0;
+
+  public string DefaultScanRootsText => _registry == null || HasScanRoots
+    ? string.Empty
+    : "No folders chosen. Projects are looked for in " +
+      string.Join(", ", RegistryService.GetDefaultScanRoots(_registry.Settings)) + ".";
+
+  private void NotifyPageChanged()
+  {
+    OnPropertyChanged(nameof(CurrentPage));
+    OnPropertyChanged(nameof(ShowOverview));
+    OnPropertyChanged(nameof(IsServerListActive));
+    OnPropertyChanged(nameof(IsTargetListActive));
+  }
+
+  private void LoadScanRoots(GlobalSettings settings)
+  {
+    ScanRoots.Clear();
+    foreach (string root in settings.ScanRoots)
+    {
+      ScanRoots.Add(root);
+    }
+
+    OnScanRootsChanged();
+  }
+
+  [RelayCommand]
+  private async Task AddScanRootAsync()
+  {
+    Window? window = GetMainWindow();
+    if (window == null || _registry == null)
+    {
+      return;
+    }
+
+    IReadOnlyList<IStorageFolder> folders = await window.StorageProvider.OpenFolderPickerAsync(
+      new FolderPickerOpenOptions { Title = "Select Folder With Projects", AllowMultiple = false });
+    if (folders.Count == 0)
+    {
+      return;
+    }
+
+    string path = folders[0].Path.LocalPath;
+    if (_registry.Settings.ScanRoots.Contains(path, StringComparer.OrdinalIgnoreCase))
+    {
+      return;
+    }
+
+    _registry.Settings.ScanRoots.Add(path);
+    ScanRoots.Add(path);
+    OnScanRootsChanged();
+    ScheduleCheck();
+    _ = RefreshDiskAsync();
+  }
+
+  [RelayCommand]
+  private void RemoveScanRoot(string? path)
+  {
+    if (_registry == null || path == null || !_registry.Settings.ScanRoots.Remove(path))
+    {
+      return;
+    }
+
+    ScanRoots.Remove(path);
+    OnScanRootsChanged();
+    ScheduleCheck();
+    _ = RefreshDiskAsync();
+  }
+
+  private void OnScanRootsChanged()
+  {
+    OnPropertyChanged(nameof(HasScanRoots));
+    OnPropertyChanged(nameof(DefaultScanRootsText));
   }
 }

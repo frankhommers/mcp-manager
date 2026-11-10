@@ -32,6 +32,45 @@ public class DiskSnapshotServiceTests : IDisposable
   }
 
   [Fact]
+  public async Task Load_classifies_known_differing_and_unknown_servers()
+  {
+    Directory.CreateDirectory(Path.Combine(_root, "app"));
+    File.WriteAllText(
+      Path.Combine(_root, "app", ".mcp.json"),
+      """{"mcpServers":{"same":{"command":"run"},"changed":{"command":"new"},"other":{"command":"x"}}}""");
+    McpRegistry registry = Registry();
+    registry.Servers.Add(new McpServer { Name = "same", Command = "run" });
+    registry.Servers.Add(new McpServer { Name = "changed", Command = "old" });
+
+    DiskSnapshot snapshot = await Service().LoadAsync(registry);
+
+    Assert.Equal(ScanMatchKind.Known, snapshot.Matches.Single(m => m.Found.Name == "same").Kind);
+    Assert.Equal(ScanMatchKind.Differs, snapshot.Matches.Single(m => m.Found.Name == "changed").Kind);
+    Assert.Equal(ScanMatchKind.Unknown, snapshot.Matches.Single(m => m.Found.Name == "other").Kind);
+  }
+
+  [Fact]
+  public async Task Duplicate_header_keys_do_not_break_the_load()
+  {
+    Directory.CreateDirectory(Path.Combine(_root, "app"));
+    File.WriteAllText(
+      Path.Combine(_root, "app", ".mcp.json"),
+      """{"mcpServers":{"api":{"type":"http","url":"https://x","headers":{"Authorization":"a","authorization":"b"}}}}""");
+    McpRegistry registry = Registry();
+    registry.Servers.Add(new McpServer
+    {
+      Name = "api",
+      TransportType = McpTransportType.Http,
+      Url = "https://x",
+      HttpHeaders = { ["Authorization"] = "c" },
+    });
+
+    DiskSnapshot snapshot = await Service().LoadAsync(registry);
+
+    Assert.Equal(ScanMatchKind.Differs, Assert.Single(snapshot.Matches).Kind);
+  }
+
+  [Fact]
   public async Task Trailing_separator_place_is_the_same_folder()
   {
     string melvin = Path.Combine(_root, "melvin");

@@ -61,7 +61,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
   public NavigationPage CurrentPage =>
     ShowSettings ? NavigationPage.Settings :
-    ShowScan ? NavigationPage.Scan :
     SelectedProfile != null ? NavigationPage.Profiles :
     SelectedTarget != null ? NavigationPage.Targets :
     SelectedServer != null ? NavigationPage.Servers :
@@ -78,14 +77,13 @@ public partial class MainWindowViewModel : ViewModelBase
   [ObservableProperty] private TargetFolderViewModel? _selectedTarget;
 
   partial void OnSelectedServerChanged(McpServerViewModel? oldValue, McpServerViewModel? newValue) =>
-    Navigate(new NavigationSnapshot(oldValue, SelectedTarget, ShowSettings, ShowScan), () =>
+    Navigate(new NavigationSnapshot(oldValue, SelectedTarget, ShowSettings), () =>
     {
       if (newValue != null)
       {
         SelectedProfile = null;
         SelectedTarget = null;
         ShowSettings = false;
-        ShowScan = false;
       }
 
       NotifyPageChanged();
@@ -97,7 +95,7 @@ public partial class MainWindowViewModel : ViewModelBase
     });
 
   partial void OnSelectedTargetChanged(TargetFolderViewModel? oldValue, TargetFolderViewModel? newValue) =>
-    Navigate(new NavigationSnapshot(SelectedServer, oldValue, ShowSettings, ShowScan), () =>
+    Navigate(new NavigationSnapshot(SelectedServer, oldValue, ShowSettings), () =>
     {
       OnPropertyChanged(nameof(SidebarSelectedTarget));
       if (newValue != null)
@@ -105,7 +103,6 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedProfile = null;
         SelectedServer = null;
         ShowSettings = false;
-        ShowScan = false;
         _ = newValue.RefreshExistingServersAsync(_registry?.Settings);
       }
 
@@ -119,7 +116,7 @@ public partial class MainWindowViewModel : ViewModelBase
   [ObservableProperty] private bool _showSettings;
 
   partial void OnShowSettingsChanged(bool oldValue, bool newValue) =>
-    Navigate(new NavigationSnapshot(SelectedServer, SelectedTarget, oldValue, ShowScan), NotifyPageChanged);
+    Navigate(new NavigationSnapshot(SelectedServer, SelectedTarget, oldValue), NotifyPageChanged);
 
   [ObservableProperty] private string _bridgeCommandHttp = "mcp-proxy {args} {headerArgs} {url}";
 
@@ -149,7 +146,6 @@ public partial class MainWindowViewModel : ViewModelBase
     _planner = new ScanImportPlanner(_configImportService, _configExportService);
     _scanService = new ConfigScanService(_configExportService);
     _diskService = new DiskSnapshotService(_scanService, _planner);
-    Scan = CreateScan(_scanService);
     InitializeSidebar();
   }
 
@@ -174,7 +170,6 @@ public partial class MainWindowViewModel : ViewModelBase
     _planner = new ScanImportPlanner(_configImportService, _configExportService);
     _scanService = scanService ?? new ConfigScanService(_configExportService);
     _diskService = diskService;
-    Scan = CreateScan(_scanService);
     InitializeSidebar();
   }
 
@@ -387,7 +382,6 @@ public partial class MainWindowViewModel : ViewModelBase
     SelectedServer = null;
     SelectedTarget = null;
     ShowSettings = false;
-    ShowScan = false;
   });
 
   [RelayCommand]
@@ -402,7 +396,6 @@ public partial class MainWindowViewModel : ViewModelBase
     SelectedProfile = null;
     SelectedServer = null;
     SelectedTarget = null;
-    ShowScan = false;
     ShowSettings = true;
   });
 

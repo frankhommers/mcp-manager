@@ -7,5 +7,4 @@ public enum NavigationPage
   Targets,
   Profiles,
   Settings,
-  Scan,
 }
