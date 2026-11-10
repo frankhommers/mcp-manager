@@ -12,7 +12,7 @@ public class MatrixViewModelTests
   private static McpServerViewModel Server(McpServer model) => new(model);
 
   [Fact]
-  public void Columns_exclude_clipboard_and_quick_export_global_first()
+  public void Columns_are_globals_plus_selected_project()
   {
     List<McpServer> servers = [new McpServer { Name = "a" }];
     TargetFolderViewModel project = Place(servers, "Zeta", TargetClientFlags.ClaudeCode, path: "/p/zeta");
@@ -25,56 +25,67 @@ public class MatrixViewModelTests
     MatrixViewModel matrix = new(
       servers.Select(s => Server(s)), [project, clipboard, projectAlpha, quick, globalOpenCode, globalClaude]);
 
-    Assert.Equal(
-      [globalClaude, globalOpenCode, projectAlpha, project], matrix.Columns.Select(c => c.Place).ToList());
-    Assert.Equal(["Claude Desktop", "OpenCode", "alpha", "Zeta"], matrix.Columns.Select(c => c.Header).ToList());
-    Assert.Equal([true, true, false, false], matrix.Columns.Select(c => c.IsGlobal).ToList());
+    Assert.Equal([projectAlpha, project], matrix.Projects.Select(c => c.Place).ToList());
+    Assert.Equal([globalClaude, globalOpenCode, projectAlpha], matrix.Columns.Select(c => c.Place).ToList());
+    Assert.Equal(["Claude Desktop", "OpenCode", "alpha"], matrix.Columns.Select(c => c.Header).ToList());
+    Assert.Equal(["Global", "Global", "Project"], matrix.Columns.Select(c => c.GroupLabel).ToList());
   }
 
   [Fact]
-  public void Cell_toggles_place_selection()
-  {
-    List<McpServer> servers = [new McpServer { Name = "b" }, new McpServer { Name = "a", DisplayName = "Zed" }];
-    TargetFolderViewModel place = Place(servers, "P", TargetClientFlags.ClaudeCode, path: "/p");
-    int changes = 0;
-    place.ConfigurationChanged += (_, _) => changes++;
-    MatrixViewModel matrix = new(servers.Select(s => Server(s)), [place]);
-
-    Assert.Equal(["b", "Zed"], matrix.Rows.Select(r => r.Label).ToList());
-    MatrixRowViewModel row = matrix.Rows[1];
-    row.Cells[0].IsEnabled = true;
-
-    Assert.True(place.ServerSelections.Single(s => s.ServerId == servers[1].Id).IsEnabled);
-    Assert.False(place.ServerSelections.Single(s => s.ServerId == servers[0].Id).IsEnabled);
-    Assert.True(changes > 0);
-  }
-
-  [Fact]
-  public void Place_filter_hides_columns_and_cells_stay_aligned()
+  public void Selecting_project_swaps_column_keeps_cells_aligned_and_reports_choice()
   {
     List<McpServer> servers = [new McpServer { Name = "a" }, new McpServer { Name = "needle" }];
+    TargetFolderViewModel global = Place(servers, "G", TargetClientFlags.OpenCode, true, "/g");
     TargetFolderViewModel one = Place(servers, "One", TargetClientFlags.ClaudeCode, path: "/work/one");
     TargetFolderViewModel two = Place(servers, "Two", TargetClientFlags.Codex, path: "/work/two");
-    TargetFolderViewModel three = Place(servers, "Three", TargetClientFlags.Cursor, path: "/other/three");
-    MatrixViewModel matrix = new(servers.Select(s => Server(s)), [one, two, three]);
+    MatrixViewModel matrix = new(servers.Select(s => Server(s)), [global, one, two], two.Id);
+    List<Guid?> reported = [];
+    matrix.SelectedProjectChanged += (_, id) => reported.Add(id);
 
-    matrix.PlaceFilter = "WORK";
-    Assert.Equal([one, two], matrix.Columns.Select(c => c.Place).ToList());
+    Assert.Equal([global, two], matrix.Columns.Select(c => c.Place).ToList());
+    matrix.SelectedProject = matrix.Projects.Single(p => p.Place == one);
+    Assert.Equal([global, one], matrix.Columns.Select(c => c.Place).ToList());
+    Assert.Equal([one.Id], reported);
     foreach (MatrixRowViewModel row in matrix.Rows)
     {
       Assert.Equal(2, row.Cells.Count);
-      Assert.Equal(row.Server.Id, row.Cells[0].ServerId);
+      Assert.Equal(row.Server.Id, row.Cells[1].ServerId);
     }
 
-    matrix.PlaceFilter = "three";
-    Assert.Single(matrix.Columns);
-    matrix.Rows[0].Cells[0].IsEnabled = true;
-    Assert.True(three.ServerSelections.Single(s => s.ServerId == matrix.Rows[0].Server.Id).IsEnabled);
+    matrix.Rows[0].Cells[1].IsEnabled = true;
+    Assert.True(one.ServerSelections.Single(s => s.ServerId == matrix.Rows[0].Server.Id).IsEnabled);
 
     matrix.ServerFilter = "NEED";
     Assert.Equal(["needle"], matrix.Rows.Select(r => r.Label).ToList());
-    matrix.PlaceFilter = "";
-    Assert.Equal(3, matrix.Rows[0].Cells.Count);
+  }
+
+  [Fact]
+  public void Unknown_remembered_project_falls_back_to_first_and_rename_keeps_selection()
+  {
+    List<McpServer> servers = [];
+    TargetFolderViewModel one = Place(servers, "Bbb", TargetClientFlags.ClaudeCode, path: "/b");
+    TargetFolderViewModel two = Place(servers, "Ccc", TargetClientFlags.Codex, path: "/c");
+    MatrixViewModel matrix = new([], [one, two], Guid.NewGuid());
+    Assert.Same(one, matrix.SelectedProject?.Place);
+    List<Guid?> reported = [];
+    matrix.SelectedProjectChanged += (_, id) => reported.Add(id);
+
+    one.Name = "Zzz";
+
+    Assert.Equal([two, one], matrix.Projects.Select(p => p.Place).ToList());
+    Assert.Same(one, matrix.SelectedProject?.Place);
+    Assert.Empty(reported);
+  }
+
+  [Fact]
+  public void Without_projects_only_globals_show()
+  {
+    TargetFolderViewModel global = Place([], "G", TargetClientFlags.Codex, true, "/g");
+    MatrixViewModel matrix = new([], [global]);
+
+    Assert.False(matrix.HasProjects);
+    Assert.Null(matrix.SelectedProject);
+    Assert.Equal([global], matrix.Columns.Select(c => c.Place).ToList());
   }
 
   [Fact]
@@ -88,8 +99,8 @@ public class MatrixViewModelTests
     MatrixViewModel matrix = new([], [claude, both, many]);
 
     Assert.Equal(["CC"], matrix.Columns.Single(c => c.Place == claude).Chips);
-    Assert.Equal(["CC", "OC"], matrix.Columns.Single(c => c.Place == both).Chips);
-    Assert.Equal(["CC", "CD", "OC", "CX", "CU", "VS", "WS"], matrix.Columns.Single(c => c.Place == many).Chips);
+    Assert.Equal(["CC", "OC"], matrix.Projects.Single(c => c.Place == both).Chips);
+    Assert.Equal(["CC", "CD", "OC", "CX", "CU", "VS", "WS"], matrix.Projects.Single(c => c.Place == many).Chips);
   }
 
   [Fact]
@@ -142,10 +153,11 @@ public class MatrixViewModelTests
     Assert.Equal(["bravo", "Zulu"], matrix.Rows.Select(r => r.Label).ToList());
 
     first.Name = "Zzz";
-    Assert.Equal([second, first], matrix.Columns.Select(c => c.Place).ToList());
-    Assert.Equal("Zzz", matrix.Columns[1].Header);
+    Assert.Equal([second, first], matrix.Projects.Select(c => c.Place).ToList());
+    Assert.Equal("Zzz", matrix.Projects[1].Header);
+    Assert.Equal([first], matrix.Columns.Select(c => c.Place).ToList());
 
     first.SelectedClient = TargetClientFlags.OpenCode;
-    Assert.Equal(["OC"], matrix.Columns[1].Chips);
+    Assert.Equal(["OC"], matrix.Columns[0].Chips);
   }
 }

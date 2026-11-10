@@ -38,23 +38,37 @@ public partial class MainWindowViewModel
   }
 
   private bool _suppressMatrixRebuild;
+  private UiState? _uiState;
 
   private void RebuildMatrix()
   {
     if (_suppressMatrixRebuild) return;
     MatrixViewModel previous = Matrix;
-    MatrixViewModel matrix = new(Servers, TargetFolders)
+    _uiState ??= UiStateStore.NextTo(_registryService.RegistryFilePath).Load();
+    MatrixViewModel matrix = new(Servers, TargetFolders, _uiState.LastProjectId)
     {
       ServerFilter = Matrix.ServerFilter,
-      PlaceFilter = Matrix.PlaceFilter,
     };
+    matrix.SelectedProjectChanged += OnMatrixProjectChanged;
     foreach ((Guid id, PlaceStatus status) in _placeStatuses)
     {
       matrix.SetStatus(id, status);
     }
 
     Matrix = matrix;
+    previous.SelectedProjectChanged -= OnMatrixProjectChanged;
     previous.Dispose();
+  }
+
+  private void OnMatrixProjectChanged(object? sender, Guid? projectId)
+  {
+    if (_uiState == null || _uiState.LastProjectId == projectId)
+    {
+      return;
+    }
+
+    _uiState = _uiState with { LastProjectId = projectId };
+    UiStateStore.NextTo(_registryService.RegistryFilePath).Save(_uiState);
   }
 
   private void InitializeManagement()

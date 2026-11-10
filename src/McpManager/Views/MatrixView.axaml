@@ -6,10 +6,21 @@
   <StackPanel Spacing="12">
     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
       <TextBox Text="{Binding ServerFilter}" Watermark="Filter servers" AutomationProperties.Name="Filter servers" />
-      <TextBox Grid.Column="1" Text="{Binding PlaceFilter}" Watermark="Filter places"
-               AutomationProperties.Name="Filter places" />
+      <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding HasProjects}">
+        <TextBlock Text="Project" VerticalAlignment="Center" Opacity="0.75" />
+        <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Projects}"
+                  SelectedItem="{Binding SelectedProject}" AutomationProperties.Name="Project">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:PlaceColumnViewModel">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{Binding Header}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Place.Path}" Opacity="0.5" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+      </Grid>
     </Grid>
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="520">
       <Grid ColumnDefinitions="220,*">
         <StackPanel Spacing="0">
           <Border Height="72" />
@@ -70,9 +81,11 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:ServerSelectionViewModel">
-                        <CheckBox Width="96" HorizontalContentAlignment="Center" HorizontalAlignment="Center"
-                                  IsChecked="{Binding IsEnabled}"
-                                  IsEnabled="{Binding ServerId, Converter={x:Static vm:MatrixCellEnabledConverter.Instance}}" />
+                        <Panel Width="96">
+                          <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="0" Padding="0"
+                                    IsChecked="{Binding IsEnabled}"
+                                    IsEnabled="{Binding ServerId, Converter={x:Static vm:MatrixCellEnabledConverter.Instance}}" />
+                        </Panel>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
@@ -82,6 +95,5 @@
           </StackPanel>
         </ScrollViewer>
       </Grid>
-    </ScrollViewer>
   </StackPanel>
 </UserControl>

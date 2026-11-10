@@ -44,7 +44,7 @@ public partial class PlaceColumnViewModel : ViewModelBase
 
   public bool IsGlobal => Place.IsGlobal;
 
-  public string GroupLabel => IsGlobal ? "Global" : "Projects";
+  public string GroupLabel => IsGlobal ? "Global" : "Project";
 
   public string Header
   {
