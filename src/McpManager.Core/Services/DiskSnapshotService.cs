@@ -33,6 +33,11 @@ public class DiskSnapshotService(ConfigScanService scanService, ScanImportPlanne
     List<string> problems = [];
     foreach (ScannedFolder folder in folders)
     {
+      foreach (string file in folder.UnreadableFiles)
+      {
+        problems.Add($"{file}: could not be read");
+      }
+
       try
       {
         matches.AddRange(planner.Match([folder], registry));

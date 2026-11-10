@@ -68,8 +68,8 @@ public partial class MainWindowViewModel
         RebuildMatrix();
         if (snapshot.Problems.Count > 0)
         {
-          string folders = snapshot.Problems.Count == 1 ? "folder" : "folders";
-          StatusMessage = $"Could not compare {snapshot.Problems.Count} {folders}: {snapshot.Problems[0]}";
+          string problems = snapshot.Problems.Count == 1 ? "problem" : "problems";
+          StatusMessage = $"{snapshot.Problems.Count} {problems} on disk: {snapshot.Problems[0]}";
         }
 
         return;

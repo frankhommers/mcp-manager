@@ -50,6 +50,22 @@ public class DiskSnapshotServiceTests : IDisposable
   }
 
   [Fact]
+  public async Task Unreadable_config_file_is_reported_as_a_problem()
+  {
+    string app = Path.Combine(_root, "app");
+    Write(app, "a");
+    string broken = Path.Combine(app, "opencode.jsonc");
+    File.WriteAllText(broken, "{ not json");
+
+    DiskSnapshot snapshot = await Service().LoadAsync(Registry());
+
+    string problem = Assert.Single(snapshot.Problems);
+    Assert.StartsWith(broken, problem);
+    Assert.EndsWith(": could not be read", problem);
+    Assert.Contains(snapshot.Matches, m => m.Found.Name == "a");
+  }
+
+  [Fact]
   public async Task Duplicate_header_keys_do_not_break_the_load()
   {
     Directory.CreateDirectory(Path.Combine(_root, "app"));

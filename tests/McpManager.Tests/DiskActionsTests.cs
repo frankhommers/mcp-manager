@@ -28,6 +28,19 @@ public class DiskActionsTests : IDisposable
   }
 
   [Fact]
+  public async Task Unreadable_config_file_is_announced_in_the_status()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "node" } } }""");
+    File.WriteAllText(Path.Combine(App, "opencode.jsonc"), "{ not json");
+    MainWindowViewModel vm = await CreateAsync();
+
+    await vm.RefreshDiskCommand.ExecuteAsync(null);
+
+    Assert.StartsWith("1 problem on disk: ", vm.StatusMessage);
+    Assert.Contains("opencode.jsonc", vm.StatusMessage);
+  }
+
+  [Fact]
   public async Task Editing_candidate_promotes_it_and_marks_dirty()
   {
     WriteApp("""{ "mcpServers": { "alpha": { "command": "node" } } }""");
