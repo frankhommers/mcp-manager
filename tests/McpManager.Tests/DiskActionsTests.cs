@@ -143,7 +143,7 @@ public class DiskActionsTests : IDisposable
     Assert.Contains(_alpha.Id, place.Model.EnabledServers);
     Assert.Equal(place.Id, vm.Matrix.SelectedChoice?.Column?.Place.Id);
     Assert.False(vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1].HasDifference);
-    Assert.Equal("Updated alpha. Save to keep it.", vm.StatusMessage);
+    Assert.Equal("Added project app. Save to keep it.", vm.StatusMessage);
   }
 
   [Fact]
@@ -232,6 +232,7 @@ public class DiskActionsTests : IDisposable
     TargetFolderViewModel place = vm.TargetFolders.Single(t => t.Path == App);
     Assert.Equal(TargetClientFlags.ClaudeCode, place.Model.EnabledClients);
     Assert.Contains(_alpha.Id, place.Model.EnabledServers);
+    Assert.Equal("Updated alpha. Save to keep it.", vm.StatusMessage);
   }
 
   [Fact]

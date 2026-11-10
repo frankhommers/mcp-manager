@@ -231,8 +231,9 @@ public partial class MainWindowViewModel
     }
 
     TargetFolder place = ScanImportPlanner.FindPlace(_registry, applied)!;
-    ReloadAfterRegistryChange(place.IsGlobal ? CurrentProjectId() : place.Id,
-      $"Updated {match.Found.Name}. Save to keep it.");
+    ReloadAfterRegistryChange(place.IsGlobal ? CurrentProjectId() : place.Id, existing == null
+      ? $"Added project {place.Name}. Save to keep it."
+      : $"Updated {match.Found.Name}. Save to keep it.");
   }
 
   [RelayCommand]
