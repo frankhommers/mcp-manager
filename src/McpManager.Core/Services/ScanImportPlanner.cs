@@ -95,6 +95,48 @@ public class ScanImportPlanner(IConfigImportService importService, IConfigExport
     }
   }
 
+  public TargetFolder PromoteFolder(McpRegistry registry, ScannedFolder folder)
+  {
+    List<ScanServerMatch> known = Match([folder], registry)
+      .Where(m => m.Kind == ScanMatchKind.Known && m.Library != null && InRegistry(registry, m.Library))
+      .ToList();
+    Apply(registry, [folder], known, new Dictionary<ScanServerMatch, ScanChoice>());
+    return FindPlace(registry, folder)!;
+  }
+
+  public McpServer AddToLibrary(McpRegistry registry, IReadOnlyList<ScannedFolder> folders, string serverName)
+  {
+    List<ScanServerMatch> occurrences = Match(folders, registry)
+      .Where(m => m.Found.Name == serverName && (m.Library == null || !InRegistry(registry, m.Library)))
+      .ToList();
+    if (occurrences.Count == 0)
+    {
+      throw new ArgumentException($"{serverName} was not found in your configs.");
+    }
+
+    ScanServerMatch first = occurrences[0];
+    McpServer server = EnsureInLibrary(registry, first.Imported);
+    foreach (ScanServerMatch occurrence in occurrences)
+    {
+      ScannedFolder folder = folders.First(f => string.Equals(f.Path, occurrence.FolderPath, StringComparison.Ordinal));
+      TargetFolder? place = FindPlace(registry, folder);
+      if (place == null || !occurrence.Found.IsEnabled
+          || ServerDiffService.Compare(first.Imported, occurrence.Imported).HasDifferences)
+      {
+        continue;
+      }
+
+      place.EnabledServers.Add(server.Id);
+      place.DisabledServers.Remove(server.Id);
+      place.AdoptedServerNames.Add(serverName);
+    }
+
+    return server;
+  }
+
+  private static bool InRegistry(McpRegistry registry, McpServer server) =>
+    registry.Servers.Any(s => s.Id == server.Id);
+
   private McpServer? Render(McpRegistry registry, ScannedFolder folder, ExistingTargetServer found, McpServer server)
   {
     try

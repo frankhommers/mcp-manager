@@ -550,4 +550,64 @@ public class ScanImportPlannerTests
     _planner.Apply(registry, [b], matches, choices);
     Assert.Equal("C", Assert.Single(registry.Servers).EnvironmentVariables["TOKEN"]);
   }
+
+  [Fact]
+  public void Promote_adopts_only_known_library_servers()
+  {
+    McpRegistry registry = new();
+    registry.Servers.Add(Library("known", "run", "tok-a"));
+    registry.Servers.Add(Library("differs", "run", "tok-a"));
+    ScannedFolder folder = Folder("/p/a", TargetClientFlags.ClaudeCode, false,
+      Found("known", "run", "tok-a"), Found("differs", "run", "tok-b"), Found("unknown", "run", "tok-a"));
+
+    TargetFolder place = _planner.PromoteFolder(registry, folder);
+
+    Assert.Equal([registry.Servers[0].Id], place.EnabledServers);
+    Assert.Equal(["known"], place.AdoptedServerNames);
+    Assert.Equal(2, registry.Servers.Count);
+    Assert.Same(place, Assert.Single(registry.TargetFolders));
+  }
+
+  [Fact]
+  public void Promote_folder_without_configs_creates_empty_place()
+  {
+    McpRegistry registry = new();
+    ScannedFolder folder = Folder("/p/empty", TargetClientFlags.None, false);
+
+    TargetFolder place = _planner.PromoteFolder(registry, folder);
+
+    Assert.Equal(TargetClientFlags.None, place.EnabledClients);
+    Assert.Equal("empty", place.Name);
+    Assert.Same(place, Assert.Single(registry.TargetFolders));
+  }
+
+  [Fact]
+  public void Add_to_library_adopts_identical_occurrences_only()
+  {
+    McpRegistry registry = new();
+    TargetFolder p1 = new() { Name = "a", Path = "/p/a", EnabledClients = TargetClientFlags.ClaudeCode };
+    TargetFolder p2 = new() { Name = "b", Path = "/p/b", EnabledClients = TargetClientFlags.ClaudeCode };
+    registry.TargetFolders.AddRange([p1, p2]);
+    ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("jira", "run", "tok-a"));
+    ScannedFolder b = Folder("/p/b", TargetClientFlags.ClaudeCode, false, Found("jira", "run", "tok-b"));
+    ScannedFolder c = Folder("/p/c", TargetClientFlags.ClaudeCode, false, Found("jira", "run", "tok-a"));
+
+    McpServer server = _planner.AddToLibrary(registry, [a, b, c], "jira");
+
+    Assert.Same(server, Assert.Single(registry.Servers));
+    Assert.Equal("tok-a", server.EnvironmentVariables["TOKEN"]);
+    Assert.Equal([server.Id], p1.EnabledServers);
+    Assert.Equal(["jira"], p1.AdoptedServerNames);
+    Assert.Empty(p2.EnabledServers);
+    Assert.Empty(p2.AdoptedServerNames);
+    Assert.Equal(2, registry.TargetFolders.Count);
+  }
+
+  [Fact]
+  public void Add_to_library_unknown_name_throws()
+  {
+    ScannedFolder a = Folder("/p/a", TargetClientFlags.ClaudeCode, false, Found("jira", "run", "tok-a"));
+
+    Assert.Throws<ArgumentException>(() => _planner.AddToLibrary(new McpRegistry(), [a], "nope"));
+  }
 }
