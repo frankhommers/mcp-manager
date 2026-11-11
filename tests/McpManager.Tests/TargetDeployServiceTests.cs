@@ -77,6 +77,27 @@ public class TargetDeployServiceTests : IDisposable
   }
 
   [Fact]
+  public async Task First_deploy_asks_about_a_conflict_on_the_callers_thread()
+  {
+    (McpRegistry registry, TargetFolder target) = CreateRegistry();
+    await File.WriteAllTextAsync(
+      Path.Combine(_directory, ".mcp.json"), """{"mcpServers":{"managed":{"url":"https://manual.test/mcp"}}}""");
+
+    (int callerThread, int? callbackThread) = SingleThreadContext.Run(async () =>
+    {
+      int? seen = null;
+      await new TargetDeployService(new ConfigExportService()).DeployAsync([target], registry, conflict =>
+      {
+        seen = Environment.CurrentManagedThreadId;
+        return Task.FromResult<ExportConflictResolution?>(null);
+      });
+      return (Environment.CurrentManagedThreadId, seen);
+    });
+
+    Assert.Equal(callerThread, callbackThread);
+  }
+
+  [Fact]
   public async Task Target_without_client_is_rejected()
   {
     (McpRegistry registry, TargetFolder target) = CreateRegistry();

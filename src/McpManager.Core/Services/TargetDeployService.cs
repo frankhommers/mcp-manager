@@ -22,7 +22,7 @@ public class TargetDeployService(IConfigExportService exportService)
     TargetConfigSelectionService selectionService = new(exportService);
     foreach (TargetFolder target in targets.Where(t => t.LastAppliedAt == null))
     {
-      ExistingTargetServers existing = await selectionService.ReadAsync(target, registry.Settings).ConfigureAwait(false);
+      ExistingTargetServers existing = await selectionService.ReadAsync(target, registry.Settings);
       if (existing.Servers.Any(s => s.ManagedId is Guid id && registry.Servers.All(server => server.Id != id)))
       {
         throw new InvalidOperationException(
@@ -64,7 +64,7 @@ public class TargetDeployService(IConfigExportService exportService)
     }
 
     Dictionary<string, string>? configs = await exportService.PrepareExportAsync(
-      effective, registry.Servers, registry.Settings, resolveConflictAsync).ConfigureAwait(false);
+      effective, registry.Servers, registry.Settings, resolveConflictAsync);
     if (configs == null)
     {
       return new DeployResult(true, []);
@@ -75,7 +75,7 @@ public class TargetDeployService(IConfigExportService exportService)
       throw new InvalidOperationException("A configuration changed during preparation. Check places and try again.");
     }
 
-    await exportService.WriteConfigsAsync(configs).ConfigureAwait(false);
+    await exportService.WriteConfigsAsync(configs);
     foreach (TargetFolder target in targets)
     {
       HashSet<string> paths = exportService.GetConfigFilePaths(target, registry.Settings)
