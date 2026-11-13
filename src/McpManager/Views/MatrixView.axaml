@@ -132,12 +132,21 @@
                                     IsEnabled="{Binding Selection.ServerId, Converter={x:Static vm:MatrixCellEnabledConverter.Instance}}" />
                           <Button HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,22,0"
                                   Padding="3" MinWidth="0" MinHeight="0" Background="Transparent" BorderThickness="0"
-                                  IsVisible="{Binding HasDifference}"
-                                  ToolTip.Tip="Differs from your library — click to compare"
-                                  AutomationProperties.Name="Differs from your library — click to compare"
+                                  IsVisible="{Binding NeedsChoice}"
+                                  ToolTip.Tip="Differs from your library — click to choose"
+                                  AutomationProperties.Name="Differs from your library — click to choose"
                                   Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ResolveDifferenceCommand}"
                                   CommandParameter="{Binding}">
                             <Ellipse Width="8" Height="8" Fill="Orange" />
+                          </Button>
+                          <Button HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,22,0"
+                                  Padding="3" MinWidth="0" MinHeight="0" Background="Transparent" BorderThickness="0"
+                                  IsVisible="{Binding IsUpdatedOnDeploy}"
+                                  ToolTip.Tip="Your library version replaces this on deploy — click to compare"
+                                  AutomationProperties.Name="Your library version replaces this on deploy — click to compare"
+                                  Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ResolveDifferenceCommand}"
+                                  CommandParameter="{Binding}">
+                            <Ellipse Width="8" Height="8" Stroke="Gray" StrokeThickness="1.5" />
                           </Button>
                         </Panel>
                       </DataTemplate>

@@ -11,6 +11,7 @@ public partial class DiffViewModel : ViewModelBase
   private readonly IReadOnlyList<ServerDiff> _items;
   private readonly IReadOnlyList<DiffChoice> _choices;
   private readonly Func<int, DiffChoice, bool>? _isAvailable;
+  private readonly IReadOnlyDictionary<DiffChoice, string> _descriptions;
   private readonly DiffChoice?[] _selected;
   private int _index;
 
@@ -19,13 +20,15 @@ public partial class DiffViewModel : ViewModelBase
     string rightLabel,
     IReadOnlyList<ServerDiff> items,
     IReadOnlyList<DiffChoice> choices,
-    Func<int, DiffChoice, bool>? isAvailable = null)
+    Func<int, DiffChoice, bool>? isAvailable = null,
+    IReadOnlyDictionary<DiffChoice, string>? descriptions = null)
   {
     LeftLabel = leftLabel;
     RightLabel = rightLabel;
     _items = items;
     _choices = choices;
     _isAvailable = isAvailable;
+    _descriptions = descriptions ?? new Dictionary<DiffChoice, string>();
     _selected = new DiffChoice?[items.Count];
     Options = BuildOptions();
     Fields = BuildFields();
@@ -110,7 +113,7 @@ public partial class DiffViewModel : ViewModelBase
   private bool IsAvailable(int index, DiffChoice choice) => _isAvailable?.Invoke(index, choice) ?? true;
 
   private List<DiffChoiceOptionViewModel> BuildOptions() =>
-    [.. _choices.Where(c => IsAvailable(_index, c)).Select(c => new DiffChoiceOptionViewModel(this, c))];
+    [.. _choices.Where(c => IsAvailable(_index, c)).Select(c => new DiffChoiceOptionViewModel(this, c, _descriptions.GetValueOrDefault(c, string.Empty)))];
 
   private List<FieldDiffViewModel> BuildFields() =>
     Current == null ? [] : [.. Current.Fields.Select(f => new FieldDiffViewModel(f))];

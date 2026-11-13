@@ -236,6 +236,74 @@ public class DiskActionsTests : IDisposable
   }
 
   [Fact]
+  public async Task Keeping_the_library_marks_the_difference_as_updated_on_deploy()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "deno" } } }""");
+    TargetFolder project = new() { Name = "app", Path = App, EnabledClients = TargetClientFlags.ClaudeCode };
+    MainWindowViewModel vm = await CreateAsync(place: project);
+    Assert.True(vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1].NeedsChoice);
+    vm.PromptResolveDifferenceAsync = _ => Task.FromResult<DiffChoice?>(DiffChoice.KeepLibrary);
+
+    await vm.ResolveDifferenceCommand.ExecuteAsync(
+      vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
+    await vm.PendingDiskWork;
+
+    MatrixCellViewModel cell = vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1];
+    Assert.True(cell.IsUpdatedOnDeploy);
+    Assert.False(cell.NeedsChoice);
+  }
+
+  [Fact]
+  public async Task Difference_dialog_explains_what_each_choice_does()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "deno" } } }""");
+    string otherPath = Path.Combine(_tmp, "elsewhere");
+    Directory.CreateDirectory(otherPath);
+    TargetFolder project = new() { Name = "app", Path = App, EnabledClients = TargetClientFlags.ClaudeCode };
+    TargetFolder other = new()
+    {
+      Name = "elsewhere", Path = otherPath, EnabledClients = TargetClientFlags.ClaudeCode, EnabledServers = [_alpha.Id],
+    };
+    MainWindowViewModel vm = await CreateAsync(place: project, otherPlaces: [other]);
+    vm.Matrix.SelectedChoice = vm.Matrix.Choices.Single(c => c.Column?.Place.Id == project.Id);
+    DiffViewModel? shown = null;
+    vm.PromptResolveDifferenceAsync = diff =>
+    {
+      shown = diff;
+      return Task.FromResult<DiffChoice?>(null);
+    };
+
+    await vm.ResolveDifferenceCommand.ExecuteAsync(vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
+
+    Dictionary<DiffChoice, string> texts = shown!.Options.ToDictionary(o => o.Choice, o => o.Description);
+    Assert.Equal("Your library stays the same. On deploy, app gets the library version of alpha.",
+      texts[DiffChoice.KeepLibrary]);
+    Assert.Equal("Changes alpha in your library, also for 1 other place that uses it. "
+      + "It gets this version on deploy.", texts[DiffChoice.UseFoundVersion]);
+    Assert.Equal("Adds alpha-app to your library for app. On deploy, alpha in its config is renamed to alpha-app.",
+      texts[DiffChoice.ImportSeparately]);
+  }
+
+  [Fact]
+  public async Task Using_the_found_version_in_a_server_nobody_else_uses_says_so()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "deno" } } }""");
+    MainWindowViewModel vm = await CreateAsync();
+    vm.Matrix.SelectedChoice = vm.Matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found);
+    DiffViewModel? shown = null;
+    vm.PromptResolveDifferenceAsync = diff =>
+    {
+      shown = diff;
+      return Task.FromResult<DiffChoice?>(null);
+    };
+
+    await vm.ResolveDifferenceCommand.ExecuteAsync(vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
+
+    Assert.Equal("Changes alpha in your library to this version.",
+      shown!.Options.Single(o => o.Choice == DiffChoice.UseFoundVersion).Description);
+  }
+
+  [Fact]
   public async Task Add_to_library_only_reads_folders_that_contain_the_server()
   {
     WriteApp("""{ "mcpServers": { "alpha": { "command": "node" }, "beta": { "command": "beta-command" } } }""");
@@ -288,14 +356,15 @@ public class DiskActionsTests : IDisposable
   }
 
   private async Task<MainWindowViewModel> CreateAsync(
-    ScanImportPlanner? diskPlanner = null, TargetFolder? place = null, IConfigImportService? importService = null)
+    ScanImportPlanner? diskPlanner = null, TargetFolder? place = null, IConfigImportService? importService = null,
+    IReadOnlyList<TargetFolder>? otherPlaces = null)
   {
     Directory.CreateDirectory(Home);
     RegistryService registryService = new(Path.Combine(_tmp, "workspace.json"));
     await registryService.SaveAsync(new McpRegistry
     {
       Servers = [_alpha, _gamma],
-      TargetFolders = place == null ? [] : [place],
+      TargetFolders = [.. place == null ? [] : new[] { place }, .. otherPlaces ?? []],
       Settings = new GlobalSettings { ScanRoots = [Root], CodexConfigPath = Path.Combine(_tmp, "global.toml") },
     });
     ConfigExportService diskExportService = new();

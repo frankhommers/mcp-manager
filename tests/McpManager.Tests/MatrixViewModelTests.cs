@@ -394,6 +394,53 @@ public class MatrixViewModelTests
   }
 
   [Fact]
+  public void Difference_that_deploy_replaces_is_marked_as_updated_on_deploy()
+  {
+    McpServer adopted = new() { Name = "adopted" };
+    McpServer managed = new() { Name = "managed" };
+    McpServer foreign = new() { Name = "foreign" };
+    List<McpServer> servers = [adopted, managed, foreign];
+    TargetFolderViewModel project = Place(servers, "P", TargetClientFlags.ClaudeCode, path: "/r/p");
+    project.Model.AdoptedServerNames.Add("adopted");
+    ScanServerMatch managedMatch = Match("/r/p", "managed", ScanMatchKind.Differs, managed);
+    DiskSnapshot disk = new(
+      [Folder("/r/p", TargetClientFlags.ClaudeCode)],
+      [
+        Match("/r/p", "adopted", ScanMatchKind.Differs, adopted),
+        managedMatch with { Found = managedMatch.Found with { ManagedId = managed.Id } },
+        Match("/r/p", "foreign", ScanMatchKind.Differs, foreign),
+      ],
+      []);
+
+    MatrixViewModel matrix = new([.. servers.Select(Server)], [project], project.Id, disk, ["/r"]);
+
+    Dictionary<string, MatrixCellViewModel> cells = matrix.Rows.ToDictionary(r => r.Server.Name, r => r.Cells.Single());
+    Assert.True(cells["adopted"].IsUpdatedOnDeploy);
+    Assert.True(cells["managed"].IsUpdatedOnDeploy);
+    Assert.False(cells["foreign"].IsUpdatedOnDeploy);
+    Assert.False(cells["adopted"].NeedsChoice);
+    Assert.True(cells["foreign"].NeedsChoice);
+  }
+
+  [Fact]
+  public void Difference_in_a_found_folder_always_needs_a_choice()
+  {
+    McpServer alpha = new() { Name = "alpha" };
+    ScanServerMatch match = Match("/r/found", "alpha", ScanMatchKind.Differs, alpha);
+    DiskSnapshot disk = new(
+      [Folder("/r/found", TargetClientFlags.ClaudeCode)],
+      [match with { Found = match.Found with { ManagedId = alpha.Id } }],
+      []);
+    MatrixViewModel matrix = new([Server(alpha)], [], null, disk, ["/r"]);
+
+    matrix.SelectedChoice = matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found);
+
+    MatrixCellViewModel cell = matrix.Rows.Single().Cells.Single();
+    Assert.False(cell.IsUpdatedOnDeploy);
+    Assert.True(cell.NeedsChoice);
+  }
+
+  [Fact]
   public void Existing_project_ignores_entries_of_harnesses_it_does_not_use()
   {
     McpServer alpha = new() { Name = "alpha" };

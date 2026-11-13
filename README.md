@@ -131,8 +131,13 @@ kept by a Save.
 
 Servers found in a project's configs that are not in the library appear as **Found in your configs, not in your
 library** rows. **+ Library** adds one to the library. An orange dot in a cell means the config on disk differs
-from the library; it opens a comparison dialog, where you choose **Keep library**, **Put this version in the
-library** or **Import as separate server**.
+from the library and you have not chosen yet; it opens a comparison dialog, where each choice says what it does:
+
+- **Keep library**: the library stays the same; on deploy the config gets the library version.
+- **Put this version in the library**: the library server changes, also for every other place that uses it.
+- **Import as separate server**: adds a copy named after the place; on deploy the entry in the config is renamed.
+
+A grey dot means the difference is settled: deploying writes the library version there.
 
 ### Save and Deploy
 

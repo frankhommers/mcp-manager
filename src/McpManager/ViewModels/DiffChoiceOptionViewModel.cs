@@ -7,13 +7,18 @@ public sealed class DiffChoiceOptionViewModel : ViewModelBase
 {
   private readonly DiffViewModel _owner;
 
-  public DiffChoiceOptionViewModel(DiffViewModel owner, DiffChoice choice)
+  public DiffChoiceOptionViewModel(DiffViewModel owner, DiffChoice choice, string description = "")
   {
     _owner = owner;
     Choice = choice;
+    Description = description;
   }
 
   public DiffChoice Choice { get; }
+
+  public string Description { get; }
+
+  public bool HasDescription => Description.Length > 0;
 
   public string Label => Choice switch
   {

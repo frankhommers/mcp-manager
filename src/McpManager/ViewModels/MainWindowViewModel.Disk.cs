@@ -184,12 +184,14 @@ public partial class MainWindowViewModel
     }
 
     string folderName = folder.IsGlobal ? "Global" : ProjectChoiceViewModel.FolderName(folder.Path);
+    SyncModels();
     DiffViewModel diff = new(
       "Library",
       "Found on disk",
       [match.Diff with { ServerName = $"{match.Found.Name} · {folderName}" }],
       [DiffChoice.KeepLibrary, DiffChoice.UseFoundVersion, DiffChoice.ImportSeparately],
-      (_, c) => c != DiffChoice.UseFoundVersion || match.CanUseFoundVersion);
+      (_, c) => c != DiffChoice.UseFoundVersion || match.CanUseFoundVersion,
+      DescribeChoices(match, folder, folderName));
     if (await PromptResolveDifferenceAsync(diff) is not { } choice)
     {
       return;
@@ -234,6 +236,46 @@ public partial class MainWindowViewModel
     ReloadAfterRegistryChange(place.IsGlobal ? CurrentProjectId() : place.Id, existing == null
       ? $"Added project {place.Name}. Save to keep it."
       : $"Updated {match.Found.Name}. Save to keep it.");
+  }
+
+  private Dictionary<DiffChoice, string> DescribeChoices(ScanServerMatch match, ScannedFolder folder, string folderName)
+  {
+    string name = match.Library?.Name ?? match.Found.Name;
+    string separate = ScanImportPlanner.SeparateServerName(folder, match.Found.Name);
+    int others = OtherPlacesUsing(match.Library?.Id, ScanImportPlanner.FindPlace(_registry!, folder)?.Id);
+    string useFound = others switch
+    {
+      0 => $"Changes {name} in your library to this version.",
+      1 => $"Changes {name} in your library, also for 1 other place that uses it. It gets this version on deploy.",
+      _ => $"Changes {name} in your library, also for {others} other places that use it. "
+        + "They get this version on deploy.",
+    };
+    return new Dictionary<DiffChoice, string>
+    {
+      [DiffChoice.KeepLibrary] =
+        $"Your library stays the same. On deploy, {folderName} gets the library version of {name}.",
+      [DiffChoice.UseFoundVersion] = useFound,
+      [DiffChoice.ImportSeparately] =
+        $"Adds {separate} to your library for {folderName}. "
+        + $"On deploy, {match.Found.Name} in its config is renamed to {separate}.",
+    };
+  }
+
+  private int OtherPlacesUsing(Guid? serverId, Guid? exceptPlaceId) =>
+    serverId is not { } id || _registry == null
+      ? 0
+      : _registry.TargetFolders.Count(p => p.Id != exceptPlaceId && UsesServer(p, id));
+
+  private bool UsesServer(TargetFolder place, Guid serverId)
+  {
+    try
+    {
+      return ProfileResolver.Resolve(place, _registry!.Profiles).EnabledServers.Contains(serverId);
+    }
+    catch (InvalidOperationException)
+    {
+      return place.EnabledServers.Contains(serverId);
+    }
   }
 
   [RelayCommand]

@@ -139,8 +139,7 @@ public partial class MatrixViewModel : ViewModelBase, IDisposable
       .OrderBy(s => s.ListName, StringComparer.CurrentCultureIgnoreCase))
     {
       Rows.Add(new MatrixRowViewModel(
-        server, Columns.Select((c, i) => new MatrixCellViewModel(CellFor(c, server), DifferenceFor(matches[i], server)))
-          .ToList()));
+        server, Columns.Select((c, i) => CellFor(c, server, DifferenceFor(matches[i], server))).ToList()));
     }
 
     RefreshUnknownRows(matches);
@@ -264,6 +263,12 @@ public partial class MatrixViewModel : ViewModelBase, IDisposable
 
   private ScannedFolder CandidateFolder(PlaceColumnViewModel candidate) =>
     _candidates.First(pair => pair.Value == candidate).Key;
+
+  private static MatrixCellViewModel CellFor(
+    PlaceColumnViewModel column, McpServerViewModel server, ScanServerMatch? difference) =>
+    new(CellFor(column, server), difference, difference != null && !column.IsCandidate
+      && (difference.Found.ManagedId == server.Id
+        || column.Place.Model.AdoptedServerNames.Contains(difference.Found.Name)));
 
   private static ScanServerMatch? DifferenceFor(IReadOnlyList<ScanServerMatch> matches, McpServerViewModel server) =>
     matches.FirstOrDefault(m => m.Kind == ScanMatchKind.Differs && m.Library?.Id == server.Id);

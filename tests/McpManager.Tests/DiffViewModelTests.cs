@@ -17,6 +17,18 @@ public class DiffViewModelTests
     choices);
 
   [Fact]
+  public void Options_carry_their_description()
+  {
+    DiffViewModel diff = new("Library", "Found on disk", [Server("s1")],
+      [DiffChoice.KeepLibrary, DiffChoice.ImportSeparately],
+      descriptions: new Dictionary<DiffChoice, string> { [DiffChoice.KeepLibrary] = "Stays the same." });
+
+    Assert.Equal("Stays the same.", diff.Options[0].Description);
+    Assert.True(diff.Options[0].HasDescription);
+    Assert.False(diff.Options[1].HasDescription);
+  }
+
+  [Fact]
   public void Secrets_masked_until_revealed()
   {
     ServerDiff server = Server(

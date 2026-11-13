@@ -13,7 +13,7 @@
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="12">
         <TextBlock Text="Differs from your library" FontSize="20" FontWeight="SemiBold" />
-        <TextBlock Text="Keep the library version, use the version found on disk, or import it as a separate server. Nothing is written until you save."
+        <TextBlock Text="Choose what should happen. Nothing is written to your configs until you save and deploy."
                    Opacity="0.75" TextWrapping="Wrap" />
         <views:DiffView x:Name="DiffHost" />
       </StackPanel>

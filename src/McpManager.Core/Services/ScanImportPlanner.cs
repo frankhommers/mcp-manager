@@ -74,7 +74,7 @@ public class ScanImportPlanner(IConfigImportService importService, IConfigExport
       {
         if (entry.Choice == ScanChoice.ImportSeparately)
         {
-          entry.Target.Name = $"{entry.Match.Found.Name}-{Slug(placeName)}";
+          entry.Target.Name = SeparateServerName(folder, entry.Match.Found.Name);
         }
 
         McpServer server = EnsureInLibrary(registry, entry.Target);
@@ -134,6 +134,9 @@ public class ScanImportPlanner(IConfigImportService importService, IConfigExport
 
     return server;
   }
+
+  public static string SeparateServerName(ScannedFolder folder, string serverName) =>
+    $"{serverName}-{Slug(PlaceName(folder))}";
 
   private static bool InRegistry(McpRegistry registry, McpServer server) =>
     registry.Servers.Any(s => s.Id == server.Id);

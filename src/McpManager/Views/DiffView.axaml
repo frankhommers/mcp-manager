@@ -96,12 +96,18 @@
     <ItemsControl Grid.Row="3" ItemsSource="{Binding Options}" IsVisible="{Binding HasChoices}">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate>
-          <StackPanel Orientation="Horizontal" Spacing="12" />
+          <StackPanel Spacing="8" />
         </ItemsPanelTemplate>
       </ItemsControl.ItemsPanel>
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="vm:DiffChoiceOptionViewModel">
-          <RadioButton Content="{Binding Label}" GroupName="DiffChoice" IsChecked="{Binding IsSelected}" />
+          <RadioButton GroupName="DiffChoice" IsChecked="{Binding IsSelected}">
+            <StackPanel Spacing="2">
+              <TextBlock Text="{Binding Label}" />
+              <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}"
+                         FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
+            </StackPanel>
+          </RadioButton>
         </DataTemplate>
       </ItemsControl.ItemTemplate>
     </ItemsControl>
