@@ -9,19 +9,23 @@
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         SizeToContent="Height">
-  <Grid Margin="24" RowDefinitions="*,Auto" RowSpacing="20">
+  <Grid Margin="24" RowDefinitions="*,Auto,Auto" RowSpacing="20">
     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
       <StackPanel Spacing="12">
         <TextBlock Text="Differs from your library" FontSize="20" FontWeight="SemiBold" />
-        <TextBlock Text="Choose what should happen. Nothing is written to your configs until you save and deploy."
+        <TextBlock Text="Choose what should happen. Green stays, red goes. Apply keeps your choice until you save; Apply &amp; deploy also writes this place's configs right away."
                    Opacity="0.75" TextWrapping="Wrap" />
         <views:DiffView x:Name="DiffHost" />
       </StackPanel>
     </ScrollViewer>
-    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+    <TextBlock Grid.Row="1" x:Name="DeployHint" IsVisible="False" Opacity="0.7" FontSize="12"
+               TextWrapping="Wrap" HorizontalAlignment="Right"
+               Text="Save or cancel your other changes first to deploy right away." />
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
       <Button Content="Cancel" IsCancel="True" Click="CancelButton_OnClick" />
-      <Button Content="Apply" Classes="primaryButton" IsEnabled="{Binding IsComplete}"
-              Click="ApplyButton_OnClick" />
+      <Button Content="Apply" IsEnabled="{Binding IsComplete}" Click="ApplyButton_OnClick" />
+      <Button x:Name="DeployButton" Content="Apply &amp; deploy" Classes="primaryButton"
+              Click="DeployButton_OnClick" />
     </StackPanel>
   </Grid>
 </Window>

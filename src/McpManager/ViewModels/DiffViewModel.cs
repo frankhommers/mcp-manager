@@ -12,6 +12,7 @@ public partial class DiffViewModel : ViewModelBase
   private readonly IReadOnlyList<DiffChoice> _choices;
   private readonly Func<int, DiffChoice, bool>? _isAvailable;
   private readonly IReadOnlyDictionary<DiffChoice, string> _descriptions;
+  private readonly IReadOnlyDictionary<DiffChoice, DiffSide> _keptSides;
   private readonly DiffChoice?[] _selected;
   private int _index;
 
@@ -21,7 +22,8 @@ public partial class DiffViewModel : ViewModelBase
     IReadOnlyList<ServerDiff> items,
     IReadOnlyList<DiffChoice> choices,
     Func<int, DiffChoice, bool>? isAvailable = null,
-    IReadOnlyDictionary<DiffChoice, string>? descriptions = null)
+    IReadOnlyDictionary<DiffChoice, string>? descriptions = null,
+    IReadOnlyDictionary<DiffChoice, DiffSide>? keptSides = null)
   {
     LeftLabel = leftLabel;
     RightLabel = rightLabel;
@@ -29,6 +31,7 @@ public partial class DiffViewModel : ViewModelBase
     _choices = choices;
     _isAvailable = isAvailable;
     _descriptions = descriptions ?? new Dictionary<DiffChoice, string>();
+    _keptSides = keptSides ?? new Dictionary<DiffChoice, DiffSide>();
     _selected = new DiffChoice?[items.Count];
     Options = BuildOptions();
     Fields = BuildFields();
@@ -60,6 +63,10 @@ public partial class DiffViewModel : ViewModelBase
 
   public bool IsComplete => !HasChoices || _selected.All(c => c.HasValue);
 
+  public DiffSide? KeptSide => !HasChoices
+    ? DiffSide.Right
+    : SelectedChoice is { } choice && _keptSides.TryGetValue(choice, out DiffSide side) ? side : null;
+
   public DiffChoice? SelectedChoice
   {
     get => Current == null ? null : _selected[_index];
@@ -74,6 +81,12 @@ public partial class DiffViewModel : ViewModelBase
       OnPropertyChanged();
       OnPropertyChanged(nameof(IsComplete));
       OnPropertyChanged(nameof(Choices));
+      OnPropertyChanged(nameof(KeptSide));
+      foreach (FieldDiffViewModel fieldDiff in Fields)
+      {
+        fieldDiff.KeptSide = KeptSide;
+      }
+
       RefreshOptions();
     }
   }
@@ -95,6 +108,7 @@ public partial class DiffViewModel : ViewModelBase
     OnPropertyChanged(nameof(Options));
     OnPropertyChanged(nameof(Position));
     OnPropertyChanged(nameof(SelectedChoice));
+    OnPropertyChanged(nameof(KeptSide));
     RefreshOptions();
     OnPropertyChanged(nameof(CanGoNext));
     OnPropertyChanged(nameof(CanGoPrevious));
@@ -116,5 +130,5 @@ public partial class DiffViewModel : ViewModelBase
     [.. _choices.Where(c => IsAvailable(_index, c)).Select(c => new DiffChoiceOptionViewModel(this, c, _descriptions.GetValueOrDefault(c, string.Empty)))];
 
   private List<FieldDiffViewModel> BuildFields() =>
-    Current == null ? [] : [.. Current.Fields.Select(f => new FieldDiffViewModel(f))];
+    Current == null ? [] : [.. Current.Fields.Select(f => new FieldDiffViewModel(f, KeptSide))];
 }

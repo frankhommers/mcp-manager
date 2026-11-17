@@ -1,4 +1,5 @@
 using McpManager.Core.Models;
+using McpManager.Core.Services;
 using McpManager.ViewModels;
 
 namespace McpManager.Tests;
@@ -20,8 +21,8 @@ public class DiffViewModelTests
   public void Options_carry_their_description()
   {
     DiffViewModel diff = new("Library", "Found on disk", [Server("s1")],
-      [DiffChoice.KeepLibrary, DiffChoice.ImportSeparately],
-      descriptions: new Dictionary<DiffChoice, string> { [DiffChoice.KeepLibrary] = "Stays the same." });
+      [DiffChoice.UseLibraryVersion, DiffChoice.ImportSeparately],
+      descriptions: new Dictionary<DiffChoice, string> { [DiffChoice.UseLibraryVersion] = "Stays the same." });
 
     Assert.Equal("Stays the same.", diff.Options[0].Description);
     Assert.True(diff.Options[0].HasDescription);
@@ -62,7 +63,7 @@ public class DiffViewModelTests
 
     FieldDiffViewModel args = diff.Fields[1];
     Assert.Equal("--token=••••••••9999\nrun", args.LeftText);
-    Assert.True(args.LeftTokens[0].IsRemoved);
+    Assert.True(args.LeftTokens[0].IsDropped);
     Assert.True(args.LeftTokens[1].IsSame);
     args.ToggleRevealCommand.Execute(null);
     Assert.Equal("--token=secretvalue9999\nrun", args.LeftText);
@@ -150,17 +151,17 @@ public class DiffViewModelTests
   [Fact]
   public void Cannot_complete_until_every_item_has_choice()
   {
-    DiffViewModel diff = Create(2, DiffChoice.KeepLibrary, DiffChoice.UseFoundVersion);
+    DiffViewModel diff = Create(2, DiffChoice.UseLibraryVersion, DiffChoice.UseFoundVersion);
 
     Assert.False(diff.IsComplete);
-    diff.SelectedChoice = DiffChoice.KeepLibrary;
+    diff.SelectedChoice = DiffChoice.UseLibraryVersion;
     Assert.False(diff.IsComplete);
 
     diff.NextCommand.Execute(null);
     diff.SelectedChoice = DiffChoice.UseFoundVersion;
 
     Assert.True(diff.IsComplete);
-    Assert.Equal([DiffChoice.KeepLibrary, DiffChoice.UseFoundVersion], diff.Choices);
+    Assert.Equal([DiffChoice.UseLibraryVersion, DiffChoice.UseFoundVersion], diff.Choices);
   }
 
   [Fact]
@@ -170,13 +171,13 @@ public class DiffViewModelTests
       "Library",
       "Found",
       [Server("s1"), Server("s2")],
-      [DiffChoice.KeepLibrary, DiffChoice.UseFoundVersion, DiffChoice.ImportSeparately],
+      [DiffChoice.UseLibraryVersion, DiffChoice.UseFoundVersion, DiffChoice.ImportSeparately],
       (index, choice) => index == 0 || choice != DiffChoice.UseFoundVersion);
 
     Assert.Equal(3, diff.Options.Count);
     diff.NextCommand.Execute(null);
 
-    Assert.Equal([DiffChoice.KeepLibrary, DiffChoice.ImportSeparately], diff.Options.Select(o => o.Choice));
+    Assert.Equal([DiffChoice.UseLibraryVersion, DiffChoice.ImportSeparately], diff.Options.Select(o => o.Choice));
     diff.SelectedChoice = DiffChoice.UseFoundVersion;
     Assert.Null(diff.SelectedChoice);
   }
@@ -184,7 +185,7 @@ public class DiffViewModelTests
   [Fact]
   public void Navigation_keeps_choice_per_item()
   {
-    DiffViewModel diff = Create(3, DiffChoice.KeepLibrary, DiffChoice.UseFoundVersion);
+    DiffViewModel diff = Create(3, DiffChoice.UseLibraryVersion, DiffChoice.UseFoundVersion);
 
     Assert.Equal("1 of 3", diff.Position);
     Assert.False(diff.PreviousCommand.CanExecute(null));
@@ -194,7 +195,7 @@ public class DiffViewModelTests
     Assert.Equal("2 of 3", diff.Position);
     Assert.Equal("s2", diff.Current!.ServerName);
     Assert.Null(diff.SelectedChoice);
-    diff.SelectedChoice = DiffChoice.KeepLibrary;
+    diff.SelectedChoice = DiffChoice.UseLibraryVersion;
 
     diff.NextCommand.Execute(null);
     Assert.False(diff.CanGoNext);
@@ -220,5 +221,49 @@ public class DiffViewModelTests
     Assert.False(empty.HasTitle);
     Assert.Equal("", empty.Position);
     Assert.Empty(empty.Fields);
+  }
+
+  [Fact]
+  public void Chosen_side_is_green_and_the_other_side_is_red()
+  {
+    ServerDiff item = ServerDiffService.Compare(
+      new McpServer { Name = "x", Command = "npx", Args = ["a@latest"] },
+      new McpServer { Name = "x", Command = "npx", Args = ["a@1.0"] });
+    DiffViewModel diff = new("Library", "Found on disk", [item],
+      [DiffChoice.UseLibraryVersion, DiffChoice.UseFoundVersion, DiffChoice.ImportSeparately],
+      keptSides: new Dictionary<DiffChoice, DiffSide>
+      {
+        [DiffChoice.UseLibraryVersion] = DiffSide.Left,
+        [DiffChoice.UseFoundVersion] = DiffSide.Right,
+        [DiffChoice.ImportSeparately] = DiffSide.Both,
+      });
+    FieldDiffViewModel args = diff.Fields.Single(f => f.Field == ServerDiffService.ArgsField);
+
+    Assert.True(args.LeftTokens.Single().IsPending);
+    Assert.True(args.RightTokens.Single().IsPending);
+
+    diff.SelectedChoice = DiffChoice.UseLibraryVersion;
+    Assert.True(args.LeftTokens.Single().IsKept);
+    Assert.True(args.RightTokens.Single().IsDropped);
+
+    diff.SelectedChoice = DiffChoice.UseFoundVersion;
+    Assert.True(args.LeftTokens.Single().IsDropped);
+    Assert.True(args.RightTokens.Single().IsKept);
+
+    diff.SelectedChoice = DiffChoice.ImportSeparately;
+    Assert.True(args.LeftTokens.Single().IsKept);
+    Assert.True(args.RightTokens.Single().IsKept);
+  }
+
+  [Fact]
+  public void Without_choices_the_right_side_is_what_stays()
+  {
+    ServerDiff item = ServerDiffService.Compare(
+      new McpServer { Name = "x", Command = "old" }, new McpServer { Name = "x", Command = "new" });
+    FieldDiffViewModel command = new DiffViewModel("In file", "MCP Manager will write", [item], [])
+      .Fields.Single(f => f.Field == ServerDiffService.CommandField);
+
+    Assert.True(command.LeftTokens.Single().IsDropped);
+    Assert.True(command.RightTokens.Single().IsKept);
   }
 }

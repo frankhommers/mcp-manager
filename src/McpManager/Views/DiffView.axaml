@@ -23,15 +23,20 @@
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="Padding" Value="4,1" />
       <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
-    <Style Selector="Border.token.added">
+    <Style Selector="Border.token.kept">
       <Setter Property="Background" Value="{DynamicResource NotificationCardSuccessBackgroundBrush}" />
     </Style>
-    <Style Selector="Border.token.removed">
+    <Style Selector="Border.token.dropped">
       <Setter Property="Background" Value="{DynamicResource NotificationCardErrorBackgroundBrush}" />
     </Style>
-    <Style Selector="Border.token.removed TextBlock">
+    <Style Selector="Border.token.dropped TextBlock">
       <Setter Property="TextDecorations" Value="Strikethrough" />
+    </Style>
+    <Style Selector="Border.token.pending">
+      <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
     </Style>
     <Style Selector="TextBlock.tokenText">
       <Setter Property="FontFamily" Value="monospace" />
@@ -69,8 +74,8 @@
                 <ItemsControl Grid.Column="1" ItemsSource="{Binding LeftTokens}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:DiffTokenViewModel">
-                      <Border Classes="token" Classes.added="{Binding IsAdded}"
-                              Classes.removed="{Binding IsRemoved}">
+                      <Border Classes="token" Classes.kept="{Binding IsKept}"
+                              Classes.dropped="{Binding IsDropped}" Classes.pending="{Binding IsPending}">
                         <TextBlock Classes="tokenText" Text="{Binding DisplayText}" />
                       </Border>
                     </DataTemplate>
@@ -79,8 +84,8 @@
                 <ItemsControl Grid.Column="2" ItemsSource="{Binding RightTokens}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:DiffTokenViewModel">
-                      <Border Classes="token" Classes.added="{Binding IsAdded}"
-                              Classes.removed="{Binding IsRemoved}">
+                      <Border Classes="token" Classes.kept="{Binding IsKept}"
+                              Classes.dropped="{Binding IsDropped}" Classes.pending="{Binding IsPending}">
                         <TextBlock Classes="tokenText" Text="{Binding DisplayText}" />
                       </Border>
                     </DataTemplate>

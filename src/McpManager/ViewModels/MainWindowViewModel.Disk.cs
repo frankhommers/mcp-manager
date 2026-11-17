@@ -24,8 +24,15 @@ public partial class MainWindowViewModel
   private HashSet<string> _shownProblems = [];
   private string? _problemsStatus;
 
-  public Func<DiffViewModel, Task<DiffChoice?>> PromptResolveDifferenceAsync { get; set; } =
+  public Func<DiffViewModel, bool, Task<DifferenceResolution?>> PromptResolveDifferenceAsync { get; set; } =
     ShowResolveDifferenceDialogAsync;
+
+  private static readonly Dictionary<DiffChoice, DiffSide> DifferenceKeptSides = new()
+  {
+    [DiffChoice.UseLibraryVersion] = DiffSide.Left,
+    [DiffChoice.UseFoundVersion] = DiffSide.Right,
+    [DiffChoice.ImportSeparately] = DiffSide.Both,
+  };
 
   internal Task PendingDiskWork { get; private set; } = Task.CompletedTask;
 
@@ -185,19 +192,22 @@ public partial class MainWindowViewModel
 
     string folderName = folder.IsGlobal ? "Global" : ProjectChoiceViewModel.FolderName(folder.Path);
     SyncModels();
+    CheckTargets();
+    bool canDeploy = !IsDirty;
     DiffViewModel diff = new(
       "Library",
       "Found on disk",
       [match.Diff with { ServerName = $"{match.Found.Name} · {folderName}" }],
-      [DiffChoice.KeepLibrary, DiffChoice.UseFoundVersion, DiffChoice.ImportSeparately],
+      [DiffChoice.UseLibraryVersion, DiffChoice.UseFoundVersion, DiffChoice.ImportSeparately],
       (_, c) => c != DiffChoice.UseFoundVersion || match.CanUseFoundVersion,
-      DescribeChoices(match, folder, folderName));
-    if (await PromptResolveDifferenceAsync(diff) is not { } choice)
+      DescribeChoices(match, folder, folderName),
+      DifferenceKeptSides);
+    if (await PromptResolveDifferenceAsync(diff, canDeploy) is not { } resolution)
     {
       return;
     }
 
-    ScanChoice scanChoice = ToScanChoice(choice);
+    ScanChoice scanChoice = ToScanChoice(resolution.Choice);
     SyncModels();
     TargetFolder? existing = ScanImportPlanner.FindPlace(_registry, folder);
     ScannedFolder applied = existing == null
@@ -236,6 +246,29 @@ public partial class MainWindowViewModel
     ReloadAfterRegistryChange(place.IsGlobal ? CurrentProjectId() : place.Id, existing == null
       ? $"Added project {place.Name}. Save to keep it."
       : $"Updated {match.Found.Name}. Save to keep it.");
+    if (resolution.Deploy && canDeploy)
+    {
+      await SaveAndDeployPlaceAsync(place.Id);
+    }
+  }
+
+  private async Task SaveAndDeployPlaceAsync(Guid placeId)
+  {
+    AlsoDeploy = false;
+    await SaveAsync();
+    CheckTargets();
+    if (IsDirty || ManagedTargets.FirstOrDefault(t => t.Id == placeId) is not { } place)
+    {
+      return;
+    }
+
+    if (await UpdateTargetsAsync([place], overwriteExternal: true))
+    {
+      StatusMessage = $"Saved and deployed {place.Name}.";
+    }
+
+    CheckTargets();
+    _ = ReloadDiskAsync();
   }
 
   private Dictionary<DiffChoice, string> DescribeChoices(ScanServerMatch match, ScannedFolder folder, string folderName)
@@ -252,8 +285,8 @@ public partial class MainWindowViewModel
     };
     return new Dictionary<DiffChoice, string>
     {
-      [DiffChoice.KeepLibrary] =
-        $"Your library stays the same. On deploy, {folderName} gets the library version of {name}.",
+      [DiffChoice.UseLibraryVersion] =
+        $"{folderName} gets your library version of {name}. The version on disk is replaced on deploy.",
       [DiffChoice.UseFoundVersion] = useFound,
       [DiffChoice.ImportSeparately] =
         $"Adds {separate} to your library for {folderName}. "
@@ -431,15 +464,17 @@ public partial class MainWindowViewModel
 
   private Guid? CurrentProjectId() => Matrix.SelectedChoice?.Column?.Place.Id;
 
-  private static async Task<DiffChoice?> ShowResolveDifferenceDialogAsync(DiffViewModel diff)
+  private static async Task<DifferenceResolution?> ShowResolveDifferenceDialogAsync(DiffViewModel diff, bool canDeploy)
   {
     Window? window = GetMainWindow();
-    return window == null ? null : await new Views.ResolveDifferenceDialog(diff).ShowDialog<DiffChoice?>(window);
+    return window == null
+      ? null
+      : await new Views.ResolveDifferenceDialog(diff, canDeploy).ShowDialog<DifferenceResolution?>(window);
   }
 
   private static ScanChoice ToScanChoice(DiffChoice choice) => choice switch
   {
-    DiffChoice.KeepLibrary => ScanChoice.KeepLibrary,
+    DiffChoice.UseLibraryVersion => ScanChoice.KeepLibrary,
     DiffChoice.UseFoundVersion => ScanChoice.UseFoundVersion,
     DiffChoice.ImportSeparately => ScanChoice.ImportSeparately,
     _ => throw new ArgumentOutOfRangeException(nameof(choice), choice, null),

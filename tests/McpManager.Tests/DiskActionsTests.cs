@@ -128,10 +128,10 @@ public class DiskActionsTests : IDisposable
     MatrixCellViewModel cell = vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1];
     Assert.True(cell.HasDifference);
     DiffViewModel? shown = null;
-    vm.PromptResolveDifferenceAsync = diff =>
+    vm.PromptResolveDifferenceAsync = (diff, _) =>
     {
       shown = diff;
-      return Task.FromResult<DiffChoice?>(DiffChoice.UseFoundVersion);
+      return Task.FromResult<DifferenceResolution?>(new(DiffChoice.UseFoundVersion, false));
     };
 
     await vm.ResolveDifferenceCommand.ExecuteAsync(cell);
@@ -152,7 +152,7 @@ public class DiskActionsTests : IDisposable
     WriteApp("""{ "mcpServers": { "alpha": { "command": "deno" } } }""");
     MainWindowViewModel vm = await CreateAsync();
     vm.Matrix.SelectedChoice = vm.Matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found);
-    vm.PromptResolveDifferenceAsync = _ => Task.FromResult<DiffChoice?>(DiffChoice.UseFoundVersion);
+    vm.PromptResolveDifferenceAsync = (_, _) => Task.FromResult<DifferenceResolution?>(new(DiffChoice.UseFoundVersion, false));
     await vm.ResolveDifferenceCommand.ExecuteAsync(vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
     await vm.PendingDiskWork;
 
@@ -199,7 +199,7 @@ public class DiskActionsTests : IDisposable
     MainWindowViewModel vm = await CreateAsync();
     vm.Matrix.SelectedChoice = vm.Matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found);
     int places = vm.TargetFolders.Count;
-    vm.PromptResolveDifferenceAsync = _ => Task.FromResult<DiffChoice?>(DiffChoice.UseFoundVersion);
+    vm.PromptResolveDifferenceAsync = (_, _) => Task.FromResult<DifferenceResolution?>(new(DiffChoice.UseFoundVersion, false));
 
     await vm.ResolveDifferenceCommand.ExecuteAsync(
       vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
@@ -223,7 +223,7 @@ public class DiskActionsTests : IDisposable
     MainWindowViewModel vm = await CreateAsync(place: project);
     Assert.Equal(project.Id, vm.Matrix.SelectedChoice?.Column?.Place.Id);
     Assert.Empty(vm.Matrix.UnknownRows);
-    vm.PromptResolveDifferenceAsync = _ => Task.FromResult<DiffChoice?>(DiffChoice.KeepLibrary);
+    vm.PromptResolveDifferenceAsync = (_, _) => Task.FromResult<DifferenceResolution?>(new(DiffChoice.UseLibraryVersion, false));
 
     await vm.ResolveDifferenceCommand.ExecuteAsync(
       vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
@@ -242,7 +242,7 @@ public class DiskActionsTests : IDisposable
     TargetFolder project = new() { Name = "app", Path = App, EnabledClients = TargetClientFlags.ClaudeCode };
     MainWindowViewModel vm = await CreateAsync(place: project);
     Assert.True(vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1].NeedsChoice);
-    vm.PromptResolveDifferenceAsync = _ => Task.FromResult<DiffChoice?>(DiffChoice.KeepLibrary);
+    vm.PromptResolveDifferenceAsync = (_, _) => Task.FromResult<DifferenceResolution?>(new(DiffChoice.UseLibraryVersion, false));
 
     await vm.ResolveDifferenceCommand.ExecuteAsync(
       vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
@@ -251,6 +251,80 @@ public class DiskActionsTests : IDisposable
     MatrixCellViewModel cell = vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1];
     Assert.True(cell.IsUpdatedOnDeploy);
     Assert.False(cell.NeedsChoice);
+  }
+
+  [Theory]
+  [InlineData(false)]
+  [InlineData(true)]
+  public async Task Keeping_the_library_and_deploying_writes_the_library_version(bool enabled)
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "deno" } } }""");
+    TargetFolder project = new() { Name = "app", Path = App, EnabledClients = TargetClientFlags.ClaudeCode };
+    if (enabled)
+    {
+      project.EnabledServers.Add(_alpha.Id);
+    }
+
+    MainWindowViewModel vm = await CreateAsync(place: project);
+    vm.PromptResolveDifferenceAsync = (_, _) => Task.FromResult<DifferenceResolution?>(new(DiffChoice.UseLibraryVersion, false));
+
+    await vm.ResolveDifferenceCommand.ExecuteAsync(
+      vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
+    await vm.PendingDiskWork;
+    vm.CheckTargetsCommand.Execute(null);
+
+    Assert.True(vm.CanAlsoDeploy, $"dirty={vm.IsDirty} files={vm.ChangedFileCount} status={vm.StatusMessage}");
+    vm.AlsoDeploy = true;
+    await vm.SaveCommand.ExecuteAsync(null);
+
+    Assert.Contains("\"node\"", await File.ReadAllTextAsync(Path.Combine(App, ".mcp.json")));
+  }
+
+  [Fact]
+  public async Task Apply_and_deploy_writes_the_library_version_right_away()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "deno" } } }""");
+    TargetFolder project = new() { Name = "app", Path = App, EnabledClients = TargetClientFlags.ClaudeCode };
+    MainWindowViewModel vm = await CreateAsync(place: project);
+    bool? offered = null;
+    vm.PromptResolveDifferenceAsync = (_, canDeploy) =>
+    {
+      offered = canDeploy;
+      return Task.FromResult<DifferenceResolution?>(new(DiffChoice.UseLibraryVersion, true));
+    };
+
+    await vm.ResolveDifferenceCommand.ExecuteAsync(
+      vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
+    await vm.PendingDiskWork;
+
+    Assert.True(offered);
+    Assert.False(vm.IsDirty);
+    Assert.Contains("\"node\"", await File.ReadAllTextAsync(Path.Combine(App, ".mcp.json")));
+    Assert.Equal("Saved and deployed app.", vm.StatusMessage);
+    Assert.False(vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1].HasDifference);
+  }
+
+  [Fact]
+  public async Task Apply_and_deploy_is_not_offered_with_other_unsaved_changes()
+  {
+    WriteApp("""{ "mcpServers": { "alpha": { "command": "deno" } } }""");
+    TargetFolder project = new() { Name = "app", Path = App, EnabledClients = TargetClientFlags.ClaudeCode };
+    MainWindowViewModel vm = await CreateAsync(place: project);
+    vm.Servers.Single(s => s.Id == _gamma.Id).Command = "changed";
+    bool? offered = null;
+    vm.PromptResolveDifferenceAsync = (_, canDeploy) =>
+    {
+      offered = canDeploy;
+      return Task.FromResult<DifferenceResolution?>(new(DiffChoice.UseLibraryVersion, true));
+    };
+
+    await vm.ResolveDifferenceCommand.ExecuteAsync(
+      vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
+    await vm.PendingDiskWork;
+
+    Assert.False(offered);
+    Assert.True(vm.IsDirty);
+    Assert.Contains("deno", await File.ReadAllTextAsync(Path.Combine(App, ".mcp.json")));
   }
 
   [Fact]
@@ -267,17 +341,17 @@ public class DiskActionsTests : IDisposable
     MainWindowViewModel vm = await CreateAsync(place: project, otherPlaces: [other]);
     vm.Matrix.SelectedChoice = vm.Matrix.Choices.Single(c => c.Column?.Place.Id == project.Id);
     DiffViewModel? shown = null;
-    vm.PromptResolveDifferenceAsync = diff =>
+    vm.PromptResolveDifferenceAsync = (diff, _) =>
     {
       shown = diff;
-      return Task.FromResult<DiffChoice?>(null);
+      return Task.FromResult<DifferenceResolution?>(null);
     };
 
     await vm.ResolveDifferenceCommand.ExecuteAsync(vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);
 
     Dictionary<DiffChoice, string> texts = shown!.Options.ToDictionary(o => o.Choice, o => o.Description);
-    Assert.Equal("Your library stays the same. On deploy, app gets the library version of alpha.",
-      texts[DiffChoice.KeepLibrary]);
+    Assert.Equal("app gets your library version of alpha. The version on disk is replaced on deploy.",
+      texts[DiffChoice.UseLibraryVersion]);
     Assert.Equal("Changes alpha in your library, also for 1 other place that uses it. "
       + "It gets this version on deploy.", texts[DiffChoice.UseFoundVersion]);
     Assert.Equal("Adds alpha-app to your library for app. On deploy, alpha in its config is renamed to alpha-app.",
@@ -291,10 +365,10 @@ public class DiskActionsTests : IDisposable
     MainWindowViewModel vm = await CreateAsync();
     vm.Matrix.SelectedChoice = vm.Matrix.Choices.Single(c => c.Kind == ProjectChoiceKind.Found);
     DiffViewModel? shown = null;
-    vm.PromptResolveDifferenceAsync = diff =>
+    vm.PromptResolveDifferenceAsync = (diff, _) =>
     {
       shown = diff;
-      return Task.FromResult<DiffChoice?>(null);
+      return Task.FromResult<DifferenceResolution?>(null);
     };
 
     await vm.ResolveDifferenceCommand.ExecuteAsync(vm.Matrix.Rows.Single(r => r.Server.Id == _alpha.Id).Cells[^1]);

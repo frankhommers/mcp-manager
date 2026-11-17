@@ -7,9 +7,13 @@ public sealed class DiffTokenViewModel
 {
   private readonly DiffToken _token;
 
-  public DiffTokenViewModel(DiffToken token, bool isRevealed, bool splitNamedValue = false, bool wholeValue = false)
+  private readonly bool? _isKept;
+
+  public DiffTokenViewModel(
+    DiffToken token, bool isRevealed, bool splitNamedValue = false, bool wholeValue = false, bool? isKept = null)
   {
     _token = token;
+    _isKept = isKept;
     DisplayText = isRevealed || !token.IsSecret ? token.Text : MaskText(token.Text, splitNamedValue, wholeValue);
   }
 
@@ -17,11 +21,13 @@ public sealed class DiffTokenViewModel
 
   public DiffKind Kind => _token.Kind;
 
-  public bool IsAdded => _token.Kind == DiffKind.Added;
-
-  public bool IsRemoved => _token.Kind == DiffKind.Removed;
-
   public bool IsSame => _token.Kind == DiffKind.Same;
+
+  public bool IsKept => !IsSame && _isKept == true;
+
+  public bool IsDropped => !IsSame && _isKept == false;
+
+  public bool IsPending => !IsSame && _isKept == null;
 
   private static string MaskText(string text, bool splitNamedValue, bool wholeValue)
   {

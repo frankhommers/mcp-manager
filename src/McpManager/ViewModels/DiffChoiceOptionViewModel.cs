@@ -22,7 +22,7 @@ public sealed class DiffChoiceOptionViewModel : ViewModelBase
 
   public string Label => Choice switch
   {
-    DiffChoice.KeepLibrary => "Keep library",
+    DiffChoice.UseLibraryVersion => "Override with library version",
     DiffChoice.UseFoundVersion => "Put this version in the library",
     DiffChoice.ImportSeparately => "Import as separate server",
     DiffChoice.Replace => "Replace with MCP Manager",

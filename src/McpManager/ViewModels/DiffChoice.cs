@@ -2,7 +2,7 @@ namespace McpManager.ViewModels;
 
 public enum DiffChoice
 {
-  KeepLibrary,
+  UseLibraryVersion,
   UseFoundVersion,
   ImportSeparately,
   Replace,

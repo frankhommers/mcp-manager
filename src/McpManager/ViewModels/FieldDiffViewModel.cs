@@ -17,9 +17,14 @@ public partial class FieldDiffViewModel : ViewModelBase
   [NotifyPropertyChangedFor(nameof(RevealLabel))]
   private bool _isRevealed;
 
-  public FieldDiffViewModel(FieldDiff diff)
+  [ObservableProperty]
+  [NotifyPropertyChangedFor(nameof(LeftTokens), nameof(RightTokens))]
+  private DiffSide? _keptSide;
+
+  public FieldDiffViewModel(FieldDiff diff, DiffSide? keptSide = DiffSide.Right)
   {
     _diff = diff;
+    _keptSide = keptSide;
   }
 
   public string Field => _diff.Field;
@@ -37,9 +42,9 @@ public partial class FieldDiffViewModel : ViewModelBase
 
   public string RevealLabel => IsRevealed ? "Hide" : "Show";
 
-  public IReadOnlyList<DiffTokenViewModel> LeftTokens => Build(_diff.Left);
+  public IReadOnlyList<DiffTokenViewModel> LeftTokens => Build(_diff.Left, IsKept(DiffSide.Left));
 
-  public IReadOnlyList<DiffTokenViewModel> RightTokens => Build(_diff.Right);
+  public IReadOnlyList<DiffTokenViewModel> RightTokens => Build(_diff.Right, IsKept(DiffSide.Right));
 
   public string LeftText => Join(LeftTokens);
 
@@ -48,8 +53,13 @@ public partial class FieldDiffViewModel : ViewModelBase
   [RelayCommand]
   private void ToggleReveal() => IsRevealed = !IsRevealed;
 
-  private List<DiffTokenViewModel> Build(IReadOnlyList<DiffToken> tokens) =>
-    [.. tokens.Select(t => new DiffTokenViewModel(t, IsRevealed, _diff.Field == ServerDiffService.ArgsField, HasSecretKey))];
+  private bool? IsKept(DiffSide side) => KeptSide is { } kept ? kept == side || kept == DiffSide.Both : null;
+
+  private List<DiffTokenViewModel> Build(IReadOnlyList<DiffToken> tokens, bool? isKept) =>
+  [
+    .. tokens.Select(t => new DiffTokenViewModel(
+      t, IsRevealed, _diff.Field == ServerDiffService.ArgsField, HasSecretKey, isKept)),
+  ];
 
   private bool HasSecretKey => Label != _diff.Field && SecretMask.IsSecretKey(Label);
 
