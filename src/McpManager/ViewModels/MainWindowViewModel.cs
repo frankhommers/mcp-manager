@@ -619,7 +619,7 @@ public partial class MainWindowViewModel : ViewModelBase
       return;
     }
 
-    string? text = await clipboard.GetTextAsync();
+    string? text = await clipboard.TryGetTextAsync();
     if (string.IsNullOrWhiteSpace(text))
     {
       StatusMessage = "Clipboard is empty";
@@ -680,7 +680,7 @@ public partial class MainWindowViewModel : ViewModelBase
       return;
     }
 
-    string? text = await clipboard.GetTextAsync();
+    string? text = await clipboard.TryGetTextAsync();
     if (string.IsNullOrWhiteSpace(text))
     {
       StatusMessage = "Clipboard is empty";

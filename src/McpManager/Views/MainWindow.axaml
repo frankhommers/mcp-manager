@@ -20,7 +20,7 @@
       <DataTemplate x:Key="SelectionEditor" x:DataType="vm:TargetFolderViewModel">
         <StackPanel Spacing="12">                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                             <TextBox Text="{Binding ServerSearchText}"
-                                                     Watermark="Search by name or group…"
+                                                     PlaceholderText="Search by name or group…"
                                                      AutomationProperties.Name="Search servers"
                                                      Classes="formField" />
                                             <Button Grid.Column="1" Content="Clear"
@@ -109,7 +109,7 @@
                                                                         <TextBlock Text="{Binding ToolFetchStatus}" IsVisible="{Binding HasToolFetchStatus}"
                                                                                    TextWrapping="Wrap" FontSize="12" Opacity="0.75" />
                                                                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding HasToolOverrides}">
-                                                                            <TextBox Text="{Binding ToolSearchText}" Watermark="Search tools…"
+                                                                            <TextBox Text="{Binding ToolSearchText}" PlaceholderText="Search tools…"
                                                                                      AutomationProperties.Name="{Binding ServerName, StringFormat='Search tools for {0}'}"
                                                                                      Classes="formField" />
                                                                             <Button Grid.Column="1" Content="Clear" Command="{Binding ClearToolSearchCommand}"
@@ -798,27 +798,27 @@
                                                        VerticalAlignment="Center" />
                                             <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding BridgeCommandHttp}"
                                                      Classes="formField"
-                                                     Watermark="mcp-proxy {args} {headerArgs} {url}" />
+                                                     PlaceholderText="mcp-proxy {args} {headerArgs} {url}" />
 
                                             <TextBlock Grid.Row="1" Grid.Column="0" Text="SSE" Opacity="0.75"
                                                        VerticalAlignment="Center" Margin="0,8,0,0" />
                                             <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding BridgeCommandSse}"
                                                      Classes="formField" Margin="0,8,0,0"
-                                                     Watermark="mcp-proxy {args} {headerArgs} {url}" />
+                                                     PlaceholderText="mcp-proxy {args} {headerArgs} {url}" />
 
                                             <TextBlock Grid.Row="2" Grid.Column="0" Text="Streamable HTTP"
                                                        Opacity="0.75" VerticalAlignment="Center" Margin="0,8,0,0" />
                                             <TextBox Grid.Row="2" Grid.Column="1"
                                                      Text="{Binding BridgeCommandStreamableHttp}" Classes="formField"
                                                      Margin="0,8,0,0"
-                                                     Watermark="mcp-proxy {args} {headerArgs} --transport streamablehttp {url}" />
+                                                     PlaceholderText="mcp-proxy {args} {headerArgs} --transport streamablehttp {url}" />
 
                                             <TextBlock Grid.Row="3" Grid.Column="0" Text="Header arguments"
                                                        Opacity="0.75" VerticalAlignment="Center" Margin="0,8,0,0" />
                                             <TextBox Grid.Row="3" Grid.Column="1"
                                                      Text="{Binding BridgeHeaderArgumentTemplate}"
                                                      Classes="formField" Margin="0,8,0,0"
-                                                     Watermark="--headers {key} {value}" />
+                                                     PlaceholderText="--headers {key} {value}" />
                                         </Grid>
 
                                         <Border Classes="secondaryPanel">
@@ -962,7 +962,7 @@
                                                        VerticalAlignment="Center" Margin="0,8,0,0" />
                                             <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedServer.Group}"
                                                      Classes="formField" Margin="0,8,0,0"
-                                                     Watermark="e.g., Development, AI Tools, Production" />
+                                                     PlaceholderText="e.g., Development, AI Tools, Production" />
                                         </Grid>
                                     </StackPanel>
                                 </Border>
@@ -1009,7 +1009,7 @@
                                                   IsVisible="{Binding SelectedServer.IsHttp}">
                                                 <TextBox Grid.Column="0" Text="{Binding SelectedServer.Url}"
                                                          Classes="formField"
-                                                         Watermark="http://localhost:8080/sse" />
+                                                         PlaceholderText="http://localhost:8080/sse" />
                                                 <Button Grid.Column="1" Content="Detect" Margin="8,0,0,0"
                                                         Command="{Binding DetectTransportTypeCommand}"
                                                         ToolTip.Tip="Send MCP initialize request to detect protocol" />
@@ -1064,7 +1064,7 @@
                                                        VerticalAlignment="Center" />
                                             <TextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
                                                      Text="{Binding SelectedServer.Command}" Classes="formField"
-                                                     Watermark="npx, uvx, node, python..." />
+                                                     PlaceholderText="npx, uvx, node, python..." />
 
                                             <TextBlock Grid.Row="1" Grid.Column="0" Text="Arguments" Opacity="0.75"
                                                        VerticalAlignment="Top" Margin="0,8,0,0" />
@@ -1074,7 +1074,7 @@
                                                         <DataTemplate>
                                                             <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,2">
                                                                 <TextBox Grid.Column="0" Text="{Binding Value}" Classes="formField"
-                                                                         Watermark="argument" />
+                                                                         PlaceholderText="argument" />
                                                                 <Button Grid.Column="1" Padding="8" Margin="4,0,0,0" VerticalAlignment="Stretch"
                                                                         ToolTip.Tip="Remove"
                                                                         Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).SelectedServer.RemoveArgumentCommand}"
@@ -1094,7 +1094,7 @@
                                             <TextBox Grid.Row="2" Grid.Column="1"
                                                      Text="{Binding SelectedServer.WorkingDirectory}" Classes="formField"
                                                      Margin="0,8,0,0"
-                                                     Watermark="Optional" />
+                                                     PlaceholderText="Optional" />
                                             <Button Grid.Row="2" Grid.Column="2" Content="Browse" Margin="8,8,0,0"
                                                     Command="{Binding BrowseWorkingDirectoryCommand}" />
 
@@ -1106,9 +1106,9 @@
                                                         <DataTemplate>
                                                             <Grid ColumnDefinitions="Auto,8,*,Auto" Margin="0,0,0,2">
                                                                 <TextBox Grid.Column="0" Text="{Binding Key}" Classes="formField"
-                                                                         Width="140" Watermark="KEY" />
+                                                                         Width="140" PlaceholderText="KEY" />
                                                                 <TextBox Grid.Column="2" Text="{Binding Value}" Classes="formField"
-                                                                         Watermark="value" />
+                                                                         PlaceholderText="value" />
                                                                 <Button Grid.Column="3" Padding="8" Margin="4,0,0,0" VerticalAlignment="Stretch"
                                                                         ToolTip.Tip="Remove"
                                                                         Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).SelectedServer.RemoveEnvironmentVariableCommand}"
@@ -1145,9 +1145,9 @@
                                                         <DataTemplate>
                                                             <Grid ColumnDefinitions="Auto,8,*,Auto" Margin="0,0,0,2">
                                                                 <TextBox Grid.Column="0" Text="{Binding Key}" Classes="formField"
-                                                                         Width="140" Watermark="Header-Name" />
+                                                                         Width="140" PlaceholderText="Header-Name" />
                                                                 <TextBox Grid.Column="2" Text="{Binding Value}" Classes="formField"
-                                                                         Watermark="value" />
+                                                                         PlaceholderText="value" />
                                                                 <Button Grid.Column="3" Padding="8" Margin="4,0,0,0" VerticalAlignment="Stretch"
                                                                         ToolTip.Tip="Remove"
                                                                         Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).SelectedServer.RemoveHttpHeaderCommand}"
@@ -1167,7 +1167,7 @@
                                             <TextBox Grid.Row="1" Grid.Column="1"
                                                      Text="{Binding SelectedServer.StartupCommand}" Classes="formField"
                                                      Margin="0,12,0,0"
-                                                     Watermark="e.g. docker compose up -d" />
+                                                     PlaceholderText="e.g. docker compose up -d" />
                                             <Button Grid.Row="1" Grid.Column="2" Content="Launch" Margin="8,12,0,0"
                                                     Classes="primaryButton"
                                                     Command="{Binding RunStartupCommandCommand}"
@@ -1179,7 +1179,7 @@
                                             <TextBox Grid.Row="2" Grid.Column="1"
                                                      Text="{Binding SelectedServer.StartupWorkingDirectory}"
                                                      Classes="formField" Margin="0,8,0,0"
-                                                     Watermark="Optional" />
+                                                     PlaceholderText="Optional" />
                                             <Button Grid.Row="2" Grid.Column="2" Content="Browse" Margin="8,8,0,0"
                                                     Command="{Binding BrowseWorkingDirectoryCommand}" />
 
@@ -1275,7 +1275,7 @@
                                 <Border Classes="detailCard">
                                   <StackPanel Spacing="10">
                                     <TextBlock Text="Destination" FontWeight="SemiBold" />
-                                    <TextBox Text="{Binding SelectedTarget.Name}" Watermark="Place name" />
+                                    <TextBox Text="{Binding SelectedTarget.Name}" PlaceholderText="Place name" />
                                     <StackPanel Spacing="6" IsVisible="{Binding SelectedTarget.IsProjectTarget}">
                                       <TextBlock Text="Harnesses" FontSize="12" Opacity="0.75" />
                                       <WrapPanel ItemSpacing="12" LineSpacing="6">
@@ -1293,7 +1293,7 @@
                                     </Grid>
                                     <TextBlock Text="{Binding SelectedTarget.ConfigFilePath}" IsVisible="{Binding SelectedTarget.IsManagedTarget}" FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
                                     <TextBlock Text="Every checked harness gets the same servers." IsVisible="{Binding SelectedTarget.IsProjectTarget}" FontSize="12" Opacity="0.75" />
-                                    <TextBox Text="{Binding SelectedTarget.BridgeArgs}" Watermark="Extra bridge arguments (optional)" IsVisible="{Binding SelectedTarget.IsClaudeDesktopGlobal}" />
+                                    <TextBox Text="{Binding SelectedTarget.BridgeArgs}" PlaceholderText="Extra bridge arguments (optional)" IsVisible="{Binding SelectedTarget.IsClaudeDesktopGlobal}" />
                                     <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding SelectedTarget.IsQuickExport}">
                                       <CheckBox Content="Claude Code" IsChecked="{Binding SelectedTarget.EnableClaudeCode}" />
                                       <CheckBox Content="Codex" IsChecked="{Binding SelectedTarget.EnableCodex}" />

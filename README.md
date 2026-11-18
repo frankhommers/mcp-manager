@@ -1,6 +1,6 @@
 # MCP Manager
 
-A cross-platform desktop application for managing Model Context Protocol (MCP) servers and exporting configurations to multiple AI coding clients. Built with .NET 10 and Avalonia.
+A cross-platform desktop application for managing Model Context Protocol (MCP) servers and exporting configurations to multiple AI coding clients. Built with .NET 11 and Avalonia.
 
 ## Features
 
@@ -55,7 +55,7 @@ brew install --cask frankhommers/tap/mcp-manager
 
 ## Requirements
 
-- **.NET 10 SDK** or later
+- **.NET 11 SDK** or later
 - Supported Operating Systems:
   - macOS 10.15 or later
   - Linux
@@ -226,7 +226,7 @@ that use a different syntax, such as `-H '{key}: {value}'` or `--header={key}={v
 
 ## Key Technologies
 
-- [.NET 10](https://dotnet.microsoft.com/)
+- [.NET 11](https://dotnet.microsoft.com/)
 - [Avalonia](https://avaloniaui.net/) — Cross-platform UI framework
 - [FluentTheme](https://github.com/avaloniaui/avalonia) — Fluent design system
 - [CommunityToolkit.Mvvm](https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/) — MVVM framework

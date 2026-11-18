@@ -6,7 +6,7 @@
              x:DataType="vm:MatrixViewModel">
   <StackPanel Spacing="12">
     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-      <TextBox Text="{Binding ServerFilter}" Watermark="Filter servers" AutomationProperties.Name="Filter servers" />
+      <TextBox Text="{Binding ServerFilter}" PlaceholderText="Filter servers" AutomationProperties.Name="Filter servers" />
       <Grid Grid.Column="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
         <TextBlock Text="Project" VerticalAlignment="Center" Opacity="0.75" />
         <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}"
