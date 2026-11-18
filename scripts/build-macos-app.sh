@@ -7,7 +7,7 @@ BUNDLE_ID="tools.franks.mcp-manager"
 CONFIGURATION="Release"
 OUTPUT_DIR="$ROOT_DIR/dist"
 RID=""
-ENABLE_CODESIGN="false"
+SIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
 APP_VERSION=""
 
 usage() {
@@ -21,7 +21,7 @@ Options:
   --rid <rid>              Runtime identifier (default: osx-arm64 on Apple Silicon, osx-x64 on Intel)
   --configuration <conf>   Build configuration (default: Release)
   --output <dir>           Output directory for .app bundle (default: ./dist)
-  --codesign               Apply ad-hoc codesign to bundle
+  --sign-identity <id>     Codesign identity (default: \$CODESIGN_IDENTITY or ad-hoc "-")
   --version <semver>       Version to embed in published binaries (e.g. 1.2.3)
   -h, --help               Show this help
 EOF
@@ -41,8 +41,11 @@ while [[ $# -gt 0 ]]; do
       OUTPUT_DIR="$2"
       shift 2
       ;;
+    --sign-identity)
+      SIGN_IDENTITY="$2"
+      shift 2
+      ;;
     --codesign)
-      ENABLE_CODESIGN="true"
       shift
       ;;
     --version)
@@ -124,6 +127,8 @@ cat > "$APP_CONTENTS_DIR/Info.plist" <<EOF
   <string>11.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>MCP Manager connects to MCP servers on your local network.</string>
 </dict>
 </plist>
 EOF
@@ -147,10 +152,9 @@ if command -v iconutil >/dev/null 2>&1 && [[ -f "$ICON_PNG" ]]; then
   rm -rf "$ICONSET_DIR"
 fi
 
-if [[ "$ENABLE_CODESIGN" == "true" ]]; then
-  echo "==> Applying ad-hoc codesign"
-  codesign --force --deep --sign - "$APP_BUNDLE_DIR"
-fi
+echo "==> Signing app bundle ($SIGN_IDENTITY)"
+codesign --force --deep --sign "$SIGN_IDENTITY" "$APP_BUNDLE_DIR"
+codesign --verify --deep --strict "$APP_BUNDLE_DIR"
 
 echo "==> Done"
 echo "App bundle: $APP_BUNDLE_DIR"
