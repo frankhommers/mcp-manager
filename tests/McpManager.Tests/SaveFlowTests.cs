@@ -78,6 +78,38 @@ public class SaveFlowTests : IDisposable
   }
 
   [Fact]
+  public async Task Renaming_selected_server_or_place_keeps_selection_without_prompting()
+  {
+    MainWindowViewModel vm = await CreateAsync();
+    int guards = 0;
+    vm.ScheduleNavigationGuard = _ => guards++;
+    vm.SidebarServers.CollectionChanged += (_, _) => vm.SidebarSelectedServer = null;
+    vm.SidebarTargets.CollectionChanged += (_, _) => vm.SidebarSelectedTarget = null;
+    List<string?> reselected = [];
+    vm.PropertyChanged += (_, e) => reselected.Add(e.PropertyName);
+    McpServerViewModel beta = vm.Servers.Single(s => s.Id == _beta.Id);
+    vm.SidebarSelectedServer = beta;
+    int afterSelectingServer = guards;
+    reselected.Clear();
+
+    beta.Name = "aaa-renamed";
+
+    Assert.Equal(afterSelectingServer, guards);
+    Assert.Same(beta, vm.SelectedServer);
+    Assert.Contains(nameof(MainWindowViewModel.SidebarSelectedServer), reselected);
+    TargetFolderViewModel placeB = Place(vm, "B");
+    vm.SidebarSelectedTarget = placeB;
+    int afterSelectingPlace = guards;
+    reselected.Clear();
+
+    placeB.Name = "AAA";
+
+    Assert.Equal(afterSelectingPlace, guards);
+    Assert.Same(placeB, vm.SelectedTarget);
+    Assert.Contains(nameof(MainWindowViewModel.SidebarSelectedTarget), reselected);
+  }
+
+  [Fact]
   public async Task Deleting_selected_server_or_place_does_not_prompt()
   {
     MainWindowViewModel vm = await CreateAsync();

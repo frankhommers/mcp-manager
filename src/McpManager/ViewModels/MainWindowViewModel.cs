@@ -79,6 +79,7 @@ public partial class MainWindowViewModel : ViewModelBase
   partial void OnSelectedServerChanged(McpServerViewModel? oldValue, McpServerViewModel? newValue) =>
     Navigate(new NavigationSnapshot(oldValue, SelectedTarget, ShowSettings), () =>
     {
+      OnPropertyChanged(nameof(SidebarSelectedServer));
       if (newValue != null)
       {
         SelectedProfile = null;

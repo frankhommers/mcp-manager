@@ -545,7 +545,7 @@
                                 </Grid>
 
                                 <ListBox ItemsSource="{Binding SidebarServers}"
-                                         SelectedItem="{Binding SelectedServer}"
+                                         SelectedItem="{Binding SidebarSelectedServer}"
                                          Classes.sidebar-inactive="{Binding !IsServerListActive}"
                                          Background="Transparent"
                                          BorderThickness="0"

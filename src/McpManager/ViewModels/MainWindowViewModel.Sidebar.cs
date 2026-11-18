@@ -12,6 +12,18 @@ public partial class MainWindowViewModel
   public ObservableCollection<McpServerViewModel> SidebarServers { get; } = [];
   public ObservableCollection<TargetFolderViewModel> SidebarTargets { get; } = [];
 
+  public McpServerViewModel? SidebarSelectedServer
+  {
+    get => SelectedServer;
+    set
+    {
+      if (value != null)
+      {
+        SelectedServer = value;
+      }
+    }
+  }
+
   public TargetFolderViewModel? SidebarSelectedTarget
   {
     get => SelectedTarget?.IsManagedTarget == true ? SelectedTarget : null;
@@ -109,6 +121,7 @@ public partial class MainWindowViewModel
       .OrderBy(s => s.ListName, StringComparer.CurrentCultureIgnoreCase)
       .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
       .ThenBy(s => s.Id));
+    OnPropertyChanged(nameof(SidebarSelectedServer));
   }
 
   private void RefreshSidebarTargets()
@@ -128,5 +141,6 @@ public partial class MainWindowViewModel
       .OrderBy(t => t.IsGlobal ? 0 : 1)
       .ThenBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase)
       .ThenBy(t => t.Id));
+    OnPropertyChanged(nameof(SidebarSelectedTarget));
   }
 }
